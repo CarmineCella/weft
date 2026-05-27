@@ -17,6 +17,7 @@
 // All layers are templated on the scalar type T (float / double).
 //
 #include "Matrix.h"
+#include "Optimizer.h"
 
 namespace weft {
 
@@ -33,9 +34,9 @@ public:
     // downstream gradient dL/dX, while storing any parameter gradients.
     virtual Matrix<T> backward(const Matrix<T>& dY) = 0;
 
-    // One step of plain SGD using the gradients stored in backward().
-    // Default is a no-op for parameter-less layers.
-    virtual void update(T /*learning_rate*/) {}
+    // One step of parameter update using the given optimiser.
+    // Default is a no-op for parameter-less layers (activations).
+    virtual void update(Optimizer<T>& /*opt*/) {}
 };
 
 } // namespace weft

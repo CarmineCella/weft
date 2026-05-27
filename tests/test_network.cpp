@@ -15,6 +15,7 @@
 #include "ReLU.h"
 #include "Softmax.h"
 #include "CrossEntropy.h"
+#include "SGD.h"
 #include "Matrix.h"
 
 #include <cmath>
@@ -142,12 +143,12 @@ int main() {
         Matrix<float> Target(3, 12, 0.f);
         for (std::size_t j = 0; j < 12; ++j) Target(j / 4, j) = 1.f;
 
-        // Train for 200 steps.
         float L0 = ce.forward(net.forward(X), Target);
+        weft::SGD<float> opt(0.2f);
         for (int step = 0; step < 200; ++step) {
             ce.forward(net.forward(X), Target);
             net.backward(ce.backward());
-            net.update(0.2f);
+            net.update(opt);
         }
         float L_final = ce.forward(net.forward(X), Target);
 

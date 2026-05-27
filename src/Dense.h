@@ -57,11 +57,12 @@ public:
         return W_.transpose() * dZ;
     }
 
-    // Plain SGD.  We'll separate this into an Optimizer class later, once
-    // we want momentum / Adam / etc.
-    void update(T learning_rate) override {
-        W_ -= learning_rate * dW_;
-        b_ -= learning_rate * db_;
+    // Hand each parameter to the optimiser.  The optimiser knows whether
+    // it's plain SGD, Adam, or anything else; the layer just exposes
+    // (parameter, gradient) pairs.
+    void update(Optimizer<T>& opt) override {
+        opt.step(W_, dW_);
+        opt.step(b_, db_);
     }
 
     // ------- accessors (used by tests; later, by the optimizer) -------

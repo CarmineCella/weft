@@ -75,11 +75,11 @@ public:
         return g;
     }
 
-    // Plain-SGD parameter step on every layer.
-    // (Layers without parameters inherit a no-op default from Layer.)
-    void update(T learning_rate) {
+    // Apply one optimiser step to every layer.  Layers without parameters
+    // (activations) just no-op.
+    void update(Optimizer<T>& opt) {
         for (auto& layer : layers_)
-            layer->update(learning_rate);
+            layer->update(opt);
     }
 
     std::size_t size() const { return layers_.size(); }

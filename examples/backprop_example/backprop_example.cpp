@@ -17,6 +17,7 @@
 
 #include "Dense.h"
 #include "Matrix.h"
+#include "SGD.h"
 
 #include <iostream>
 #include <iomanip>
@@ -112,7 +113,8 @@ int main() {
                                   << ", " << layer.dW()(0, 1) << " ]\n";
     cout << "db from backward(): [ " << layer.db()(0, 0) << " ]\n\n";
 
-    layer.update(lr);
+    weft::SGD<float> opt(lr);
+    layer.update(opt);
     cout << "After update():\n";
     cout << "  W = [ " << layer.W()(0, 0) << ", " << layer.W()(0, 1) << " ]\n";
     cout << "  b = [ " << layer.b()(0, 0) << " ]\n\n";

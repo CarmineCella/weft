@@ -7,6 +7,7 @@
 //   4. SGD actually reduces a quadratic loss (end-to-end sanity)
 //
 #include "Dense.h"
+#include "SGD.h"
 #include "Matrix.h"
 
 #include <cmath>
@@ -150,10 +151,11 @@ int main() {
 
         Matrix<float> dZ;
         float L0 = loss_and_grad(dZ);
+        weft::SGD<float> opt(0.05f);
         for (int step = 0; step < 50; ++step) {
             loss_and_grad(dZ);
             layer.backward(dZ);
-            layer.update(0.05f);
+            layer.update(opt);
         }
         float L_final = loss_and_grad(dZ);
         check(L_final < L0 * 0.1f, "SGD reduces a quadratic loss by >10x in 50 steps");
