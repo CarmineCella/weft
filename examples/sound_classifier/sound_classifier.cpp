@@ -141,7 +141,7 @@ int main(int argc, char** argv) {
     Adam<float>         opt(1e-3f);
 
     const std::size_t batch_size = 32;
-    const int         epochs     = 100;
+    const int         epochs     = 200;
 
     std::cout << "loss:       cross-entropy\n"
               << "optimiser:  Adam (lr=1e-3)\n"
