@@ -136,6 +136,23 @@ public:
     }
 
     // ------------------------------------------------------------------
+    // Select a subset of columns by index.  Used everywhere we need to
+    // build a batch, split a dataset, or shuffle examples.  The result
+    // has indices.size() columns, in the order they were given.
+    // ------------------------------------------------------------------
+    Matrix selectColumns(const std::vector<std::size_t>& indices) const {
+        Matrix R(rows_, indices.size());
+        for (std::size_t k = 0; k < indices.size(); ++k) {
+            const std::size_t src_j = indices[k];
+            if (src_j >= cols_)
+                throw std::out_of_range("selectColumns: index out of range");
+            for (std::size_t i = 0; i < rows_; ++i)
+                R(i, k) = (*this)(i, src_j);
+        }
+        return R;
+    }
+
+    // ------------------------------------------------------------------
     // Matrix multiplication:  (m x k) * (k x n) -> (m x n)
     // The i-k-j loop ordering keeps the innermost loop walking
     // contiguously through memory, which is much friendlier to the CPU
