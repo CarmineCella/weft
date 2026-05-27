@@ -14,18 +14,19 @@
 #  Project layout this Makefile expects:
 #      root/
 #        README.md
-#        src/        *.h          (the header-only library)
-#        tests/      *.cpp        (one executable per .cpp file)
-#        notes/      *.md
-#        <example>/  *.cpp        (one executable per example folder)
-#        build/      Makefile     (you are here)
+#        src/              *.h        (the header-only library)
+#        tests/            *.cpp      (one executable per .cpp file)
+#        notes/            *.md
+#        examples/<name>/  *.cpp      (one executable per example folder)
+#        build/            Makefile   (you are here)
 # ============================================================================
 
 # ---- locations (relative to this build/ directory) ------------------------
-ROOT      := ..
-SRC_DIR   := $(ROOT)/src
-TEST_DIR  := $(ROOT)/tests
-BIN_DIR   := bin
+ROOT         := ..
+SRC_DIR      := $(ROOT)/src
+TEST_DIR     := $(ROOT)/tests
+EXAMPLES_DIR := $(ROOT)/examples
+BIN_DIR      := bin
 
 # ---- compiler --------------------------------------------------------------
 CXX       := g++
@@ -40,10 +41,10 @@ TEST_BINS := $(patsubst $(TEST_DIR)/%.cpp,$(BIN_DIR)/tests/%,$(TEST_SRCS))
 
 # ---- examples: one executable per folder listed below ----------------------
 #  Add new example folders here as we create them (e.g. nn_classif autoenc ...)
-ALL_EXAMPLES := nn_classif
+ALL_EXAMPLES := backprop_example nn_classif
 #  Keep only the ones that actually contain sources yet, so naming a folder
 #  before it has any .cpp does not break the build.
-EXAMPLES     := $(foreach e,$(ALL_EXAMPLES),$(if $(wildcard $(ROOT)/$(e)/*.cpp),$(e)))
+EXAMPLES     := $(foreach e,$(ALL_EXAMPLES),$(if $(wildcard $(EXAMPLES_DIR)/$(e)/*.cpp),$(e)))
 EXAMPLE_BINS := $(foreach e,$(EXAMPLES),$(BIN_DIR)/examples/$(e))
 
 # ---- phony targets ---------------------------------------------------------
@@ -51,8 +52,8 @@ EXAMPLE_BINS := $(foreach e,$(EXAMPLES),$(BIN_DIR)/examples/$(e))
 
 all: $(TEST_BINS) $(EXAMPLE_BINS)
 
-# Build, then run every test; stop at the first failure.
-test: $(TEST_BINS)
+# Build all tests AND all examples, then run every test; stop at first failure.
+test: $(TEST_BINS) $(EXAMPLE_BINS)
 	@echo "--- running tests ---"
 	@for t in $(TEST_BINS); do \
 		echo "> $$t"; \
@@ -77,7 +78,7 @@ $(BIN_DIR)/tests/%: $(TEST_DIR)/%.cpp $(HEADERS) | $(BIN_DIR)/tests
 # Each example folder -> one executable built from all .cpp files inside it.
 # One rule is generated per example via $(eval).  ($$ escapes for the template.)
 define EXAMPLE_template
-$(BIN_DIR)/examples/$(1): $$(wildcard $(ROOT)/$(1)/*.cpp) $$(HEADERS) | $(BIN_DIR)/examples
-	$$(CXX) $$(CXXFLAGS) $$(wildcard $(ROOT)/$(1)/*.cpp) -o $$@
+$(BIN_DIR)/examples/$(1): $$(wildcard $(EXAMPLES_DIR)/$(1)/*.cpp) $$(HEADERS) | $(BIN_DIR)/examples
+	$$(CXX) $$(CXXFLAGS) $$(wildcard $(EXAMPLES_DIR)/$(1)/*.cpp) -o $$@
 endef
 $(foreach e,$(EXAMPLES),$(eval $(call EXAMPLE_template,$(e))))
