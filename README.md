@@ -5,7 +5,7 @@ library written from scratch in C++, with no external dependencies (standard lib
 
 This is a learning project: the goal isn't just working code, but understanding every
 piece of it. The library is built up one component at a time, and the *why* behind each
-component is written down in companion `.md` notes as we go.
+component is written down in companion `.md` notes.
 
 ## Principles
 
@@ -32,14 +32,8 @@ g++ -std=c++17 -Wall -Wextra test_matrix.cpp -o test_matrix
 
 ## Roadmap
 
-1. **Fully-connected classifier** — IRIS, then handwritten digits, then orchestral
+1. **Fully-connected classifier** — IRIS, handwritten digits, orchestral
    instrument sounds.
 2. **(Variational) autoencoder** — with generative applications for sound.
 3. **Convolutional network** — classification on a larger image dataset.
 
-## Status
-
-- [x] `Matrix.h` — dense matrix: matmul, transpose, Hadamard, broadcasting, reductions.
-- [ ] `Layer.h` / activations / forward & backward passes.
-- [ ] loss functions, training loop, optimizers.
-- [ ] datasets, then the milestones above.
