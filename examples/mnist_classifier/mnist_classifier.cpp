@@ -80,7 +80,7 @@ evaluate(Network<float>& net,
 int main(int argc, char** argv) {
     using clock = std::chrono::steady_clock;
 
-    const std::string data_dir = (argc > 1) ? argv[1] : "../data/mnist";
+    const std::string data_dir = (argc > 1) ? argv[1] : "../../../data/mnist";
 
     std::cout << "weft :: MNIST classifier\n";
     std::cout << "data directory: " << data_dir << "\n\n";
