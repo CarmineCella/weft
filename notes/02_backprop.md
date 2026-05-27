@@ -159,13 +159,14 @@ public:
     virtual ~Layer() = default;
     virtual Matrix<T> forward(const Matrix<T>& X)   = 0;
     virtual Matrix<T> backward(const Matrix<T>& dY) = 0;
-    virtual void update(T /*learning_rate*/) {}     // no-op default
+    virtual void update(Optimizer<T>& /*opt*/) {}   // no-op default
 };
 ```
 
-`update(lr)` has a default no-op so activation layers (ReLU, Softmax) that
-have no parameters don't need to implement anything. `Dense::update` will
-override it with a plain SGD step.
+`update` has a default no-op so activation layers (ReLU, Softmax) that
+have no parameters don't need to implement anything. `Dense::update`
+overrides it to hand each parameter to the optimiser; the optimiser
+decides how to apply the update.
 
 ### Initialisation
 

@@ -118,15 +118,12 @@ These defaults work surprisingly often. The most-tuned knob is `lr`.
 
 ---
 
-## 5. The architectural refactor
+## 5. The Optimizer abstraction
 
-The old `Layer::update(T learning_rate)` baked the SGD step into each
-layer. Adam needs per-parameter state (`m`, `v`, `t`), and the same
-optimiser instance has to own the state for *all* of a network's
-parameters — so the update logic can't live inside individual layers
-anymore.
-
-New shape:
+Adam needs per-parameter state — `m`, `v`, and `t` — and the same
+optimiser instance has to own that state for *all* of a network's
+parameters. So update logic doesn't live inside individual layers; it
+lives in an Optimizer.
 
 ```cpp
 class Optimizer<T> {
@@ -151,8 +148,8 @@ class Adam : public Optimizer<T> {
 };
 ```
 
-Each layer's `update` becomes "here are my parameters, please update
-them":
+A layer's `update` just hands its parameters to the optimiser, one at a
+time:
 
 ```cpp
 void Dense::update(Optimizer<T>& opt) override {
@@ -162,21 +159,19 @@ void Dense::update(Optimizer<T>& opt) override {
 ```
 
 The layer encapsulates *what* its parameters are; the optimiser decides
-*how* they get updated.  Parameter-less layers (activations) inherit a
-no-op default.
+*how* they get updated. Parameter-less layers (activations) inherit a
+no-op default. `Network::update` forwards the optimiser to every layer.
 
-`Network::update` just forwards the optimiser to every layer.
-
-### Training-loop syntax now
+### In the training loop
 
 ```cpp
-SGD<float>  opt(0.1f);                  // or Adam<float> opt(1e-3f);
+SGD<float>  opt(0.1f);                  // or  Adam<float> opt(1e-3f);
 for (int epoch = 0; epoch < epochs; ++epoch) {
     for (auto batch : batches) {
         net.forward(X_batch);
         ce.forward(...);
         net.backward(ce.backward());
-        net.update(opt);                // <-- this is the only change
+        net.update(opt);
     }
 }
 ```

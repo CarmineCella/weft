@@ -90,6 +90,7 @@ mapped into the same space the training inputs live in.
 Mini-batch SGD with per-epoch shuffling:
 
 ```cpp
+SGD<float> opt(learning_rate);
 for (int epoch = 0; epoch < epochs; ++epoch) {
     auto idx = shuffled_indices(X_train.cols(), epoch);   // new order each epoch
 
@@ -103,7 +104,7 @@ for (int epoch = 0; epoch < epochs; ++epoch) {
         Matrix<float> S = net.forward(X_batch);
         ce.forward(S, Y_batch);
         net.backward(ce.backward());
-        net.update(learning_rate);
+        net.update(opt);
     }
 }
 ```
@@ -225,15 +226,17 @@ noise. Two implications:
 
 Now that we have a working classifier, the next milestone scales up:
 **MNIST** (handwritten digits). 60,000 training images × 784 pixels × 10
-classes. Three things that IRIS got away with will start to bite:
+classes. Two things IRIS got away with will start to bite:
 
-- **Plain SGD becomes painful**: gradients across thousands of parameters
-  need adaptive learning rates. → **Adam** (and an `Optimizer` refactor).
 - **Capacity outstrips the data more aggressively**, so we'll need
   regularisation. → **Dropout** (and a training/eval mode flag on
   `Layer`).
-- **Single accuracy numbers stop being noisy** (10,000 test examples is
-  plenty), so we can skip k-fold for now.
+- **Plain SGD will be slower** than Adam on a problem this size. Both
+  optimisers are already available; the practical win shows up on
+  MNIST.
+
+We can skip k-fold cross-validation: with 10,000 test examples, a single
+accuracy number is no longer noisy.
 
 After MNIST: orchestral instrument sounds, then the autoencoder, then
 ConvNets.

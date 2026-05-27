@@ -115,11 +115,11 @@ Some libraries treat the loss as a final layer. We don't, for two reasons.
   Keeping them separate makes the training loop read like the math:
 
 ```cpp
-Matrix<T> pred = net.forward(X);     // network produces predictions
-T         L    = loss.forward(pred, target);   // loss measures them
+Matrix<T> pred = net.forward(X);                // network produces predictions
+T         L    = loss.forward(pred, target);    // loss measures them
 Matrix<T> dPred = loss.backward();              // loss starts the gradient
 net.backward(dPred);                            // network finishes it
-net.update(lr);                                 // SGD step
+net.update(opt);                                // optimiser applies the step
 ```
 
 This is also why PyTorch, TensorFlow, JAX, etc. all keep losses separate
@@ -186,8 +186,6 @@ accuracy. That goes in `examples/iris_classifier/`.
 After IRIS we'll also start collecting the roadmap items the project will
 need as it scales:
 
-- **Optimiser refactor + Adam**: factor `update(lr)` out of `Layer` into
-  a separate `Optimizer` that holds per-parameter state.
 - **Train/eval mode + Dropout**: layers gain a mode flag; Dropout drops a
   random fraction of activations during training, scales them up at
   inference (or uses inverted dropout).
