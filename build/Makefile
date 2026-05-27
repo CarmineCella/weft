@@ -40,8 +40,14 @@ TEST_SRCS := $(wildcard $(TEST_DIR)/*.cpp)
 TEST_BINS := $(patsubst $(TEST_DIR)/%.cpp,$(BIN_DIR)/tests/%,$(TEST_SRCS))
 
 # ---- examples: one executable per folder listed below ----------------------
-#  Add new example folders here as we create them (e.g. nn_classif autoenc ...)
-ALL_EXAMPLES := backprop_example iris_classifier mnist_classifier
+#  Add new example folders here as we create them (e.g. autoenc, etc.).
+ALL_EXAMPLES := \
+    backprop_example   \
+    iris_classifier    \
+    mnist_classifier   \
+    extract_features   \
+    sound_classifier
+
 #  Keep only the ones that actually contain sources yet, so naming a folder
 #  before it has any .cpp does not break the build.
 EXAMPLES     := $(foreach e,$(ALL_EXAMPLES),$(if $(wildcard $(EXAMPLES_DIR)/$(e)/*.cpp),$(e)))

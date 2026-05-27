@@ -25,6 +25,8 @@
 // after we've assembled the bytes -- and we use the explicit cast from
 // uint16_t to int16_t which is well-defined for the bit pattern.
 //
+#include "Endian.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -40,23 +42,6 @@ struct WavData {
 };
 
 namespace detail {
-
-inline std::uint16_t read_le_u16(std::ifstream& in) {
-    unsigned char b[2];
-    in.read(reinterpret_cast<char*>(b), 2);
-    if (!in) throw std::runtime_error("WAV: unexpected end of file");
-    return std::uint16_t(b[0]) | (std::uint16_t(b[1]) << 8);
-}
-
-inline std::uint32_t read_le_u32(std::ifstream& in) {
-    unsigned char b[4];
-    in.read(reinterpret_cast<char*>(b), 4);
-    if (!in) throw std::runtime_error("WAV: unexpected end of file");
-    return  std::uint32_t(b[0])
-         | (std::uint32_t(b[1]) <<  8)
-         | (std::uint32_t(b[2]) << 16)
-         | (std::uint32_t(b[3]) << 24);
-}
 
 inline std::string read_fourcc(std::ifstream& in) {
     char fourcc[4];
