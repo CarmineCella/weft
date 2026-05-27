@@ -5,7 +5,10 @@
 //   forward(X)        :  feed X through the layers in order, return final output.
 //   backward(dY)      :  feed dY back through the layers in reverse, return dL/dX.
 //                        Side effect: every layer's parameter gradients are set.
-//   update(lr)        :  apply one SGD step to every layer that has parameters.
+//   update(opt)       :  hand each layer's parameters to the optimiser.
+//   train() / eval()  :  propagate training/inference mode to every layer.
+//                        Layers default to training mode; only call eval() when
+//                        running on a validation/test set.
 //
 //   add<L>(args...)   :  construct a new layer of type L<T> with the given
 //                        constructor args and append it.  Returns a reference
@@ -23,12 +26,13 @@
 //       net.add<Softmax>();
 //
 //       CrossEntropy<float> ce;
+//       SGD<float>          opt(0.01f);
 //
 //       Matrix<float> S  = net.forward(X);
 //       float        L   = ce.forward(S, Targets);
 //       Matrix<float> dS = ce.backward();
 //       net.backward(dS);
-//       net.update(0.01f);
+//       net.update(opt);
 //
 #include "Layer.h"
 #include "Matrix.h"
@@ -80,6 +84,19 @@ public:
     void update(Optimizer<T>& opt) {
         for (auto& layer : layers_)
             layer->update(opt);
+    }
+
+    // Switch every layer to training mode (the default).
+    void train() {
+        for (auto& layer : layers_)
+            layer->set_training(true);
+    }
+
+    // Switch every layer to inference mode.  Dropout becomes identity,
+    // and any future stateful normaliser stops updating its running stats.
+    void eval() {
+        for (auto& layer : layers_)
+            layer->set_training(false);
     }
 
     std::size_t size() const { return layers_.size(); }

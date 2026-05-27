@@ -37,6 +37,15 @@ public:
     // One step of parameter update using the given optimiser.
     // Default is a no-op for parameter-less layers (activations).
     virtual void update(Optimizer<T>& /*opt*/) {}
+
+    // Training-vs-inference mode.  Some layers (Dropout, later BatchNorm)
+    // compute different things at training time than at inference time.
+    // Defaults to training mode -- you only ever explicitly switch to eval.
+    virtual void set_training(bool t) { training_ = t; }
+    bool training() const { return training_; }
+
+private:
+    bool training_ = true;
 };
 
 } // namespace weft
