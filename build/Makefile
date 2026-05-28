@@ -37,6 +37,21 @@ CXX       := g++
 # you can add -mcpu=native (Apple Clang / Apple Silicon) or -march=native
 # (GNU g++ on x86); both are optional and omitted here for portability.
 CXXFLAGS  := -std=c++17 -O3 -pthread -Wall -Wextra -I$(SRC_DIR)
+LDFLAGS   :=
+
+# Optional tuned-BLAS backend for the matmul:  make BLAS=1
+# Off by default, so the standard build stays dependency-free.  When on, it
+# defines WEFT_USE_BLAS (activating the BLAS path in Matrix.h) and links a
+# BLAS: Apple's Accelerate framework on macOS (ships with the OS, nothing to
+# install) or OpenBLAS elsewhere (apt: libopenblas-dev, brew: openblas).
+ifdef BLAS
+  CXXFLAGS += -DWEFT_USE_BLAS
+  ifeq ($(shell uname),Darwin)
+    LDFLAGS += -framework Accelerate
+  else
+    LDFLAGS += -lopenblas
+  endif
+endif
 
 # ---- the header-only library: tests/examples rebuild if any header changes -
 HEADERS   := $(wildcard $(SRC_DIR)/*.h)
@@ -91,12 +106,12 @@ $(BIN_DIR)/tests $(BIN_DIR)/examples:
 
 # Each test .cpp -> its own executable.
 $(BIN_DIR)/tests/%: $(TEST_DIR)/%.cpp $(HEADERS) | $(BIN_DIR)/tests
-	$(CXX) $(CXXFLAGS) $< -o $@
+	$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
 
 # Each example folder -> one executable built from all .cpp files inside it.
 # One rule is generated per example via $(eval).  ($$ escapes for the template.)
 define EXAMPLE_template
 $(BIN_DIR)/examples/$(1): $$(wildcard $(EXAMPLES_DIR)/$(1)/*.cpp) $$(HEADERS) | $(BIN_DIR)/examples
-	$$(CXX) $$(CXXFLAGS) $$(wildcard $(EXAMPLES_DIR)/$(1)/*.cpp) -o $$@
+	$$(CXX) $$(CXXFLAGS) $$(wildcard $(EXAMPLES_DIR)/$(1)/*.cpp) -o $$@ $$(LDFLAGS)
 endef
 $(foreach e,$(EXAMPLES),$(eval $(call EXAMPLE_template,$(e))))

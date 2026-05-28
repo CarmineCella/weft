@@ -28,6 +28,19 @@
 #include <iostream>
 #include <iomanip>
 #include <thread>
+#include <type_traits>
+
+// Optional tuned-BLAS backend for the matmul, enabled with -DWEFT_USE_BLAS.
+// All BLAS use is confined to operator* below; the default build never
+// includes or links anything here.  Apple's Accelerate framework ships with
+// macOS (no install); elsewhere this expects a CBLAS header (e.g. OpenBLAS).
+#ifdef WEFT_USE_BLAS
+  #ifdef __APPLE__
+    #include <Accelerate/Accelerate.h>
+  #else
+    #include <cblas.h>
+  #endif
+#endif
 
 namespace weft {
 
@@ -163,6 +176,31 @@ public:
         if (cols_ != B.rows_)
             throw std::invalid_argument("Matrix*: inner dimensions do not match");
         Matrix C(rows_, B.cols_, T(0));
+
+#ifdef WEFT_USE_BLAS
+        // Optional: hand float/double matmuls to a tuned BLAS (Apple
+        // Accelerate on macOS, OpenBLAS elsewhere).  These libraries use
+        // cache blocking and hand-tuned kernels that beat our loop by a
+        // wide margin for large matmuls.  Other scalar types fall through
+        // to the portable threaded path below.
+        if constexpr (std::is_same_v<T, float>) {
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                        static_cast<int>(rows_), static_cast<int>(B.cols_),
+                        static_cast<int>(cols_),
+                        1.0f, data_.data(),   static_cast<int>(cols_),
+                        B.data_.data(),       static_cast<int>(B.cols_),
+                        0.0f, C.data_.data(), static_cast<int>(B.cols_));
+            return C;
+        } else if constexpr (std::is_same_v<T, double>) {
+            cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                        static_cast<int>(rows_), static_cast<int>(B.cols_),
+                        static_cast<int>(cols_),
+                        1.0, data_.data(),   static_cast<int>(cols_),
+                        B.data_.data(),      static_cast<int>(B.cols_),
+                        0.0, C.data_.data(), static_cast<int>(B.cols_));
+            return C;
+        }
+#endif
 
         // Compute a contiguous block of result rows [i0, i1).  Each block
         // touches a disjoint set of rows of C, so blocks can run on
