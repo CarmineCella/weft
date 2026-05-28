@@ -89,9 +89,7 @@ int main() {
     const float  learning_rate = 0.10f;
     SGD<float>   opt(learning_rate);
 
-    std::cout << "architecture: Dense(" << iris::N_FEATURES
-              << ",16) -> ReLU -> Dense(16," << iris::N_CLASSES
-              << ") -> Softmax\n";
+    std::cout << "architecture:\n" << net.summary() << "\n";
     std::cout << "loss:         cross-entropy\n";
     std::cout << "optimiser:    plain SGD, lr=" << learning_rate
               << ", batch_size=" << batch_size << "\n";

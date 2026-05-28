@@ -151,35 +151,60 @@ some modest positive number rather than collapsing or exploding.
 
 ---
 
-## 5. The demos
+## 5. Latent dimension: quality vs. the manifold picture
+
+There's a tension specific to this example. A **2D** latent lets us draw
+the manifold grid (below), which is the clearest demonstration that the
+space is continuous and gap-free. But two numbers cannot describe a
+specific handwritten digit — every slant, stroke width, and loop — so
+2D reconstructions are necessarily a blurry class-average. Pushing
+60,000 varied images through a 2-float bottleneck simply doesn't have
+the capacity, and you see it directly: a 2D run lands around 0.20 RMS
+error per pixel, versus ~0.07 for the 16-dimensional plain autoencoder
+in note 13.
+
+So the example defaults to **LATENT = 16** for genuinely sharp
+reconstructions and varied samples, and you set it back to 2 when you
+want the manifold picture. Raising the dimension is the single biggest
+lever on quality; more epochs help only at the margin once recon stops
+falling. (A second, smaller lever: MSE itself blurs generative image
+output, because the MSE-optimal guess under uncertainty is the *average*
+of all plausible outputs. Per-pixel binary cross-entropy sharpens MNIST,
+and `beta < 1` trades latent regularity for reconstruction sharpness.)
+
+## 6. The demos
 
 **Reconstruction** uses `mu` directly (no sampling) — the deterministic
-"best guess" code for each image. Output looks much like the plain AE:
-recognisable, slightly blurry, denoised.
+"best guess" code for each image. At 16D these are crisp; at 2D they're
+the blurry averages described above.
 
-**Latent grid** is the demo the plain AE couldn't produce, and the one
-that makes the whole thing click. With a 2D latent we sweep `z` over a
-regular grid covering `[-2.5, 2.5]^2`, decode each grid point, and tile
-the results into a single image. The result is the entire data
-manifold laid out as one continuous sheet: each region of the plane
-owns a kind of digit, and moving across the sheet morphs one into
-another smoothly with no dead patches. That smooth, fully-populated
-sheet is the visual proof that the KL term did its job.
+**Latent grid** (only drawn when `LATENT == 2`) is the demo the plain AE
+couldn't produce, and the one that makes the whole thing click. We sweep
+`z` over a regular grid covering `[-2.5, 2.5]^2`, decode each grid point,
+and tile the results into a single image: the entire data manifold laid
+out as one continuous sheet, each region owning a kind of digit and
+morphing smoothly into its neighbours with no dead patches. That fully
+populated sheet is the visual proof the KL term did its job.
 
-(We space the grid linearly here for simplicity. The textbook version
-spaces it by the inverse normal CDF of evenly-spaced probabilities, so
-the grid samples the prior uniformly *by probability mass* — it makes
-a slightly nicer manifold but needs a probit function we haven't
-written.)
+(We space the grid linearly for simplicity. The textbook version spaces
+it by the inverse normal CDF of evenly-spaced probabilities, sampling the
+prior uniformly *by probability mass* — a slightly nicer manifold, but it
+needs a probit function we haven't written.)
+
+**Latent interpolation** works in any dimension: encode two digits to
+their means, walk the straight line between the two codes, and decode
+each step. One digit morphs into another through latent space — the
+same idea as the AE's interpolation, now in a space that's been
+regularised to be smooth everywhere.
 
 **Random samples** draw `z ~ N(0, I)` and decode. These are images the
-encoder never produced from any real input — pure generation. Most are
-clean digits; a few are blurry blends from samples that landed between
+encoder never produced from any real input — pure generation. At 16D
+most are clean digits; a few are blends from samples landing between
 clusters.
 
 ---
 
-## 6. What this sets up for audio
+## 7. What this sets up for audio
 
 Nothing in the VAE machinery is image-specific. Swap the 784-pixel
 input for a per-frame magnitude spectrum and the same encoder/decoder/

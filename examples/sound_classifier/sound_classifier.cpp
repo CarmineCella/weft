@@ -287,23 +287,17 @@ int main(int argc, char** argv) {
         net.add<Dropout>(0.3f, /*seed=*/2);
         net.add<Dense>  (128, K);
         net.add<Softmax>();
-        std::cout << "architecture:\n"
-                  << "    Dense(" << FEAT_DIM << ", 256) -> ReLU -> Dropout(0.3)\n"
-                  << "    Dense(256, 128)  -> ReLU -> Dropout(0.3)\n"
-                  << "    Dense(128, " << K << ")    -> Softmax\n";
     } else if (cache.feature_type == "mfcc") {
         net.add<Dense>  (FEAT_DIM, 64);
         net.add<ReLU>   ();
         net.add<Dropout>(0.2f, /*seed=*/1);
         net.add<Dense>  (64, K);
         net.add<Softmax>();
-        std::cout << "architecture:\n"
-                  << "    Dense(" << FEAT_DIM << ", 64)  -> ReLU -> Dropout(0.2)\n"
-                  << "    Dense(64, " << K << ")    -> Softmax\n";
     } else {
         std::cerr << "unknown feature type in cache: " << cache.feature_type << "\n";
         return 1;
     }
+    std::cout << "architecture:\n" << net.summary() << "\n";
 
     CrossEntropy<float> ce;
     Adam<float>         opt(1e-3f);

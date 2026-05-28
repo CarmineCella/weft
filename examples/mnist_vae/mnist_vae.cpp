@@ -68,8 +68,12 @@
 
 using namespace weft;
 
-constexpr std::size_t LATENT = 2;       // 2D so we can render the manifold
-constexpr float       BETA   = 1.0f;    // weight on the KL term
+constexpr std::size_t LATENT = 2;       // 2D so we can render the manifold grid
+                                        // (Demo 2).  Pedagogically the clearest
+                                        // choice; set to 16 for sharper recon at
+                                        // the cost of the grid visualisation.
+constexpr float       BETA   = 1.0f;    // weight on the KL term (lower => sharper
+                                        // recon but a looser latent; try 0.5)
 
 // Draw a 28x28 image (column `col` of a 784xN matrix, values in [0,1])
 // into `bmp` at top-left (x0, y0), scaled up by an integer factor.
@@ -86,6 +90,13 @@ static void blit_digit(Bitmap& bmp, const Matrix<float>& M, std::size_t col,
         }
 }
 
+// Column index of the first image whose label == digit.
+static std::size_t find_digit(const std::vector<int>& labels, int digit) {
+    for (std::size_t i = 0; i < labels.size(); ++i)
+        if (labels[i] == digit) return i;
+    return 0;
+}
+
 int main(int argc, char** argv) {
     using clock = std::chrono::steady_clock;
     const std::string data_dir = (argc > 1) ? argv[1] : "../data/mnist";
@@ -93,11 +104,13 @@ int main(int argc, char** argv) {
     std::cout << "weft :: MNIST variational autoencoder\n";
     std::cout << "data dir: " << data_dir << "\n\n";
 
-    // ---- Load MNIST (no labels needed -- fully unsupervised) ----
-    Matrix<float> X_train, X_test;
+    // ---- Load MNIST (labels only used to pick digits for the morph demo) ----
+    Matrix<float>    X_train, X_test;
+    std::vector<int> y_test;
     try {
         X_train = mnist::load_images<float>(data_dir + "/train-images-idx3-ubyte");
         X_test  = mnist::load_images<float>(data_dir + "/t10k-images-idx3-ubyte");
+        y_test  = mnist::load_labels       (data_dir + "/t10k-labels-idx1-ubyte");
     } catch (const std::exception& e) {
         std::cerr << "error loading MNIST: " << e.what() << "\n";
         std::cerr << "did you run data/download_mnist.sh ?\n";
@@ -126,13 +139,13 @@ int main(int argc, char** argv) {
     Adam<float> opt(1e-3f);
 
     const std::size_t batch_size = 128;
-    const int         epochs     = 30;
+    const int         epochs     = 40;
 
     std::cout << "architecture:\n"
-              << "    encoder: 784 -> 128 -> ReLU -> 32 -> ReLU -> " << 2 * LATENT
-              << "  (= mu[" << LATENT << "] ++ logvar[" << LATENT << "])\n"
-              << "    sample : z = mu + sigma * eps,  eps ~ N(0, I)\n"
-              << "    decoder: " << LATENT << " -> 32 -> ReLU -> 128 -> ReLU -> 784 -> Sigmoid\n"
+              << "  encoder (last layer = mu[" << LATENT << "] ++ logvar["
+              << LATENT << "]):\n" << enc.summary() << "\n"
+              << "  sample: z = mu + sigma * eps,  eps ~ N(0, I)\n"
+              << "  decoder:\n" << dec.summary() << "\n"
               << "loss:        MSE + " << BETA << " * KL\n"
               << "optimiser:   Adam (lr=1e-3)\n"
               << "batch:       " << batch_size << "\n"
@@ -268,8 +281,8 @@ int main(int argc, char** argv) {
                   << ", top = originals, bottom = reconstructions)\n";
     }
 
-    // ---- Demo 2: latent grid -- decode a grid of z over the 2D plane ----
-    {
+    // ---- Demo 2: latent grid -- only meaningful for a 2D latent ----
+    if constexpr (LATENT == 2) {
         const int   n = 18;          // n x n grid of digits
         const float r = 2.5f;        // sweep each axis over [-r, r]
         const int   s = 2;           // small per-cell scale; no gaps -> continuous sheet
@@ -286,6 +299,26 @@ int main(int argc, char** argv) {
         save_bmp("vae_latent_grid.bmp", img);
         std::cout << "wrote vae_latent_grid.bmp (" << img.width() << "x" << img.height()
                   << ", the digit manifold over z in [-" << r << ", " << r << "]^2)\n";
+    } else {
+        std::cout << "skipped latent grid (drawn only for LATENT==2; current LATENT="
+                  << LATENT << ")\n";
+    }
+
+    // ---- Demo 2b: latent interpolation (works in any dimension) ----
+    {
+        const int steps = 8;
+        Matrix<float> za = encode_mu(X_test, find_digit(y_test, 3));
+        Matrix<float> zb = encode_mu(X_test, find_digit(y_test, 8));
+        Bitmap img(steps * cell + (steps - 1) * gap, cell);
+        for (int s = 0; s < steps; ++s) {
+            const float t = static_cast<float>(s) / (steps - 1);
+            Matrix<float> z = za * (1.0f - t) + zb * t;
+            Matrix<float> r = dec.forward(z);
+            blit_digit(img, r, 0, s * (cell + gap), 0, scale);
+        }
+        save_bmp("vae_interpolation.bmp", img);
+        std::cout << "wrote vae_interpolation.bmp (" << img.width() << "x" << img.height()
+                  << ", latent morph 3 -> 8 through mu)\n";
     }
 
     // ---- Demo 3: random samples z ~ N(0, I) ----

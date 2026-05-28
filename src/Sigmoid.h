@@ -40,6 +40,8 @@ public:
     }
     // update() inherits the no-op default from Layer -- no parameters.
 
+    std::string describe() const override { return "Sigmoid"; }
+
 private:
     Matrix<T> Y_;   // cached output sigma(Z), reused in backward
 };

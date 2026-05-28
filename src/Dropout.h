@@ -33,7 +33,10 @@
 #include "Layer.h"
 #include "Matrix.h"
 
+#include <iomanip>
 #include <random>
+#include <sstream>
+#include <string>
 
 namespace weft {
 
@@ -67,6 +70,12 @@ public:
     }
 
     T rate() const { return rate_; }
+
+    std::string describe() const override {
+        std::ostringstream os;
+        os << "Dropout(" << std::fixed << std::setprecision(2) << rate_ << ")";
+        return os.str();
+    }
 
 private:
     T rate_;

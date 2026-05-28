@@ -32,6 +32,8 @@ public:
     }
     // update() inherits the no-op default from Layer -- no parameters.
 
+    std::string describe() const override { return "ReLU"; }
+
 private:
     Matrix<T> mask_;   // recorded during forward, used in backward
 };

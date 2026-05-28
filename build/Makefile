@@ -48,7 +48,8 @@ ALL_EXAMPLES := \
     extract_features   \
     sound_classifier   \
     mnist_autoencoder  \
-    mnist_vae
+    mnist_vae          \
+	mnist_weights
 
 #  Keep only the ones that actually contain sources yet, so naming a folder
 #  before it has any .cpp does not break the build.

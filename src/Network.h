@@ -39,6 +39,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -100,6 +101,19 @@ public:
     }
 
     std::size_t size() const { return layers_.size(); }
+
+    // Multi-line description of the network, one layer per line, indented
+    // four spaces, no trailing newline.  Built from each layer's describe(),
+    // so the printed architecture is generated from the real layers and
+    // can't drift out of sync the way a hand-written string can.
+    std::string summary() const {
+        std::string out;
+        for (std::size_t i = 0; i < layers_.size(); ++i) {
+            out += "    " + layers_[i]->describe();
+            if (i + 1 < layers_.size()) out += "\n";
+        }
+        return out;
+    }
 
 private:
     std::vector<std::unique_ptr<Layer<T>>> layers_;

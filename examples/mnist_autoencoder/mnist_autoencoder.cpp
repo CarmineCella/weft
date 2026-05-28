@@ -74,7 +74,7 @@ static std::size_t find_digit(const std::vector<int>& labels, int digit) {
 
 int main(int argc, char** argv) {
     using clock = std::chrono::steady_clock;
-    const std::string data_dir = (argc > 1) ? argv[1] : "../../../data/mnist";
+    const std::string data_dir = (argc > 1) ? argv[1] : "../data/mnist";
 
     std::cout << "weft :: MNIST autoencoder\n";
     std::cout << "data dir: " << data_dir << "\n\n";
@@ -117,8 +117,8 @@ int main(int argc, char** argv) {
     const int         epochs     = 20;
 
     std::cout << "architecture:\n"
-              << "    encoder: 784 -> 128 -> ReLU -> 32 -> ReLU -> " << BOTTLENECK << "\n"
-              << "    decoder: " << BOTTLENECK << " -> 32 -> ReLU -> 128 -> ReLU -> 784 -> Sigmoid\n"
+              << "  encoder:\n" << enc.summary() << "\n"
+              << "  decoder:\n" << dec.summary() << "\n"
               << "loss:        MSE (target = input)\n"
               << "optimiser:   Adam (lr=1e-3)\n"
               << "batch:       " << batch_size << "\n"

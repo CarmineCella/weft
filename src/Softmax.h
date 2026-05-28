@@ -80,6 +80,8 @@ public:
     }
     // update() inherits the no-op default from Layer -- no parameters.
 
+    std::string describe() const override { return "Softmax"; }
+
 private:
     Matrix<T> S_cache_;   // forward output, needed by backward
 };

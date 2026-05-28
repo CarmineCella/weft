@@ -80,7 +80,7 @@ evaluate(Network<float>& net,
 int main(int argc, char** argv) {
     using clock = std::chrono::steady_clock;
 
-    const std::string data_dir = (argc > 1) ? argv[1] : "../../../data/mnist";
+    const std::string data_dir = (argc > 1) ? argv[1] : "../data/mnist";
 
     std::cout << "weft :: MNIST classifier\n";
     std::cout << "data directory: " << data_dir << "\n\n";
@@ -131,10 +131,7 @@ int main(int argc, char** argv) {
     const std::size_t batch_size = 128;
     const int         epochs     = 10;
 
-    std::cout << "architecture:\n"
-              << "    Dense(784, 256) -> ReLU -> Dropout(0.3)\n"
-              << "    Dense(256, 128) -> ReLU -> Dropout(0.3)\n"
-              << "    Dense(128,  10) -> Softmax\n";
+    std::cout << "architecture:\n" << net.summary() << "\n";
     std::cout << "loss:         cross-entropy\n";
     std::cout << "optimiser:    Adam (lr=1e-3)\n";
     std::cout << "batch size:   " << batch_size << "\n";

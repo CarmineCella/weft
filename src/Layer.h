@@ -19,6 +19,8 @@
 #include "Matrix.h"
 #include "Optimizer.h"
 
+#include <string>
+
 namespace weft {
 
 template <typename T = float>
@@ -43,6 +45,13 @@ public:
     // Defaults to training mode -- you only ever explicitly switch to eval.
     virtual void set_training(bool t) { training_ = t; }
     bool training() const { return training_; }
+
+    // One-line, human-readable description of this layer, e.g.
+    // "Dense(784, 128)", "ReLU", "Dropout(0.30)".  Network::summary()
+    // builds the printed architecture from these, so the description is
+    // generated from the actual layers rather than hand-written (and so
+    // can never silently drift out of sync with the real network).
+    virtual std::string describe() const = 0;
 
 private:
     bool training_ = true;

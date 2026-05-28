@@ -19,6 +19,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <string>
 
 namespace weft {
 
@@ -72,6 +73,12 @@ public:
     const Matrix<T>& b()  const { return b_; }
     const Matrix<T>& dW() const { return dW_; }
     const Matrix<T>& db() const { return db_; }
+
+    // W_ is (out_features x in_features), so cols() is fan-in, rows() fan-out.
+    std::string describe() const override {
+        return "Dense(" + std::to_string(W_.cols()) + ", "
+                        + std::to_string(W_.rows()) + ")";
+    }
 
 private:
     Matrix<T> W_, b_;        // parameters
