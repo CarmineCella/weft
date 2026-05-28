@@ -27,6 +27,8 @@
 //
 #include "Endian.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -146,6 +148,59 @@ inline WavData load_wav(const std::string& path) {
         }
     }
     return out;
+}
+
+// Write mono 16-bit PCM WAV.  `samples` are floats in [-1, 1]; values
+// outside the range are clamped.  Mirrors load_wav -- save then load
+// round-trips to within 16-bit quantisation.
+//
+// Layout (the minimal canonical WAV):
+//     "RIFF" <u32 file_size-8> "WAVE"
+//     "fmt " <u32 16> <u16 1=PCM> <u16 channels=1> <u32 sample_rate>
+//            <u32 byte_rate> <u16 block_align> <u16 bits=16>
+//     "data" <u32 data_bytes> <int16 samples...>
+//
+inline void save_wav(const std::string& path,
+                     const std::vector<float>& samples,
+                     std::uint32_t sample_rate) {
+    std::ofstream out(path, std::ios::binary);
+    if (!out) throw std::runtime_error("WAV: cannot open for write: " + path);
+
+    const std::uint16_t channels    = 1;
+    const std::uint16_t bits        = 16;
+    const std::uint16_t block_align = channels * bits / 8;
+    const std::uint32_t byte_rate   = sample_rate * block_align;
+    const std::uint32_t data_bytes  =
+        static_cast<std::uint32_t>(samples.size()) * block_align;
+
+    out.write("RIFF", 4);
+    detail::write_le_u32(out, 36 + data_bytes);     // file size - 8
+    out.write("WAVE", 4);
+
+    out.write("fmt ", 4);
+    detail::write_le_u32(out, 16);                  // fmt chunk size
+    detail::write_le_u16(out, 1);                   // PCM
+    detail::write_le_u16(out, channels);
+    detail::write_le_u32(out, sample_rate);
+    detail::write_le_u32(out, byte_rate);
+    detail::write_le_u16(out, block_align);
+    detail::write_le_u16(out, bits);
+
+    out.write("data", 4);
+    detail::write_le_u32(out, data_bytes);
+    for (float s : samples) {
+        s = std::max(-1.0f, std::min(1.0f, s));
+        // Symmetric mapping; 32767 keeps +1.0 and -1.0 in range.
+        auto v = static_cast<std::int16_t>(std::lround(s * 32767.0f));
+        detail::write_le_u16(out, static_cast<std::uint16_t>(v));
+    }
+
+    if (!out) throw std::runtime_error("WAV: write failed: " + path);
+}
+
+// Convenience overload taking a WavData.
+inline void save_wav(const std::string& path, const WavData& wav) {
+    save_wav(path, wav.samples, wav.sample_rate);
 }
 
 } // namespace weft

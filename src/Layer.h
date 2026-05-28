@@ -19,6 +19,7 @@
 #include "Matrix.h"
 #include "Optimizer.h"
 
+#include <iosfwd>
 #include <string>
 
 namespace weft {
@@ -52,6 +53,14 @@ public:
     // generated from the actual layers rather than hand-written (and so
     // can never silently drift out of sync with the real network).
     virtual std::string describe() const = 0;
+
+    // Serialise / deserialise this layer's trainable parameters to a binary
+    // stream.  Default is a no-op (activations have no parameters); Dense
+    // overrides to read/write its weights and bias.  The network's
+    // architecture must be reconstructed identically before load_params,
+    // so each layer reads exactly what its counterpart wrote.
+    virtual void save_params(std::ostream& /*out*/) const {}
+    virtual void load_params(std::istream& /*in*/) {}
 
 private:
     bool training_ = true;

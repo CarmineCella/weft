@@ -158,6 +158,83 @@ int main() {
               "training: SGD reduces cross-entropy by >3x in 200 steps");
     }
 
+    // ---- describe() / summary() ----
+    {
+        Network<float> net;
+        net.add<Dense>(4, 16);
+        net.add<ReLU>();
+        net.add<Dense>(16, 3);
+        net.add<Softmax>();
+
+        const std::string expected =
+            "    Dense(4, 16)\n"
+            "    ReLU\n"
+            "    Dense(16, 3)\n"
+            "    Softmax";
+        check(net.summary() == expected, "summary() lists layers from describe()");
+    }
+    {
+        // Dense reports fan-in, fan-out from its weight matrix shape.
+        weft::Dense<float> d(784, 128);
+        check(d.describe() == "Dense(784, 128)", "Dense::describe() shows (in, out)");
+    }
+
+    // ---- save / load round-trip ----
+    {
+        // Build a net, run it, save. Build an identical fresh net, load,
+        // and confirm it produces bit-identical outputs on the same input.
+        Network<float> a;
+        a.add<Dense>(5, 8);
+        a.add<ReLU>();
+        a.add<Dense>(8, 3);
+        a.add<Softmax>();
+
+        Matrix<float> X(5, 4);
+        for (std::size_t i = 0; i < X.rows(); ++i)
+            for (std::size_t j = 0; j < X.cols(); ++j)
+                X(i, j) = 0.1f * static_cast<float>(i) - 0.05f * static_cast<float>(j);
+
+        Matrix<float> out_a = a.forward(X);
+        const std::string path = "/tmp/weft_test_net.bin";
+        a.save(path);
+
+        Network<float> b;             // same architecture, fresh random weights
+        b.add<Dense>(5, 8);
+        b.add<ReLU>();
+        b.add<Dense>(8, 3);
+        b.add<Softmax>();
+        b.load(path);
+        std::remove(path.c_str());
+
+        Matrix<float> out_b = b.forward(X);
+
+        bool identical = true;
+        for (std::size_t i = 0; i < out_a.rows() && identical; ++i)
+            for (std::size_t j = 0; j < out_a.cols() && identical; ++j)
+                if (std::fabs(out_a(i, j) - out_b(i, j)) > 1e-7f) identical = false;
+        check(identical, "save/load: reloaded net reproduces outputs exactly");
+    }
+
+    // ---- load into wrong architecture throws ----
+    {
+        Network<float> a;
+        a.add<Dense>(5, 8);
+        a.add<Softmax>();
+        const std::string path = "/tmp/weft_test_net2.bin";
+        a.save(path);
+
+        Network<float> wrong;          // different layer count
+        wrong.add<Dense>(5, 8);
+        wrong.add<ReLU>();
+        wrong.add<Dense>(8, 3);
+        wrong.add<Softmax>();
+        bool threw = false;
+        try { wrong.load(path); }
+        catch (const std::runtime_error&) { threw = true; }
+        std::remove(path.c_str());
+        check(threw, "save/load: mismatched architecture throws");
+    }
+
     std::cout << "\n" << (g_run - g_failed) << " / " << g_run
               << " checks passed.\n";
     return g_failed == 0 ? 0 : 1;

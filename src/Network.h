@@ -38,7 +38,10 @@
 #include "Matrix.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <fstream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -113,6 +116,42 @@ public:
             if (i + 1 < layers_.size()) out += "\n";
         }
         return out;
+    }
+
+    // Save / load trainable parameters to a binary file.  The file records
+    // a magic tag, a version, and the layer count; each layer then writes
+    // its own parameters (Dense writes weights+bias; activations write
+    // nothing).  load() requires an already-constructed network with the
+    // SAME architecture -- it fills in the weights, it does not build the
+    // graph.  Layer-count and per-matrix shape checks catch a mismatch.
+    void save(const std::string& path) const {
+        std::ofstream out(path, std::ios::binary);
+        if (!out) throw std::runtime_error("Network::save: cannot open " + path);
+        out.write("WNET", 4);
+        const std::uint32_t version = 1;
+        const std::uint32_t n = static_cast<std::uint32_t>(layers_.size());
+        out.write(reinterpret_cast<const char*>(&version), sizeof(version));
+        out.write(reinterpret_cast<const char*>(&n), sizeof(n));
+        for (const auto& layer : layers_) layer->save_params(out);
+        if (!out) throw std::runtime_error("Network::save: write failed: " + path);
+    }
+
+    void load(const std::string& path) {
+        std::ifstream in(path, std::ios::binary);
+        if (!in) throw std::runtime_error("Network::load: cannot open " + path);
+        char magic[4];
+        in.read(magic, 4);
+        if (!in || std::string(magic, 4) != "WNET")
+            throw std::runtime_error("Network::load: bad magic in " + path);
+        std::uint32_t version = 0, n = 0;
+        in.read(reinterpret_cast<char*>(&version), sizeof(version));
+        in.read(reinterpret_cast<char*>(&n), sizeof(n));
+        if (n != layers_.size())
+            throw std::runtime_error(
+                "Network::load: layer count mismatch (build the same "
+                "architecture before loading)");
+        for (auto& layer : layers_) layer->load_params(in);
+        if (!in) throw std::runtime_error("Network::load: read failed: " + path);
     }
 
 private:
