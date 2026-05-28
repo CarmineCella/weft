@@ -133,18 +133,42 @@ int main(int argc, char** argv) {
     // ---- iSTFT ----
     auto out = istft(out_frames, FRAME_SIZE, HOP_SIZE, wav.samples.size());
 
-    // ---- Normalise to avoid clipping, then write ----
-    float peak = 0.0f;
-    for (float s : out) peak = std::max(peak, std::fabs(s));
-    if (peak > 1e-6f) {
-        const float g = 0.9f / peak;
-        for (float& s : out) s *= g;
+    // ---- Suppress edge clicks, normalise robustly, write ----
+    //
+    // The iSTFT amplifies tiny errors at the edges (where the WOLA
+    // synthesis-window power is small but above the divide-by-zero
+    // threshold) into an audible click.  A one-hop cosine fade (~46 ms at
+    // 44.1 kHz) covers that region; inaudible as a fade.
+    {
+        const std::size_t fade = std::min<std::size_t>(2048, out.size() / 4);
+        for (std::size_t i = 0; i < fade; ++i) {
+            const float w = 0.5f * (1.0f - std::cos(3.14159265f * i / fade));
+            out[i]                  *= w;
+            out[out.size() - 1 - i] *= w;
+        }
+    }
+    // Percentile-based normalisation: plain peak-to-0.9 is hostage to
+    // any single transient (residual click, model artifact), which can
+    // pull the whole signal down 100x.  The 99th percentile of |x| is
+    // robust to outliers; samples that exceed 1.0 after the gain are
+    // clipped on write.
+    if (!out.empty()) {
+        std::vector<float> abs_out(out.size());
+        for (std::size_t i = 0; i < out.size(); ++i) abs_out[i] = std::fabs(out[i]);
+        const std::size_t p =
+            static_cast<std::size_t>(0.99 * (abs_out.size() - 1));
+        std::nth_element(abs_out.begin(), abs_out.begin() + p, abs_out.end());
+        const float peak = abs_out[p];
+        if (peak > 1e-6f) {
+            const float g = 0.9f / peak;
+            for (float& s : out) s *= g;
+        }
     }
     try { save_wav(out_path, out, wav.sample_rate); }
     catch (const std::exception& e) {
         std::cerr << "error writing output: " << e.what() << "\n";
         return 1;
     }
-    std::cout << "wrote " << out_path << "  (peak-normalised to 0.9)\n";
+    std::cout << "wrote " << out_path << "  (fade + 99th-percentile normalised)\n";
     return 0;
 }

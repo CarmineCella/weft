@@ -77,6 +77,12 @@ note 14 — encoder emits `mu` and `logvar`, reparameterise
 reconstruction and KL gradients into the encoder. At the end it saves
 `<prefix>.enc` and `<prefix>.dec`.
 
+This is also the first training run heavy enough to need performance care:
+the frames are subsampled (adjacent STFT frames are highly redundant) and
+the model is checkpointed periodically so a long run is never
+all-or-nothing. Those tricks, and the parallelised matmul underneath
+them, are the subject of note 17.
+
 A balance note: because MSE is summed over 2049 bins, the
 reconstruction term dwarfs the KL at `beta = 1`, so the latent isn't
 pulled tightly onto the unit Gaussian. That's the "ignored prior" regime
@@ -132,19 +138,24 @@ some fidelity for simplicity.
 
 **Interpolation** morphs between two real sounds. Encode both to latent
 means, then for each output frame blend the codes —
-`z = (1-t)*z_A + t*z_B` — and decode. With `t` swept 0->1 over the
-duration the timbre travels from A to B; with a fixed `t` it holds a
-static hybrid ("halfway between these two instruments"). The phase is
-reused from sound A, frame by frame. Because interpolation has a genuine
-source to borrow phase from, it sounds nearly as clean as the remap on
-sustained material; coherence degrades as `t` approaches 1 and A's phase
-no longer matches B's magnitude, worst on transients.
+`z = (1-t)*z_A + t*z_B`, with `t` sweeping linearly from 0 at the first
+output frame to 1 at the last — and decode. The phase is reused from
+sound A, frame by frame. Because interpolation has a genuine source to
+borrow phase from, it sounds nearly as clean as the remap on sustained
+material; coherence degrades as `t` approaches 1 and A's phase no longer
+matches B's magnitude, worst on transients.
 
-**Sampling** is the pure generative case: draw `z ~ N(0, I)`, decode to a
-single invented magnitude spectrum, and sustain it. Here there is no
-source at all, so we borrow the phase of a *donor* sound frame by frame.
-This is the crudest path, and honestly so: the donor's phase only "fits"
-the frequency bins where the donor had energy, and the sampled magnitude
+**Sampling** is the pure generative case: draw `count` anchor latents
+`z ~ N(0, I)` and walk linearly through them across the donor's duration.
+Frame 0 lands on anchor 0, the last frame lands on anchor `count-1`, and
+interior frames interpolate between adjacent anchors — so you hear a
+journey through several invented timbres in one go. This also exposes the
+latent space's continuity, which is one of the VAE's signature properties:
+nearby latents decode to similar sounds. The trade-off comes from phase:
+there is no source at all, so we borrow the phase of the donor sound
+frame by frame. This is the crudest path, and honestly so: the donor's
+phase only "fits" the frequency bins where the donor had energy, and the
+sampled magnitude
 generally peaks elsewhere, so the mismatch produces artifacts. It is
 exactly the case a real phase-reconstruction method (Griffin-Lim, or a
 neural vocoder) would most improve. We include it because hearing a

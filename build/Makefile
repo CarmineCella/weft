@@ -30,7 +30,13 @@ BIN_DIR      := bin
 
 # ---- compiler --------------------------------------------------------------
 CXX       := g++
-CXXFLAGS  := -std=c++17 -O2 -Wall -Wextra -I$(SRC_DIR)
+# -O3 lets the compiler vectorise the inner loops; -pthread enables the
+# std::thread-based parallel matmul in Matrix::operator*.  Both work with
+# any standard compiler (Apple Clang, GNU g++, etc.) -- no OpenMP or
+# architecture-specific flags required.  For a little extra vectorisation
+# you can add -mcpu=native (Apple Clang / Apple Silicon) or -march=native
+# (GNU g++ on x86); both are optional and omitted here for portability.
+CXXFLAGS  := -std=c++17 -O3 -pthread -Wall -Wextra -I$(SRC_DIR)
 
 # ---- the header-only library: tests/examples rebuild if any header changes -
 HEADERS   := $(wildcard $(SRC_DIR)/*.h)

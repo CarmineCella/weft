@@ -50,12 +50,19 @@ int main(int argc, char** argv) {
     using clock = std::chrono::steady_clock;
 
     if (argc < 3) {
-        std::cerr << "usage: train_audio_vae <feature.feat> <model_prefix> [epochs]\n";
+        std::cerr << "usage: train_audio_vae <feature.feat> <model_prefix> "
+                     "[epochs] [subsample]\n"
+                     "  subsample N: train on every Nth frame (default 1 = all). "
+                     "Adjacent STFT frames are highly redundant, so 2-4 cuts "
+                     "epoch time with little quality loss.\n";
         return 1;
     }
     const std::string feature_path = argv[1];
     const std::string prefix       = argv[2];
     const int         epochs       = (argc > 3) ? std::atoi(argv[3]) : 20;
+    const std::size_t subsample    =
+        (argc > 4) ? std::max(1, std::atoi(argv[4])) : 1;
+    constexpr int CKPT_EVERY = 5;   // save a checkpoint every N epochs
 
     std::cout << "weft :: train audio VAE\n";
     std::cout << "feature file: " << feature_path << "\n";
@@ -101,6 +108,14 @@ int main(int argc, char** argv) {
 
     const std::size_t batch_size = 256;
 
+    // Subsample the frames: train on every `subsample`-th column.  We
+    // subsample the INDEX LIST, not the matrix, so there's no second
+    // multi-gigabyte copy -- batches are still selected from cache.X.
+    std::vector<std::size_t> base_idx;
+    base_idx.reserve(N / subsample + 1);
+    for (std::size_t i = 0; i < N; i += subsample) base_idx.push_back(i);
+    const std::size_t n_train = base_idx.size();
+
     std::cout << "architecture:\n"
               << "  encoder (last layer = mu[" << LATENT << "] ++ logvar["
               << LATENT << "]):\n" << enc.summary() << "\n"
@@ -109,7 +124,10 @@ int main(int argc, char** argv) {
               << "loss:        MSE + " << BETA << " * KL\n"
               << "optimiser:   Adam (lr=1e-3)\n"
               << "batch:       " << batch_size << "\n"
-              << "epochs:      " << epochs << "\n\n";
+              << "subsample:   every " << subsample << " frame(s)  -> "
+              << n_train << " of " << N << " frames\n"
+              << "epochs:      " << epochs
+              << "  (checkpoint every " << CKPT_EVERY << ")\n\n";
 
     std::cout << "epoch  recon       KL        total      time\n";
     std::cout << "-----  ---------   -------   ---------   -----\n";
@@ -117,16 +135,35 @@ int main(int argc, char** argv) {
     auto t_start = clock::now();
     unsigned eps_seed = 1234;
 
+    // Helper: write the current encoder/decoder to <prefix>.enc/.dec.
+    auto save_models = [&](const std::string& tag) {
+        try {
+            enc.save(prefix + ".enc");
+            dec.save(prefix + ".dec");
+            std::cout << "  [" << tag << " saved -> " << prefix
+                      << ".enc/.dec]\n" << std::flush;
+        } catch (const std::exception& e) {
+            std::cerr << "  save failed: " << e.what() << "\n";
+        }
+    };
+
     for (int epoch = 1; epoch <= epochs; ++epoch) {
         auto t_epoch = clock::now();
         enc.train(); dec.train();
-        auto idx = shuffled_indices(N, /*seed=*/epoch);
+        // Shuffle the subsampled index list for this epoch.
+        std::vector<std::size_t> idx = base_idx;
+        {
+            auto perm = shuffled_indices(n_train, /*seed=*/epoch);
+            std::vector<std::size_t> shuffled(n_train);
+            for (std::size_t i = 0; i < n_train; ++i) shuffled[i] = idx[perm[i]];
+            idx.swap(shuffled);
+        }
 
         double sum_recon = 0, sum_kl = 0;
         std::size_t n_seen = 0;
 
-        for (std::size_t start = 0; start < N; start += batch_size) {
-            const std::size_t end = std::min(start + batch_size, N);
+        for (std::size_t start = 0; start < n_train; start += batch_size) {
+            const std::size_t end = std::min(start + batch_size, n_train);
             std::vector<std::size_t> bidx(idx.begin() + start, idx.begin() + end);
             const std::size_t B = bidx.size();
             Matrix<float> Xb = cache.X.selectColumns(bidx);
@@ -189,24 +226,20 @@ int main(int argc, char** argv) {
                   << std::setprecision(4) << std::setw(7) << kl << "   "
                   << std::setprecision(4) << std::setw(9) << (recon + BETA * kl) << "   "
                   << std::setprecision(1) << std::setw(5) << secs << "s\n" << std::flush;
+
+        // Checkpoint periodically (and on the final epoch) so a long run is
+        // never all-or-nothing: kill it any time and the latest weights are
+        // already on disk at <prefix>.enc/.dec.
+        if (epoch % CKPT_EVERY == 0 && epoch != epochs)
+            save_models("checkpoint @ epoch " + std::to_string(epoch));
     }
 
     double total = std::chrono::duration<double>(clock::now() - t_start).count();
     std::cout << "\ntotal training time: " << std::setprecision(1) << total << "s\n";
 
-    // ---- Save encoder and decoder ----
-    const std::string enc_path = prefix + ".enc";
-    const std::string dec_path = prefix + ".dec";
-    try {
-        enc.save(enc_path);
-        dec.save(dec_path);
-    } catch (const std::exception& e) {
-        std::cerr << "save failed: " << e.what() << "\n";
-        return 1;
-    }
-    std::cout << "saved encoder -> " << enc_path << "\n"
-              << "saved decoder -> " << dec_path << "\n"
-              << "\nlatent dim: " << LATENT
+    // ---- Final save ----
+    save_models("final");
+    std::cout << "\nlatent dim: " << LATENT
               << "  (apps must rebuild this same architecture before loading)\n";
     return 0;
 }

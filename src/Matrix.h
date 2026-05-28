@@ -27,6 +27,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <iomanip>
+#include <thread>
 
 namespace weft {
 
@@ -162,13 +163,42 @@ public:
         if (cols_ != B.rows_)
             throw std::invalid_argument("Matrix*: inner dimensions do not match");
         Matrix C(rows_, B.cols_, T(0));
-        for (std::size_t i = 0; i < rows_; ++i) {
-            for (std::size_t k = 0; k < cols_; ++k) {
-                const T a = (*this)(i, k);
-                for (std::size_t j = 0; j < B.cols_; ++j)
-                    C(i, j) += a * B(k, j);
-            }
+
+        // Compute a contiguous block of result rows [i0, i1).  Each block
+        // touches a disjoint set of rows of C, so blocks can run on
+        // separate threads with no synchronisation.
+        auto compute_rows = [&](std::size_t i0, std::size_t i1) {
+            for (std::size_t i = i0; i < i1; ++i)
+                for (std::size_t k = 0; k < cols_; ++k) {
+                    const T a = (*this)(i, k);
+                    for (std::size_t j = 0; j < B.cols_; ++j)
+                        C(i, j) += a * B(k, j);
+                }
+        };
+
+        // Parallelise across rows with std::thread (std-lib only, portable),
+        // but only when there's enough arithmetic to outweigh thread-launch
+        // overhead -- small matmuls just run serially.
+        const std::size_t work = rows_ * cols_ * B.cols_;
+        unsigned hw = std::thread::hardware_concurrency();
+        std::size_t nthreads = std::min<std::size_t>(hw == 0 ? 1 : hw, rows_);
+
+        if (nthreads <= 1 || work < (std::size_t(1) << 20)) {
+            compute_rows(0, rows_);
+            return C;
         }
+
+        const std::size_t chunk = (rows_ + nthreads - 1) / nthreads;
+        std::vector<std::thread> pool;
+        pool.reserve(nthreads - 1);
+        for (std::size_t t = 1; t < nthreads; ++t) {
+            const std::size_t i0 = t * chunk;
+            const std::size_t i1 = std::min(rows_, i0 + chunk);
+            if (i0 >= i1) break;
+            pool.emplace_back(compute_rows, i0, i1);
+        }
+        compute_rows(0, std::min(rows_, chunk));   // main thread takes block 0
+        for (auto& th : pool) th.join();
         return C;
     }
 
