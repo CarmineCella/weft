@@ -247,7 +247,51 @@ audio analysis going back to speech recognition in the 1960s.
 
 ---
 
-## 5. Which feature to choose?
+## 5. Averaged vs per-frame output
+
+Both feature functions come in two flavours. The "averaged" forms
+(`logmag_spectrum`, `mfcc`) collapse the whole signal into a single
+energy-weighted vector. The "per-frame" forms (`logmag_spectrum_frames`,
+`mfcc_frames`) keep one vector per non-silent frame and return a list
+of them.
+
+Same windowing, same FFT, same mel filterbank, same DCT — the only
+difference is whether the per-frame results get averaged at the end or
+kept separate.
+
+When to use which:
+
+- **Averaged** — when you want one feature per file, the data is
+  short enough that "what does this sound like on average" is
+  meaningful, and the file count itself is enough training signal.
+  Compact, fast.
+- **Per-frame** — when you want to (a) treat each frame as its own
+  training example so the network sees temporal variation, (b) reuse
+  the output for a per-frame application like an autoencoder that
+  reconstructs frame-by-frame, or (c) aggregate downstream predictions
+  per file by averaging softmax outputs across frames at eval time
+  (ensembling).
+
+For SOL specifically, per-frame extraction roughly 20× the number of
+training rows (single-note files at 44.1 kHz, frame 4096 hop 2048 give
+~20 frames per file). The downstream classifier needs to (a) split by
+file_id rather than by row to avoid frames-from-the-same-file leaking
+across train and test, and (b) aggregate per file at eval time. Both
+are handled by `group_train_test_split` in `Data.h` and per-file
+aggregation in the classifier.
+
+Per-frame is also what the autoencoder will train on: each frame is
+one training example, the encoder learns a compact representation of
+"plausible SOL spectra," and the decoder inverts.
+
+Note that the per-frame functions skip silent frames (energy below a
+small threshold) so we don't train on noise from leading/trailing
+silence. The averaged version effectively does the same thing via
+energy weighting.
+
+---
+
+## 6. Which feature to choose?
 
 For the instrument classifier, both are worth trying:
 
@@ -261,14 +305,15 @@ For the instrument classifier, both are worth trying:
   Much faster to train. Likely loses some discrimination ability
   because of the compression.
 
-We'll expose both in the example and let you toggle between them with
-a CLI flag. My guess: logmag will be 2-5 percentage points more
-accurate, but MFCC will train in seconds. Both should comfortably
-clear chance accuracy by a wide margin.
+Both are exposed in the example and you can toggle with a CLI flag.
+My guess: logmag will be 2-5 percentage points more accurate, but MFCC
+will train in seconds. Both should comfortably clear chance accuracy
+by a wide margin. Per-frame mode lifts both by another 5-10 points
+through file-level ensembling at eval time.
 
 ---
 
-## 6. What's not in here (yet)
+## 7. What's not in here (yet)
 
 A real audio pipeline usually adds several things we're skipping:
 

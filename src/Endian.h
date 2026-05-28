@@ -36,6 +36,14 @@ inline std::uint32_t read_le_u32(std::ifstream& in) {
 
 // ---- Little-endian writes ----
 
+inline void write_le_u16(std::ofstream& out, std::uint16_t x) {
+    unsigned char b[2] = {
+        static_cast<unsigned char>( x       & 0xff),
+        static_cast<unsigned char>((x >> 8) & 0xff)
+    };
+    out.write(reinterpret_cast<char*>(b), 2);
+}
+
 inline void write_le_u32(std::ofstream& out, std::uint32_t x) {
     unsigned char b[4] = {
         static_cast<unsigned char>( x        & 0xff),

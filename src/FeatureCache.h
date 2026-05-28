@@ -14,15 +14,17 @@
 // File layout:
 //
 //     "WFED"                              -- 4-byte magic (weft feature dataset)
-//     uint32  version = 1
+//     uint32  version = 2
 //     uint32  feature_dim
 //     uint32  n_samples
 //     uint32  n_classes
+//     uint32  per_frame                   -- 0 (averaged) or 1 (per-frame)
 //     uint32  type_len; type_len bytes    -- feature type label
 //     for each class:                     -- n_classes times
 //         uint32 name_len; name_len bytes
 //     float[feature_dim * n_samples]      -- column-major, native byte order
 //     int32[n_samples]                    -- labels, native byte order
+//     int32[n_samples]                    -- file_ids, native byte order
 //
 // Header integers are little-endian (byte-by-byte) so the metadata can
 // be inspected on any host.  The bulk float/int32 payload is in the
@@ -47,6 +49,13 @@ struct CachedFeatures {
     std::vector<int>         labels;       // n_samples
     std::vector<std::string> class_names;  // class_names[id] -> name
     std::string              feature_type; // e.g. "mfcc", "logmag"
+    bool                     per_frame = false;
+    // file_ids[j] = which file column j came from.  For per_frame=false,
+    // each column is its own file so this is just {0, 1, 2, ...}.  For
+    // per_frame=true, columns from the same file share an id, which lets
+    // the classifier split by file (not by frame) and aggregate
+    // predictions across frames of the same file at eval time.
+    std::vector<int>         file_ids;
 };
 
 namespace detail {
@@ -64,7 +73,7 @@ inline std::string read_string(std::ifstream& in) {
     return s;
 }
 
-constexpr std::uint32_t VERSION = 1;
+constexpr std::uint32_t VERSION = 2;
 
 } // namespace detail
 
@@ -74,12 +83,15 @@ inline void save_features(const std::string& path, const CachedFeatures& data) {
 
     if (data.X.cols() != data.labels.size())
         throw std::runtime_error("FeatureCache: matrix columns != labels");
+    if (data.X.cols() != data.file_ids.size())
+        throw std::runtime_error("FeatureCache: matrix columns != file_ids");
 
     out.write("WFED", 4);                                  // magic
     detail::write_le_u32(out, detail::VERSION);
     detail::write_le_u32(out, static_cast<std::uint32_t>(data.X.rows()));
     detail::write_le_u32(out, static_cast<std::uint32_t>(data.X.cols()));
     detail::write_le_u32(out, static_cast<std::uint32_t>(data.class_names.size()));
+    detail::write_le_u32(out, data.per_frame ? 1u : 0u);
     detail::write_string(out, data.feature_type);
     for (const auto& name : data.class_names)
         detail::write_string(out, name);
@@ -103,6 +115,13 @@ inline void save_features(const std::string& path, const CachedFeatures& data) {
     out.write(reinterpret_cast<const char*>(label_buf.data()),
               static_cast<std::streamsize>(label_buf.size() * sizeof(std::int32_t)));
 
+    // File IDs.
+    std::vector<std::int32_t> file_id_buf(data.file_ids.size());
+    for (std::size_t i = 0; i < data.file_ids.size(); ++i)
+        file_id_buf[i] = static_cast<std::int32_t>(data.file_ids[i]);
+    out.write(reinterpret_cast<const char*>(file_id_buf.data()),
+              static_cast<std::streamsize>(file_id_buf.size() * sizeof(std::int32_t)));
+
     if (!out) throw std::runtime_error("FeatureCache: write failed: " + path);
 }
 
@@ -118,13 +137,17 @@ inline CachedFeatures load_features(const std::string& path) {
     std::uint32_t version = detail::read_le_u32(in);
     if (version != detail::VERSION)
         throw std::runtime_error("FeatureCache: unsupported version " +
-                                 std::to_string(version) + " in " + path);
+                                 std::to_string(version) + " in " + path +
+                                 " (expected " + std::to_string(detail::VERSION) +
+                                 "; re-run extract_features)");
 
     const std::uint32_t feat_dim  = detail::read_le_u32(in);
     const std::uint32_t n_samples = detail::read_le_u32(in);
     const std::uint32_t n_classes = detail::read_le_u32(in);
+    const std::uint32_t per_frame = detail::read_le_u32(in);
 
     CachedFeatures out;
+    out.per_frame    = (per_frame != 0);
     out.feature_type = detail::read_string(in);
     out.class_names.resize(n_classes);
     for (std::uint32_t i = 0; i < n_classes; ++i)
@@ -147,6 +170,12 @@ inline CachedFeatures load_features(const std::string& path) {
             static_cast<std::streamsize>(label_buf.size() * sizeof(std::int32_t)));
     if (!in) throw std::runtime_error("FeatureCache: short read in labels");
     out.labels.assign(label_buf.begin(), label_buf.end());
+
+    std::vector<std::int32_t> file_id_buf(n_samples);
+    in.read(reinterpret_cast<char*>(file_id_buf.data()),
+            static_cast<std::streamsize>(file_id_buf.size() * sizeof(std::int32_t)));
+    if (!in) throw std::runtime_error("FeatureCache: short read in file_ids");
+    out.file_ids.assign(file_id_buf.begin(), file_id_buf.end());
 
     return out;
 }

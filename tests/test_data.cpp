@@ -159,6 +159,53 @@ int main() {
         check(close(acc, 0.75f), "accuracy: argmax-per-column matching");
     }
 
+    // ---- group_train_test_split ----
+    {
+        //  6 columns, 3 files (2 frames each).  With test_fraction=0.5
+        //  and a fixed seed, expect exactly one entire file (= 2 frames)
+        //  in test, the other two files (= 4 frames) in train.
+        Matrix<float> X(2, 6);
+        Matrix<float> Y(2, 6);
+        for (std::size_t j = 0; j < 6; ++j) {
+            X(0, j) = static_cast<float>(j);
+            X(1, j) = static_cast<float>(j) * 10.0f;
+            Y(0, j) = (j < 3) ? 1.0f : 0.0f;
+            Y(1, j) = (j < 3) ? 0.0f : 1.0f;
+        }
+        std::vector<int> file_ids = {0, 0, 1, 1, 2, 2};
+        auto g = weft::group_train_test_split(X, Y, file_ids, 0.5, /*seed=*/1);
+
+        check(g.X_train.cols() + g.X_test.cols() == 6,
+              "group split: no columns lost");
+        check(g.X_test.cols() % 2 == 0,
+              "group split: test contains whole files only (2 frames each)");
+        check(g.file_ids_test.size() == g.X_test.cols(),
+              "group split: file_ids_test length matches X_test cols");
+
+        // No file_id should appear in BOTH train and test.
+        std::vector<int> file_ids_train;
+        // Recover train file_ids by inverse logic: any file_id not in test.
+        bool no_leak = true;
+        for (std::size_t j = 0; j < g.X_train.cols(); ++j) {
+            // X_train(0, j) is the original column index 0..5; recover file_id
+            int orig = static_cast<int>(g.X_train(0, j));
+            int fid  = file_ids[orig];
+            for (int test_fid : g.file_ids_test)
+                if (fid == test_fid) no_leak = false;
+        }
+        check(no_leak, "group split: no file_id appears in both train and test");
+    }
+
+    // ---- group_train_test_split: empty test fraction ----
+    {
+        Matrix<float> X(2, 4);
+        Matrix<float> Y(2, 4);
+        std::vector<int> file_ids = {0, 0, 1, 1};
+        auto g = weft::group_train_test_split(X, Y, file_ids, 0.0, /*seed=*/1);
+        check(g.X_test.cols() == 0 && g.X_train.cols() == 4,
+              "group split: test_fraction=0 puts all in train");
+    }
+
     std::cout << "\n" << (g_run - g_failed) << " / " << g_run
               << " checks passed.\n";
     return g_failed == 0 ? 0 : 1;

@@ -46,7 +46,9 @@ ALL_EXAMPLES := \
     iris_classifier    \
     mnist_classifier   \
     extract_features   \
-    sound_classifier
+    sound_classifier   \
+    mnist_autoencoder  \
+    mnist_vae
 
 #  Keep only the ones that actually contain sources yet, so naming a folder
 #  before it has any .cpp does not break the build.

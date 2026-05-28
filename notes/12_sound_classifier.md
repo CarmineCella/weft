@@ -6,11 +6,8 @@ dash-delimited token is the instrument class. The job is to predict
 the instrument from the audio.
 
 This is the first weft example that builds its own dataset from raw
-files. Everything before this used either embedded data (IRIS) or a
-purpose-built format (MNIST IDX); SOL is "a folder of audio files",
-which is far closer to what real ML projects look like.
-
-It's also the first example split across **two tools**.
+files, and it's split across **two tools** so the slow feature-
+extraction step doesn't repeat on every classifier iteration.
 
 ---
 
@@ -23,179 +20,187 @@ minutes on a laptop. The actual neural-network training on the
 extracted features takes a few seconds at most.
 
 If we kept everything in one binary, every iteration on the classifier
-(tweak an architecture, change a learning rate, try a different
-dropout rate) would re-do the slow feature extraction first. Wasteful.
+would re-do the slow extraction first. Wasteful.
 
 So the workflow splits:
 
 ```
-extract_features <data_dir> <output.feat> [logmag|mfcc]   # slow, once
-sound_classifier <feature_file>                            # fast, iterate
+extract_features <data_dir> <output.feat> [logmag|mfcc] [averaged|per_frame]
+sound_classifier <feature_file>
 ```
 
-You run the extractor once per (dataset, feature_type) combination,
-then iterate on the model as many times as you like. This is the
-standard ETL-then-train pattern that essentially every real ML
+You run the extractor once per (dataset × feature_type × mode)
+combination, then iterate on the model as many times as you like. This
+is the standard ETL-then-train pattern that essentially every real ML
 project ends up with.
 
 ---
 
-## 2. The cache format
+## 2. Two extraction modes
+
+### Averaged (one feature per file)
+
+The original mode: STFT, energy-weighted average across frames, one
+fixed-length vector per file. Compact, fast, and the baseline result.
+Network architecture is sized to the feature dimension.
+
+### Per-frame (one feature per non-silent frame)
+
+For each WAV file we keep every non-silent STFT frame as its own
+training example. Same feature dimension as averaged mode (2049 for
+logmag, 13 for MFCC), but ~20× more rows.
+
+Why it matters:
+
+- More training data per file → the network's parameters are better
+  constrained, less overfitting.
+- The network can learn from the instrument's temporal evolution
+  (attack vs sustain vs release) rather than only seeing the time-
+  averaged spectrum.
+- At inference, predictions are aggregated across all frames of a
+  test file by averaging softmax outputs and taking argmax. This is
+  ensembling and typically buys 5-10 percentage points on its own.
+- The same per-frame infrastructure is what we'll need for the
+  autoencoder / morphing work.
+
+Trade-off: cache file is ~20× larger, training is ~20× more
+iterations per epoch (though each iteration is the same cost since
+the architecture is unchanged).
+
+For real SOL the averaged mode plateaus around 75% test accuracy with
+log-mag features; per-frame typically pushes that into the 85%+
+range, with much of the gap coming from per-file ensembling rather
+than the larger training set.
+
+---
+
+## 3. The file-leakage problem (and the fix)
+
+Per-frame mode introduces a subtle issue: frames from the same file
+are not independent. They share most of their spectral character.
+If you split frames at random into train/test, frames from the same
+SOL file end up on both sides, and the network can essentially
+"memorise" specific files at frame granularity. Test accuracy looks
+inflated.
+
+The fix is to split **by file_id**, not by frame: choose 20% of files
+to be test, all of their frames go to test, none of their frames go
+to train. The cache stores a `file_id` per row exactly for this
+purpose, and `group_train_test_split` in `Data.h` does the file-aware
+split.
+
+For averaged mode this distinction doesn't matter — each row is its
+own file by construction — but the same function handles both cases
+uniformly (in averaged mode file_ids are `{0, 1, 2, ...}` and the
+behaviour collapses to a regular random split).
+
+---
+
+## 4. Per-file aggregation at eval time
+
+Once the network is trained, evaluating per-frame mode means:
+
+1. Forward-pass all test frames through the network in batches.
+2. Group the resulting softmax outputs by `file_id`.
+3. Average the softmax outputs across frames of each file.
+4. Argmax on the averaged vector to get a per-file prediction.
+5. Compare to the file's true label.
+
+This is a textbook example of test-time ensembling. Each frame gives
+a (slightly noisy) probability distribution over classes; averaging
+across all frames of a file cancels out frame-level noise and gives a
+much sharper file-level prediction.
+
+The reported "test acc (per file)" reflects this aggregation.
+
+---
+
+## 5. Confusion matrix
+
+After training, we print a `K × K` confusion matrix over the test
+set: rows are true class, columns are predicted class. The diagonal
+shows correct counts; off-diagonal entries show specific confusions.
+
+This is much more informative than a single accuracy number. With
+~15 instruments you see, for example:
+
+- Violin and viola confused with each other at high rate → structural
+  problem with this representation (their overlapping pitch ranges +
+  similar spectral envelopes are nearly indistinguishable in
+  averaged-over-time features)
+- Brass instruments cross-confused but not confused with strings →
+  the network learned the broad timbre family but is fuzzy on
+  individuals
+- Scattered random off-diagonals → mostly model noise
+
+For SOL specifically, the dominant confusions are within instrument
+families. That's both diagnostic and pedagogically interesting: a
+human listener would have the same trouble with isolated notes.
+
+---
+
+## 6. The cache format (v2)
 
 `FeatureCache.h` provides `save_features` and `load_features`. The
-file format is small and custom:
+file format:
 
 ```
 "WFED"  magic                          (weft feature dataset)
-uint32  version = 1
+uint32  version = 2
 uint32  feature_dim
-uint32  n_samples
+uint32  n_samples (or n_frames in per_frame mode)
 uint32  n_classes
+uint32  per_frame (0 or 1)
 length-prefixed string  feature_type   ("mfcc", "logmag", ...)
 length-prefixed strings  class_names[] (n_classes of them)
 float[feature_dim * n_samples]         column-major
 int32[n_samples]                       labels
+int32[n_samples]                       file_ids
 ```
 
-Header integers are little-endian (assembled byte-by-byte, so the
-metadata is host-endian-agnostic). The bulk float and int32 payload
-is native byte order — if you extract on one machine and load on a
-different-endianness machine, the data will be scrambled. Don't do
-that.
+Header integers are little-endian (assembled byte-by-byte, host-
+endian-agnostic). The bulk payload is native byte order — if you
+extract on one machine and load on a different-endianness machine,
+the floats will be scrambled. Don't do that.
 
-The feature_type label is stored in the file so the classifier doesn't
-need a separate CLI flag — it picks its architecture automatically
-based on what the cache says was extracted. Sane defaults beat
-duplicating configuration across tools.
+Version was bumped from 1 to 2 to add `per_frame` and `file_ids`.
+v1 caches can't be loaded; just re-run `extract_features`.
 
 ---
 
-## 3. extract_features: from WAVs to a cache file
+## 7. What to expect from the four combinations
 
-Three things this tool does:
+| feature | mode      | typical test accuracy | training time |
+|---------|-----------|-----------------------|---------------|
+| mfcc    | averaged  | 70-80%                | seconds       |
+| mfcc    | per_frame | 80-88%                | < 30s         |
+| logmag  | averaged  | 75-85%                | ~30s          |
+| logmag  | per_frame | 85-92%                | ~3 min        |
 
-1. **Scan and sort.** `std::filesystem::directory_iterator` (C++17)
-   walks the data dir. `.wav` files go into a vector; we sort it for
-   determinism so the train/test split is reproducible.
+(Per-frame logmag is the slowest because of the 2049-dim Dense first
+layer × 20× more frames. Still very feasible on a laptop.)
 
-2. **Parse the class.** The filename stem split on the first dash
-   gives the class name. The map `class_to_id` grows organically as
-   new prefixes appear, exactly the pattern you sketched out.
-
-3. **Extract and cache.** For each file: `load_wav` → either
-   `logmag_spectrum` or `mfcc`, accumulate into a matrix and a label
-   vector. Save the result.
-
-Failed files (bad WAV header, unsupported format) are logged (first
-few only, then suppressed) and skipped. We don't want one malformed
-file to abort processing of thousands of good ones.
-
-The CLI is:
-
-```
-extract_features SOL_flat sol_mfcc.feat    mfcc
-extract_features SOL_flat sol_logmag.feat  logmag
-```
-
-After both, you have two cache files and you can train the classifier
-on either.
+The gap from averaged → per_frame is mostly per-file ensembling
+working as intended. The gap from mfcc → logmag is the higher-
+resolution feature giving the network more to work with.
 
 ---
 
-## 4. sound_classifier: from cache file to model
+## 8. What's still not in here
 
-This is now a pure ML loop. Load the cache, do train/test split,
-standardise, build network, train.
+- **CQT (Constant-Q Transform)** — logarithmically-spaced bins for
+  better pitch invariance. Genuinely worth adding; would slot in as a
+  third feature type alongside `logmag` and `mfcc`.
+- **Per-class weighting** — if some instruments have many more samples
+  than others, the loss is dominated by majority classes.
+- **Data augmentation** — pitch-shifting, time-stretching, additive
+  noise. Standard moves to lift accuracy further.
+- **Spectrogram-based ConvNet** — instead of averaging-or-aggregating
+  frame-level features, feed the full (frames × bins) spectrogram to
+  a 2D ConvNet. The biggest jump available, and the natural way to
+  handle time in audio. On the roadmap once ConvNets are built.
 
-```cpp
-auto cache = load_features(argv[1]);
-auto split = train_test_split(cache.X, Y, 0.2f, /*seed=*/1);
-Standardizer<float> scaler;
-auto X_tr = scaler.fit_transform(split.X_train);
-auto X_te = scaler.transform   (split.X_test);
-```
-
-20% test, fixed seed 1. Standardiser fit on train only — fitting on
-the full dataset would leak test statistics into preprocessing.
-
-The architecture is picked from `cache.feature_type`:
-
-- **logmag** (2049 features): `Dense(2049, 256) → ReLU → Dropout(0.3)
-  → Dense(256, 128) → ReLU → Dropout(0.3) → Dense(128, K) → Softmax`
-- **mfcc** (13 features): `Dense(13, 64) → ReLU → Dropout(0.2) →
-  Dense(64, K) → Softmax`
-
-There's no point putting a 256-unit hidden layer in front of 13 input
-features, and no point trying to learn 2049-dim envelopes with a
-64-unit hidden. Two presets sized to their feature's information
-content.
-
-Then a standard 50-epoch loop with Adam (lr=1e-3), batch 32,
-`train()`/`eval()` switching so dropout fires only during training.
-
----
-
-## 5. What to expect from the two features
-
-Rough predictions for the full SOL dataset (~5000 files, ~14
-instrument classes):
-
-- **MFCC**: 80-90% test accuracy. Training takes seconds. The
-  compactness limits the ceiling — 13 numbers can't fully describe an
-  oboe — but it captures enough to separate most instruments well.
-- **logmag**: 85-95% test accuracy. Training takes ~30 seconds.
-  Higher-resolution features let the network exploit fine details
-  (specific formant peaks, harmonic decay rates) that MFCC averages
-  away.
-
-The pitch-confounding caveat from note 11 applies to both: F0
-dominates the spectrum, and instruments have overlapping pitch
-ranges, so some confusions are likely between acoustically similar
-classes at overlapping pitches.
-
-### A teaching example about overfitting
-
-If you run this on a tiny dataset (a few dozen files), **the logmag
-setup overfits catastrophically**. The first layer's 524K parameters
-need many more examples than that to learn a generalisable mapping.
-MFCC, with only a few thousand parameters total, handles small
-datasets much better.
-
-This is the classic capacity-vs-data tradeoff in microcosm. Logmag
-has the expressiveness to fit complex patterns; it just needs enough
-training data to constrain that expressiveness toward generalisable
-patterns rather than memorising specific examples. Dropout helps but
-can't manufacture data out of nothing.
-
-Real SOL is large enough that this isn't a problem. If you want to
-experiment with small subsets, stick to MFCC.
-
----
-
-## 6. Things we deliberately didn't do
-
-- **No data augmentation.** Time-stretching, pitch-shifting, and
-  adding noise are common in audio ML. Would help generalisation.
-- **No per-class weighting.** If some instruments have many more
-  samples than others, the loss is dominated by majority classes.
-  Class-balanced loss or stratified sampling fixes this.
-- **No confusion matrix.** Knowing the final accuracy is one number;
-  knowing *which* instruments get confused with which is much more
-  diagnostic. Easy to add: a K×K matrix counting predicted-vs-true
-  pairs across the test set.
-- **No constant-Q / chroma features.** Either would handle the
-  pitch-confounding more cleanly than mel-on-linear-FFT. More
-  complexity than we need for a first pass.
-- **No 1D/2D ConvNet over the spectrogram.** Modern audio classifiers
-  use convolutional layers over the time-frequency representation
-  rather than averaging frames into one vector. The next big weft
-  milestone.
-- **No incremental cache updates.** Adding new WAVs means re-running
-  the full extractor. For SOL this is fine; for streaming or
-  online-learning scenarios you'd want append support.
-
-The current setup is enough to demonstrate that everything we built —
-WAV I/O, FFT, windowing, mel filterbank, DCT, Adam, dropout,
-train/eval mode, standardisation, a small binary serialisation
-format — composes into a working end-to-end pipeline you can
-actually iterate on.
+The current pipeline composes everything else we have — WAV I/O, FFT,
+windowing, mel filterbank, DCT, Adam, dropout, train/eval mode,
+standardisation, group-aware splitting, a small binary serialisation
+format — into a working end-to-end classifier you can iterate on.

@@ -175,6 +175,94 @@ std::vector<T> energy_weighted_features(const std::vector<T>& samples,
 
 // ---- Public feature functions --------------------------------------------
 
+// Per-frame log-magnitude spectra.  Returns one vector per non-silent
+// frame; vector length is frame_size/2 + 1.  Used by the classifier (with
+// per-file aggregation at eval time) and by future autoencoder work.
+//
+// Silent frames are skipped so we don't waste training capacity on noise
+// in leading/trailing silence.
+template <typename T>
+std::vector<std::vector<T>>
+logmag_spectrum_frames(const std::vector<T>& samples,
+                       std::size_t frame_size = 4096,
+                       std::size_t hop_size = 2048)
+{
+    if (samples.size() < frame_size)
+        throw std::runtime_error("AudioFeatures: input shorter than frame_size");
+
+    const std::size_t n_bins = frame_size / 2 + 1;
+    auto window = detail::hann_window<T>(frame_size);
+    std::vector<std::vector<T>> out;
+    std::vector<T> frame(frame_size);
+
+    for (std::size_t start = 0;
+         start + frame_size <= samples.size();
+         start += hop_size)
+    {
+        T energy = T(0);
+        for (std::size_t i = 0; i < frame_size; ++i) {
+            frame[i] = samples[start + i] * window[i];
+            energy  += frame[i] * frame[i];
+        }
+        if (energy < T(1e-12)) continue;
+
+        auto mag = detail::frame_magnitudes(frame);
+        std::vector<T> log_mag(n_bins);
+        for (std::size_t i = 0; i < n_bins; ++i)
+            log_mag[i] = std::log(T(1) + mag[i]);
+        out.push_back(std::move(log_mag));
+    }
+    return out;
+}
+
+// Per-frame MFCCs.  Same shape as logmag_spectrum_frames but with num_mfcc
+// features per frame.
+template <typename T>
+std::vector<std::vector<T>>
+mfcc_frames(const std::vector<T>& samples,
+            T sample_rate,
+            std::size_t frame_size = 4096,
+            std::size_t hop_size = 2048,
+            std::size_t num_mel_bins = 40,
+            std::size_t num_mfcc = 13)
+{
+    if (samples.size() < frame_size)
+        throw std::runtime_error("AudioFeatures: input shorter than frame_size");
+
+    const std::size_t n_bins = frame_size / 2 + 1;
+    auto window     = detail::hann_window<T>(frame_size);
+    auto filterbank = detail::mel_filterbank<T>(num_mel_bins, n_bins, sample_rate);
+    std::vector<std::vector<T>> out;
+    std::vector<T> frame(frame_size);
+
+    for (std::size_t start = 0;
+         start + frame_size <= samples.size();
+         start += hop_size)
+    {
+        T energy = T(0);
+        for (std::size_t i = 0; i < frame_size; ++i) {
+            frame[i] = samples[start + i] * window[i];
+            energy  += frame[i] * frame[i];
+        }
+        if (energy < T(1e-12)) continue;
+
+        auto mag = detail::frame_magnitudes(frame);
+        std::vector<T> power(n_bins);
+        for (std::size_t i = 0; i < n_bins; ++i)
+            power[i] = mag[i] * mag[i];
+
+        std::vector<T> log_mel(num_mel_bins);
+        for (std::size_t m = 0; m < num_mel_bins; ++m) {
+            T sum = T(0);
+            for (std::size_t k = 0; k < n_bins; ++k)
+                sum += filterbank[m][k] * power[k];
+            log_mel[m] = std::log(sum + T(1e-12));
+        }
+        out.push_back(detail::dct2(log_mel, num_mfcc));
+    }
+    return out;
+}
+
 // Energy-weighted log-magnitude spectrum.
 // Returns a vector of length frame_size/2 + 1.
 template <typename T>

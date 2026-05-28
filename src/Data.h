@@ -6,6 +6,7 @@
 //   shuffled_indices(n, seed)     : return [0..n) randomly permuted.
 //   one_hot<T>(labels, K)         : (K x N) one-hot matrix from class labels.
 //   train_test_split<T>(X, Y, ...): random split into train/test.
+//   group_train_test_split<T>(...): split by file_id, no leakage across groups.
 //   accuracy<T>(predictions, targets)
 //                                 : argmax-per-column match rate.
 //
@@ -72,6 +73,85 @@ Split<T> train_test_split(const Matrix<T>& X, const Matrix<T>& Y,
     s.Y_train = Y.selectColumns(tr);
     s.X_test  = X.selectColumns(te);
     s.Y_test  = Y.selectColumns(te);
+    return s;
+}
+
+// ---- group-aware train/test split ---------------------------------------
+//   Splits columns by GROUP (e.g. file_id) rather than by individual column.
+//   When a dataset has multiple columns per source file (e.g. per-frame audio
+//   features), splitting columns at random would leak frames from the same
+//   file into both train and test, inflating test accuracy.  This variant
+//   shuffles the unique group ids and assigns whole groups to train or test.
+//
+//   Returns the same X_train/Y_train/X_test/Y_test as Split, plus the
+//   file_ids that remained in the test set (so the classifier can aggregate
+//   predictions across all frames of the same file at eval time).
+template <typename T>
+struct GroupedSplit {
+    Matrix<T>        X_train, Y_train;
+    Matrix<T>        X_test,  Y_test;
+    std::vector<int> file_ids_test;     // file id for each column of X_test
+};
+
+template <typename T = float>
+GroupedSplit<T> group_train_test_split(const Matrix<T>& X, const Matrix<T>& Y,
+                                        const std::vector<int>& file_ids,
+                                        double test_fraction, unsigned seed)
+{
+    if (X.cols() != Y.cols())
+        throw std::invalid_argument(
+            "group_train_test_split: X and Y must have the same number of columns");
+    if (X.cols() != file_ids.size())
+        throw std::invalid_argument(
+            "group_train_test_split: file_ids length must match X.cols()");
+    if (test_fraction < 0.0 || test_fraction > 1.0)
+        throw std::invalid_argument(
+            "group_train_test_split: test_fraction not in [0, 1]");
+
+    // Unique file ids, in order of first appearance.
+    std::vector<int> unique_ids;
+    {
+        std::vector<bool> seen;
+        for (int id : file_ids) {
+            if (id < 0)
+                throw std::invalid_argument(
+                    "group_train_test_split: negative file_id");
+            if (static_cast<std::size_t>(id) >= seen.size())
+                seen.resize(id + 1, false);
+            if (!seen[id]) {
+                seen[id] = true;
+                unique_ids.push_back(id);
+            }
+        }
+    }
+
+    // Shuffle and split the unique ids.
+    std::shuffle(unique_ids.begin(), unique_ids.end(), std::mt19937(seed));
+    const std::size_t n_test_files = static_cast<std::size_t>(
+        test_fraction * unique_ids.size());
+
+    // Mark each id as test or train using a flat lookup table for speed.
+    std::vector<bool> is_test(
+        *std::max_element(file_ids.begin(), file_ids.end()) + 1, false);
+    for (std::size_t i = 0; i < n_test_files; ++i)
+        is_test[unique_ids[i]] = true;
+
+    // Bucket the column indices accordingly.
+    std::vector<std::size_t> tr_cols, te_cols;
+    tr_cols.reserve(file_ids.size());
+    te_cols.reserve(file_ids.size());
+    for (std::size_t j = 0; j < file_ids.size(); ++j) {
+        if (is_test[file_ids[j]]) te_cols.push_back(j);
+        else                      tr_cols.push_back(j);
+    }
+
+    GroupedSplit<T> s;
+    s.X_train = X.selectColumns(tr_cols);
+    s.Y_train = Y.selectColumns(tr_cols);
+    s.X_test  = X.selectColumns(te_cols);
+    s.Y_test  = Y.selectColumns(te_cols);
+    s.file_ids_test.reserve(te_cols.size());
+    for (auto c : te_cols) s.file_ids_test.push_back(file_ids[c]);
     return s;
 }
 
