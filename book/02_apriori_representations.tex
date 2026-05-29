@@ -1,0 +1,495 @@
+% chapters/02_apriori_representations.tex
+%
+% Part I, Chapter 2.  A-priori representations: Fourier, Wavelet,
+% Scattering.  Adapted from the geometric tour's Chapter 2 with the
+% Scattering Transform significantly expanded (it's the bridge to
+% Chapter 3) and the connection to convolution made more explicit.
+
+\chapter{A-priori representations}
+\labch{apriori}
+
+\epigraph{Music is the pleasure the human mind experiences from counting
+without being aware that it is counting.}{Gottfried Wilhelm Leibniz}
+
+%------------------------------------------------------------------------
+\section{The question and three answers}
+%------------------------------------------------------------------------
+
+\noindent A sustained violin note arriving at our ears is a pressure
+wave: a long sequence of small fluctuations around atmospheric pressure,
+sampled by the eardrum at something like 40\,000 times per second.  As a
+mathematical object it is a vector in $\R^N$ with $N$ very large.  As a
+listening experience, it is a single sustained tone with a particular
+timbre, attack, and decay.
+
+The gap between those two descriptions is what a \emph{representation} is
+supposed to close.  We want a transformation $\Phi$ such that $\Phi(\xb)$
+exposes the structure we care about --- pitch, brightness, attack, the
+texture of the bowing --- and ideally hides what we don't.  The previous
+chapter argued that any reasonable $\Phi$ looks like an inner product
+with a chosen set of reference vectors.  This chapter looks at three
+specific choices, each historically and practically important.  All
+three are \emph{a-priori} in the sense that the reference vectors are
+designed mathematically, not learned from data.  The next chapter will
+turn to representations whose reference vectors come from data.
+
+The three a-priori representations we consider are:
+
+\begin{itemize}
+    \item The \emph{Discrete Fourier Transform} (Section~\ref{sec:dft}),
+    whose reference vectors are pure sinusoids.  Fourier exposes
+    frequency content with maximum sharpness and is the workhorse of
+    classical signal processing.
+
+    \item The \emph{Discrete Wavelet Transform} (Section~\ref{sec:dwt}),
+    whose reference vectors are localized oscillations --- a single
+    \emph{mother wavelet}, scaled and translated to cover the
+    time-frequency plane.  Wavelets give us frequency information with
+    time localisation, at the cost of some spectral precision.
+
+    \item The \emph{Scattering Transform} (Section~\ref{sec:scattering}),
+    a multi-layer cascade of wavelet convolutions and absolute-value
+    nonlinearities.  It is the bridge between classical signal processing
+    and modern convolutional neural networks: structurally identical to a
+    CNN, but with all the filters fixed by mathematics rather than learned
+    from data.
+\end{itemize}
+
+\noindent The progression Fourier $\to$ Wavelet $\to$ Scattering will
+turn out to add, one step at a time, three things: \emph{locality}
+(wavelets are localised, sinusoids are not), \emph{depth} (Scattering
+stacks two or three wavelet transforms), and \emph{nonlinearity}
+(Scattering inserts an absolute value between the layers).  Once we have
+these three, a fourth step --- replacing the predefined filters with
+\emph{learned} ones --- gets us a convolutional network.  That fourth
+step is the subject of the next chapter.
+
+%------------------------------------------------------------------------
+\section{The Discrete Fourier Transform}
+\label{sec:dft}
+%------------------------------------------------------------------------
+
+The Discrete Fourier Transform represents a length-$N$ signal as a sum
+of $N$ complex sinusoids.  For each frequency index $k \in
+\{0, 1, \ldots, N-1\}$,
+\begin{equation}
+    \hat{\xb}[k]
+    \;=\;
+    \sum_{n=0}^{N-1} \xb[n] \, e^{-i 2\pi k n / N}.
+    \label{eq:dft}
+\end{equation}
+The inverse transform reconstructs $\xb$ from $\hat\xb$ via the same
+formula with the opposite sign in the exponent and a $1/N$ normalisation:
+\begin{equation}
+    \xb[n]
+    \;=\;
+    \frac{1}{N} \sum_{k=0}^{N-1} \hat{\xb}[k] \, e^{i 2 \pi k n / N}.
+    \label{eq:idft}
+\end{equation}
+
+\marginnote{%
+The DFT in \eqref{eq:dft} would naively cost $O(N^2)$ operations to
+evaluate.  The \emph{Fast Fourier Transform} reduces this to
+$O(N \log N)$ by exploiting the recursive structure of the sum.  The FFT
+is what makes Fourier analysis practical for audio; we use it
+extensively in Part~II.}
+
+\paragraph{The DFT as projection.}  Compare \eqref{eq:dft} with the
+inner-product formula \eqref{eq:inner} from the previous chapter.  The
+DFT is just the inner product of $\xb$ with the $k$-th complex sinusoid:
+\begin{equation}
+    \hat{\xb}[k] \;=\; \inner{\xb}{\mathbf{f}_k},
+    \qquad
+    \mathbf{f}_k[n] \;=\; e^{i 2 \pi k n / N}.
+    \label{eq:dft_as_inner}
+\end{equation}
+Each $\mathbf{f}_k$ is one of our reference vectors: a discrete sinusoid
+that completes exactly $k$ full cycles over the length of the signal.
+The set $\{\mathbf{f}_k\}_{k=0}^{N-1}$ is an \emph{orthogonal basis} for
+$\C^N$, and in fact an orthonormal one after the $1/N$ scaling in
+\eqref{eq:idft}.  This is why the inverse transform exists in closed
+form: an orthogonal basis is its own decoder.
+
+In matrix form, letting $\mathbf{F}$ be the $N \times N$ matrix with
+$\mathbf{F}_{kn} = e^{-i 2 \pi k n / N}$,
+\begin{equation}
+    \hat\xb \;=\; \mathbf{F}\, \xb,
+    \qquad
+    \xb \;=\; \frac{1}{N} \mathbf{F}^H\, \hat\xb.
+    \label{eq:dft_matrix}
+\end{equation}
+The Fourier transform is, exactly, a particular choice of
+$\mathbf{B}$ in the framework of the previous chapter.
+
+\paragraph{What the DFT exposes.}  Because each basis vector
+$\mathbf{f}_k$ is a pure tone of frequency $k$, the coefficient
+$\hat\xb[k]$ is large precisely when $\xb$ contains energy at that
+frequency.  The magnitude $\abs{\hat\xb[k]}$ is the amount of frequency
+$k$ in the signal; the argument $\arg \hat\xb[k]$ is its phase.  For
+musical signals --- a sustained pitched tone --- the DFT magnitude
+shows a peak at the fundamental and at each harmonic, telling us
+immediately how loud each harmonic is.  This is the basis of pitch
+detection, spectral envelopes, and timbre analysis.
+
+\paragraph{What the DFT hides.}  Two properties of \eqref{eq:dft_as_inner}
+matter.  First, the sum runs over the \emph{entire} signal: every sample
+contributes to every coefficient.  A short click at $n = 100$
+contributes to $\hat\xb[k]$ for every $k$.  The DFT has no notion of
+``when'' --- it gives a global summary of frequency content, averaged
+over all of time.  Second, the sinusoids $\mathbf{f}_k$ extend
+unattenuated across the whole signal length; they are global functions
+masquerading as basis vectors.
+
+This is fine for stationary signals (an organ note holding constant for
+seconds at a time) but disastrous for transient signals (a snare hit,
+a consonant in speech, the attack of a piano note).  For such signals
+we want \emph{locality}: a representation that tells us not just what
+frequencies are present but \emph{when}.
+
+\paragraph{Translation invariance and frequency sensitivity.}
+The DFT has one beautiful invariance and one painful sensitivity.
+
+If we shift $\xb$ in time by $\Delta$, the DFT magnitudes are
+unchanged --- only the phases change:
+\begin{equation}
+    \xb[n - \Delta] \;\;\longleftrightarrow\;\;
+    \hat\xb[k] \, e^{-i 2 \pi k \Delta / N}.
+\end{equation}
+This is what we want: a violin note arriving slightly later sounds the
+same.  The magnitude spectrum is \emph{translation-invariant}.
+
+But if we shift $\xb$ in \emph{frequency} by even a small amount --- say,
+the violin is slightly mistuned, or our sample rate drifts ---
+the DFT coefficients can move around dramatically.  A pure tone at
+frequency $k + 0.5$ smears across many bins because it doesn't match
+any single basis vector.  This is the well-known \emph{leakage}
+phenomenon, and it's the fundamental cost of using strictly periodic
+basis vectors on signals that are not strictly periodic.
+
+\marginnote{%
+A continuous version of the leakage problem is the
+\emph{Heisenberg uncertainty principle for signals}: a representation
+cannot have arbitrarily sharp resolution in both time and frequency.
+The DFT chooses maximum frequency resolution (sharp basis vectors in
+frequency) and accepts zero time resolution (global basis vectors in
+time).  Wavelets choose a different trade-off; the scattering transform
+yet another.}
+
+\paragraph{Convolution becomes multiplication.}  The Fourier transform's
+most useful algebraic property, far beyond its role as a representation,
+is that convolution in the time domain corresponds to pointwise
+multiplication in the frequency domain:
+\begin{equation}
+    \yb \;=\; \xb \conv \mathbf{h}
+    \qquad \Longleftrightarrow \qquad
+    \hat\yb[k] \;=\; \hat\xb[k] \cdot \hat{\mathbf{h}}[k].
+    \label{eq:conv_theorem}
+\end{equation}
+This is the \emph{convolution theorem}; we sketch a proof in
+Appendix~\ref{ch:convolution_theorem}.  The practical consequence is
+that a convolution that would naively cost $O(NM)$ to evaluate directly
+costs $O(N \log N)$ via three FFTs (forward, multiply, inverse).  For
+large kernels, the FFT-based convolution is by far the faster method.
+
+In the other direction, multiplication of two signals corresponds to
+\emph{convolution} of their spectra.  This is how the Short-Time
+Fourier Transform works (next), why amplitude modulation in audio
+creates sidebands, and why the spectral analysis of a windowed signal
+shows the window's spectrum convolved with the signal's spectrum.
+
+%------------------------------------------------------------------------
+\section{The Discrete Wavelet Transform}
+\label{sec:dwt}
+%------------------------------------------------------------------------
+
+The DFT gives us frequency at the cost of time.  The Wavelet Transform
+restores time by giving up some frequency.
+
+\paragraph{Mother wavelets and their family.}  Pick a \emph{mother
+wavelet} $\psi$: a short, oscillatory, zero-mean function of finite
+energy.  Generate a family of basis vectors by scaling and translating
+it:
+\begin{equation}
+    \psi_{a, b}[n]
+    \;=\;
+    \frac{1}{\sqrt{|a|}} \, \psi\!\left( \frac{n - b}{a} \right).
+    \label{eq:wavelet_family}
+\end{equation}
+The scale parameter $a$ stretches or compresses the wavelet: a large
+$a$ produces a wide, low-frequency wavelet; a small $a$ produces a
+narrow, high-frequency one.  The translation parameter $b$ shifts the
+wavelet along the time axis.  The normalisation $1/\sqrt{|a|}$ keeps the
+energy constant across scales.
+
+The Discrete Wavelet Transform of a signal $\xb$ is the array of inner
+products of $\xb$ with this family:
+\begin{equation}
+    \mathbf{w}[a, b] \;=\; \inner{\xb}{\psi_{a, b}}.
+\end{equation}
+The coefficient $\mathbf{w}[a, b]$ tells us how much of the signal looks
+like a wavelet of scale $a$ centred at time $b$.  Large coefficients
+mark places in time-frequency where the signal has structure at that
+particular scale.
+
+\marginnote{%
+Common mother wavelets include the \emph{Haar} (a square wave: simplest,
+discontinuous), \emph{Daubechies} families (compactly supported,
+orthogonal, smoother), the \emph{Mexican hat} (a Gaussian's second
+derivative), and the \emph{Morlet} (a complex sinusoid times a Gaussian,
+much used in time-frequency audio analysis).  The choice of mother
+wavelet matters in practice; for this book the Morlet is the most
+relevant.}
+
+\paragraph{The time-frequency plane.}  Where the DFT gives one
+coefficient per frequency, the DWT gives one coefficient per
+\emph{location in time-frequency}.  Plot a DWT as a heatmap with time
+on the horizontal axis and scale on the vertical axis, and you see a
+picture: which frequencies are active when.  This is exactly the
+\emph{spectrogram-like} visualisation that audio engineers use to look
+at sounds.  In Part~II we build a related construction --- the Short-Time
+Fourier Transform --- which gives a similar picture using DFTs of
+short windowed segments.  Wavelets are the more principled relative,
+with proper mathematical foundations rather than ad-hoc windowing.
+
+\paragraph{What the wavelet representation costs.}  We gain time
+localisation, but we pay for it.  Two specific costs.
+
+First, the representation is no longer translation-invariant in
+magnitude.  Shifting $\xb$ in time \emph{does} change which wavelet
+coefficients are large, because the coefficients are indexed by both
+scale and position.  A wavelet representation is translation-\emph{equivariant}:
+the pattern of coefficients shifts in lockstep with the signal, but the
+shifted pattern is not the same pattern.
+
+Second, the frequency resolution at any single scale is lower than the
+DFT's.  Each wavelet covers a range of frequencies rather than a single
+one; the trade is wider time coverage in exchange for narrower
+frequency coverage.  This is unavoidable: tight in time forces broad in
+frequency, and vice versa.
+
+\paragraph{Stability to frequency drift.}  In exchange, the DWT is much
+more stable than the DFT to small drifts in frequency.  A pure tone at
+frequency $f_0 + \delta$ produces wavelet coefficients close to those
+of a pure tone at $f_0$, because each wavelet's frequency response is
+already broad.  This makes wavelets the better tool for analysing
+real-world signals whose frequencies wobble or evolve --- vibrato,
+glissando, the slowly drifting pitch of a struck bell.
+
+\paragraph{Matrix form.}  Just as with the DFT, the DWT has a matrix
+representation.  Let $\boldsymbol\Psi$ be the matrix whose rows are the
+wavelets $\psi_{a, b}$ at every $(a, b)$ pair in our chosen
+discretisation.  Then
+\begin{equation}
+    \mathbf{w} \;=\; \boldsymbol\Psi\, \xb,
+    \qquad
+    \xb \;=\; \boldsymbol\Psi^H\, \mathbf{w}
+    \quad\text{(if the wavelets form an orthonormal basis).}
+    \label{eq:dwt_matrix}
+\end{equation}
+We have the same analysis-synthesis structure as the DFT, with a
+different choice of basis.  The framework is invariant; the basis is
+the design choice.
+
+%------------------------------------------------------------------------
+\section{Between transforms: the time-frequency trade}
+%------------------------------------------------------------------------
+
+Before we get to the Scattering Transform, it is worth pausing on the
+relationship between the DFT and the DWT, because it makes the design
+space visible.
+
+The DFT picks one extreme of the time-frequency trade: maximally sharp
+in frequency, maximally blurry in time.  Every basis vector spans the
+whole signal, so we know exactly which frequencies are present but
+nothing about when.
+
+The Short-Time Fourier Transform (STFT), which we build in Part~II,
+picks a middle point: we cut the signal into short overlapping
+windows, take the DFT of each, and stack the results.  Each window has
+fixed time width (call it $W$), so every frequency bin has the same
+time resolution $W$ and the same frequency resolution $\sim\!1/W$.
+Audio engineers reach for the STFT constantly; it is the basis of the
+spectrogram.
+
+The DWT picks a different middle point, one where the time-frequency
+resolution varies with scale.  High frequencies (small $a$) get fine
+time resolution and coarse frequency resolution --- a clear ``the
+transient happened here'' answer.  Low frequencies (large $a$) get
+coarse time resolution and fine frequency resolution --- a clear
+``the pitch is $f_0$'' answer over a longer window.  This is exactly
+the right behaviour for natural signals: short events tend to be
+broadband, long events tend to be narrowband.
+
+\marginnote{%
+The DWT's variable resolution is sometimes called \emph{constant-Q
+analysis}: each band has a fixed ratio of frequency width to centre
+frequency.  This matches the way the human auditory system processes
+sound, where critical bands also have approximately constant $Q$.  It is
+not a coincidence that wavelet-like decompositions appear in the
+cochlea.}
+
+The progression is from rigid (DFT) to adaptive (DWT) to multi-layered
+(Scattering, next).  Each step gives up some elegance --- the DFT has a
+closed-form inverse; the DWT requires careful choice of mother wavelet;
+the Scattering Transform has multiple stages and a fixed but non-trivial
+schedule of operations --- in exchange for better behaviour on real
+signals.
+
+%------------------------------------------------------------------------
+\section{The Scattering Transform}
+\label{sec:scattering}
+%------------------------------------------------------------------------
+
+The Scattering Transform, introduced by Mallat in the early 2010s
+(\emph{Group invariant scattering}, Communications on Pure and Applied
+Mathematics, 2012), builds on the DWT in two crucial ways: it adds a
+nonlinearity (the absolute value) between successive wavelet
+decompositions, and it stacks several of them.  The resulting structure
+is, mathematically and conceptually, a convolutional neural network with
+all the filters fixed by hand.
+
+\paragraph{One layer.}  We start with a signal $\xb$ and a family of
+wavelets $\{\psi_{\lambda_1}\}$ indexed by scale (we collapse the
+notation $\psi_{a, b}$ into $\psi_\lambda$ where $\lambda$ ranges over
+both scale and shift).  The first-layer scattering coefficients are
+\begin{equation}
+    S_1 \xb \;=\; \abs{\xb \conv \psi_{\lambda_1}}.
+    \label{eq:scattering1}
+\end{equation}
+Compute the wavelet transform of $\xb$, take the absolute value of each
+coefficient.  This is the only operation; nothing learned, nothing
+adjustable.
+
+\paragraph{Two layers.}  The output $S_1 \xb$ is itself a signal --- in
+fact, a collection of signals, one per scale.  We can apply the same
+operation to each of them, using a second family of wavelets
+$\{\psi_{\lambda_2}\}$:
+\begin{equation}
+    S_2 \xb \;=\; \abs{\, \abs{\xb \conv \psi_{\lambda_1}} \conv \psi_{\lambda_2} \,}.
+    \label{eq:scattering2}
+\end{equation}
+This is a wavelet transform applied to the magnitude of a wavelet
+transform.  The result captures \emph{interactions} between frequency
+bands: how does activity at scale $\lambda_1$ vary over time?  How does
+that variation itself look at scale $\lambda_2$?
+
+The transform can be extended to three or more layers by repeating the
+recipe.  In practice, two or three layers suffice; later layers tend
+to capture diminishing amounts of energy.
+
+\paragraph{Why the absolute value.}  Without the nonlinearity between
+the two wavelet transforms, equation \eqref{eq:scattering2} would
+collapse into a single wavelet transform (because the composition of
+two linear operators is a linear operator).  The absolute value
+prevents this collapse: it is the \emph{nonlinearity} that makes a deep
+representation more expressive than a shallow one.
+
+The choice of absolute value, specifically, is not arbitrary.  It is
+the simplest nonlinearity that is \emph{stable} (Lipschitz: small
+changes in input produce only small changes in output) and that
+removes the phase information (which is highly oscillatory in time and
+would otherwise destabilise the second layer).  Other nonlinearities
+work too, but the absolute value has the cleanest theoretical
+properties.
+
+\paragraph{Stability and invariance.}  The scattering transform inherits
+two key properties from its construction:
+
+\begin{itemize}
+    \item It is \emph{stable to deformations}: if $\xb$ is replaced by
+    a slightly time-warped version $\xb \circ \tau$ where $\tau$ is a
+    smooth deformation, the scattering coefficients $S\xb$ change by an
+    amount controlled by the smoothness of $\tau$, not by the size of
+    the deformation itself.  This is the right notion of robustness for
+    natural signals, which are constantly subject to small distortions
+    (recording-room acoustics, microphone characteristics, breath
+    fluctuations).
+
+    \item It is \emph{translation-invariant at large scale}: when the
+    final layer is averaged over a window much wider than the signal's
+    features, the result depends on $\xb$'s content but not on where in
+    time that content occurs.  This is what we want for classification
+    (a violin is a violin whether it arrives at sample $1000$ or
+    $2000$).
+\end{itemize}
+
+\marginnote{%
+\textbf{Why this matters.}  Bruna and Mallat showed in 2013 (\emph{Invariant
+scattering convolution networks}, IEEE TPAMI) that a two-layer scattering
+transform achieves near-state-of-the-art accuracy on some image and audio
+classification tasks, \emph{without any learning}.  The features it
+produces are good enough that a simple linear classifier on top reaches
+accuracies that a CNN of the same depth would achieve.  This is a
+remarkable result: it suggests that much of what early CNN layers do can
+be replicated by fixed mathematical operations.  Of course, deeper
+learned networks eventually outperform scattering, but the comparison
+frames the question: what is the depth of learning truly buying us?}
+
+\paragraph{The architecture.}  Look at the structure of the scattering
+transform from a distance.  Each layer convolves the input with a bank
+of filters, applies a nonlinearity, and passes the result to the next
+layer.  Strip the words ``wavelet'' and ``absolute value'' and replace
+them with ``learned filter'' and ``ReLU'' and you have, exactly, a
+convolutional neural network.  Wavelet convolution becomes
+$\Wb \conv \xb$; the absolute value becomes ReLU; the cascade of
+layers is the same.
+
+This is the bridge from classical signal processing to modern deep
+learning.  The scattering transform is the \emph{minimum} deep network:
+filters chosen for theoretical optimality (translation invariance,
+locality, stability), nonlinearity chosen for stability.  A CNN
+\emph{replaces} the principled-but-rigid wavelets with filters that the
+data adjusts, trading mathematical guarantees for flexibility.  Some
+problems do not benefit from that trade --- and for those, scattering is
+competitive.  Most problems do --- and for those, we need learning.
+
+\paragraph{Hierarchical features.}  The scattering transform also makes
+explicit a structural point about \emph{depth}.  The first-layer
+coefficients $\abs{\xb \conv \psi_{\lambda_1}}$ are very similar to a
+spectrogram: they tell us about frequency content over time.  The
+second-layer coefficients capture how that frequency content is itself
+modulated.  Energy that fluctuates rapidly at the first layer becomes
+visible as a clear peak at a particular $\lambda_2$ in the second layer.
+This is the modulation spectrum, central in audio analysis.
+
+We will see the same hierarchical structure in CNNs: first layer
+detects edges; second layer detects combinations of edges; third layer
+detects parts; eventually the network detects objects.  The CNN's
+hierarchy is learned; the scattering transform's is mathematical.  They
+are, structurally, the same hierarchy.
+
+%------------------------------------------------------------------------
+\section{Closing thoughts}
+%------------------------------------------------------------------------
+
+We have walked through three a-priori representations: the DFT
+(maximum frequency resolution, no time resolution), the DWT (a
+flexible time-frequency trade-off), and the Scattering Transform
+(multi-layer, locally invariant, deformation-stable).  Each is a
+specific choice of $\Phi(\xb) = f(\mathbf{B}\xb)$ in the framework of
+the previous chapter, with $\mathbf{B}$ a fixed matrix designed by
+mathematicians and $f$ either the identity, the magnitude
+$\abs{\cdot}$, or a composition of those.
+
+The three transforms answer different questions about a signal.  The
+DFT answers ``what frequencies are present?''  The DWT answers ``what
+frequencies are present, and when?''  The Scattering Transform
+answers ``what frequencies are present, when, and how do they
+interact?''  Each successive question is more demanding; each requires
+more structure in the representation.  The progression suggests a
+natural fourth step: ``what features are present, and we don't even
+know what features we mean?''  When we don't know what kinds of
+patterns to look for, we let the data tell us.  That is the subject of
+the next chapter --- representations whose reference vectors are
+\emph{learned}.
+
+The progression also previews the architectural pattern we will
+re-encounter many times: \emph{projection}, \emph{nonlinearity},
+\emph{stacking}.  These three together make depth meaningful.  Without
+projection there is nothing to compose; without nonlinearity composition
+collapses; without stacking there is no hierarchy.  The Scattering
+Transform demonstrates that all three can be in place without any
+learning at all.  The point of learning, as we will see, is to let the
+projections themselves adapt to whatever signals we throw at the
+network --- to choose $\mathbf{B}$ from data rather than from a
+mathematician's foresight.

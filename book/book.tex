@@ -1,0 +1,238 @@
+%-------------------------------------------------------------------------------
+% book.tex  --  Designing Musical Networks
+% Master file.  Chapters live in chapters/ (hand-written) and generated/
+% (produced by pandoc from ../notes/*.md).  See book/Makefile.
+%-------------------------------------------------------------------------------
+
+\documentclass[
+    fontsize=10pt,
+    twoside=true,        % proper book layout: even/odd pages
+    secnumdepth=2,       % number chapters, sections, subsections
+    fontmethod=modern,   % unicode-math via lualatex; uses TeX Gyre Pagella
+                         % (we patched kao.sty's modern path to use TeX Gyre
+                         % Pagella + DejaVu instead of Libertinus, since
+                         % Pagella ships with every TeX Live install).
+]{kaobook}
+
+% --- Language / quotes ---
+\usepackage[english]{babel}
+\usepackage[english=british]{csquotes}
+
+% --- Math / theorems / refs ---
+\usepackage{kaotheorems}
+\usepackage{kaorefs}
+\usepackage{epigraph}    % chapter-opening quotations
+
+% --- Code listings -------------------------------------------------------------
+% We use the listings package (portable, no shell-escape needed) with a
+% C++-friendly style.  Code in the notes (markdown ```cpp ... ```) is
+% converted by pandoc to lstlisting environments that pick this style up.
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codebg}{HTML}{F7F7F4}
+\definecolor{codekw}{HTML}{1F4E79}
+\definecolor{codecm}{HTML}{6E7781}
+\definecolor{codest}{HTML}{8B5E3C}
+
+\lstdefinestyle{weft}{
+    backgroundcolor   = \color{codebg},
+    basicstyle        = \ttfamily\small,
+    keywordstyle      = \color{codekw}\bfseries,
+    commentstyle      = \color{codecm}\itshape,
+    stringstyle       = \color{codest},
+    numbers           = none,
+    showstringspaces  = false,
+    breaklines        = true,
+    frame             = none,
+    aboveskip         = 1.2em,
+    belowskip         = 1.2em,
+    xleftmargin       = 0.5em,
+    xrightmargin      = 0.5em,
+}
+\lstset{style=weft}
+
+% --- Bibliography --------------------------------------------------------------
+\usepackage{kaobiblio}
+\addbibresource{bibliography/refs.bib}
+
+% --- Graphics paths ------------------------------------------------------------
+\graphicspath{{images/}{./}}
+
+% --- Custom commands shared across parts --------------------------------------
+% These keep notation consistent between the geometric (Part I) and
+% computational (Part II) chapters.
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\inner}[2]{\langle #1, #2 \rangle}
+\newcommand{\norm}[1]{\lVert #1 \rVert}
+\newcommand{\abs}[1]{\lvert #1 \rvert}
+\newcommand{\xb}{\mathbf{x}}
+\newcommand{\yb}{\mathbf{y}}
+\newcommand{\zb}{\mathbf{z}}
+\newcommand{\wb}{\mathbf{w}}
+\newcommand{\Wb}{\mathbf{W}}
+% Convolution star reads better with a thin space on either side.
+\newcommand{\conv}{\,*\,}
+
+% --- Pandoc helper commands ----------------------------------------------------
+% Pandoc's markdown -> latex conversion emits a few commands that aren't
+% defined by LaTeX itself; pandoc's own default template provides them.
+% Since we use a custom (minimal) template, we provide them here.
+\providecommand{\tightlist}{%
+    \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+% \passthrough wraps inline code (markdown backticks) so it survives
+% pandoc's tokenization unchanged.  Default behaviour is just the content.
+\providecommand{\passthrough}[1]{#1}
+
+\makeindex[columns=3, title=Alphabetical Index, intoc]
+
+%-------------------------------------------------------------------------------
+\begin{document}
+
+\titlehead{}
+\subject{}
+\title[Designing Musical Networks]{Designing Musical Networks}
+\subtitle{From Linear Algebra to Music Composition}
+\author[C.-E. Cella]{Carmine-Emanuele Cella}
+\date{\today}
+\publishers{draft --- not for circulation}
+
+\frontmatter
+
+\makeatletter
+\uppertitleback{\@titlehead}
+\lowertitleback{%
+    \textbf{Draft.}\\
+    This is a working draft of \emph{Designing Musical Networks}.  Not for
+    circulation.  Comments welcome.
+
+    \medskip
+
+    \textbf{Colophon.}\\
+    Typeset with \href{https://sourceforge.net/projects/koma-script/}{\KOMAScript{}} and \LaTeX{}
+    using the \href{https://github.com/fmarotta/kaobook/}{kaobook} class.
+    Code companion: \texttt{weft}, a header-only C++17 neural network library
+    available alongside this book.
+}
+\makeatother
+
+\dedication{%
+    For those who hear mathematics in music\\
+    and music in mathematics.\\
+    \flushright -- the author
+}
+
+\maketitle
+
+% --- Preface ---
+\chapter*{Preface}
+\input{chapters/preface.tex}
+
+% --- TOC ---
+\begingroup
+\setlength{\textheight}{230\vscale}
+\etocstandarddisplaystyle
+\etocstandardlines
+\tableofcontents
+\endgroup
+
+%-------------------------------------------------------------------------------
+\mainmatter
+\setchapterstyle{kao}
+
+% =============================================================================
+% PART I --- FOUNDATION
+% =============================================================================
+\pagelayout{wide}
+\addpart{Foundation}
+\pagelayout{margin}
+
+\input{01_signals_as_vectors.tex}
+\input{02_apriori_representations.tex}
+\input{03_learned_representations.tex}
+% \input{chapters/04_style_transfer_problem.tex}     % bridge to Part II
+
+
+% =============================================================================
+% PART II --- TECHNOLOGY
+% =============================================================================
+% Most chapters here are generated by pandoc from ../notes/*.md.
+% See book/Makefile.  The \input lines are commented until the build pipeline
+% has produced them.
+% =============================================================================
+\pagelayout{wide}
+\addpart{Technology}
+\pagelayout{margin}
+
+% Part II chapters are generated from ../notes/*.md by `make notes`
+% (see book/Makefile).  They are currently disabled because the notes
+% contain Unicode math characters (·, →, ₁, etc.) inside code blocks
+% that need a pre-processing pass before LaTeX renders them cleanly.
+% See book/TODO_part2.md for the preprocessing plan.
+
+\input{generated/0b_why_cpp.tex}
+\input{generated/01_matrix.tex}
+\input{generated/02_backprop.tex}
+\input{generated/02b_one_weight.tex}
+\input{generated/03_activations.tex}
+\input{generated/03b_jacobian.tex}
+\input{generated/04_cross_entropy.tex}
+\input{generated/05_network.tex}
+\input{generated/06_iris.tex}
+\input{generated/07_optimizers.tex}
+\input{generated/08_dropout.tex}
+\input{generated/09_mnist.tex}
+\input{generated/10_fft.tex}
+\input{generated/11_audio_features.tex}
+\input{generated/12_sound_classifier.tex}
+\input{generated/13_autoencoder.tex}
+\input{generated/14_vae.tex}
+\input{generated/15_weight_visualization.tex}
+\input{generated/16_audio_vae.tex}
+\input{generated/17_performance.tex}
+\input{generated/18_from_matrices_to_tensors.tex}
+\input{generated/19_convnets.tex}
+
+
+% =============================================================================
+% PART III --- CREATION
+% =============================================================================
+\pagelayout{wide}
+\addpart{Creation}
+\pagelayout{margin}
+
+% \input{chapters/20_transformations_without_learning.tex}
+% \input{chapters/21_unsupervised_hybridizations.tex}
+% \input{chapters/22_computer_assisted_orchestration.tex}
+% \input{chapters/23_neural_design_for_music.tex}
+% \input{chapters/24_a_philosophical_offering.tex}
+
+
+% =============================================================================
+% APPENDICES
+% =============================================================================
+\appendix
+\pagelayout{wide}
+\addpart{Appendices}
+\pagelayout{margin}
+
+% \input{chapters/A_matrix_theory.tex}
+% \input{chapters/B_invariance_eigenvectors.tex}
+% \input{chapters/C_complex_and_euler.tex}
+% \input{chapters/D_convolution_theorem.tex}
+% \input{chapters/E_chain_rule.tex}
+
+
+%-------------------------------------------------------------------------------
+\backmatter
+\setchapterstyle{plain}
+
+\defbibnote{bibnote}{References cited in this work.\par\bigskip}
+\printbibliography[heading=bibintoc, title=Bibliography, prenote=bibnote]
+
+\printindex
+
+\end{document}

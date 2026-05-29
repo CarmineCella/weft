@@ -1,0 +1,6 @@
+$if(title)$
+\chapter{$title$}
+$if(label)$\label{$label$}$endif$
+$endif$
+
+$body$

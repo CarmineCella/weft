@@ -1,0 +1,447 @@
+% chapters/01_signals_as_vectors.tex
+%
+% Part I, Chapter 1.  Adapted and rewritten from "A Geometric Tour of
+% Machine Learning" Chapter 1 (Mathematical Foundation), with a new
+% musically-motivated opening, tighter prose, and margin notes to keep the
+% reader oriented.
+
+\chapter{Signals as vectors}
+\labch{signals_as_vectors}
+
+\epigraph{The fool doth think he is wise, but the wise man knows himself
+to be a fool.}{William Shakespeare, \emph{As You Like It}}
+
+%------------------------------------------------------------------------
+\section{Two notes}
+%------------------------------------------------------------------------
+
+\noindent Listen to a sustained violin note and a sustained flute note,
+played at the same pitch.  They have the same fundamental frequency.
+They sound nothing alike.  Now play them together.  They blend into
+something that is neither violin nor flute --- a third instrument that
+exists only while they are sounding together.
+
+\marginnote{%
+This is the setup.  The math we develop in this chapter --- vector spaces,
+inner products, projections --- is the language in which the difference
+between a violin and a flute, and the meaning of ``blend,'' can be made
+precise.}
+
+The question \emph{why do they sound different} can be answered at two
+levels.  At the musical level the answer is timbre: the way each
+instrument's overtones reinforce or attenuate the others, the attack
+transient, the bow noise or the breath noise, the small fluctuations in
+pitch and amplitude.  At the mathematical level the answer is that the
+two recordings, considered as long sequences of numbers, point in
+different directions in a very high-dimensional space.  When we add them,
+we are doing geometry: the result is a third point in the same space,
+neither of the originals but related to both.
+
+This book lives in the gap between those two answers.  The technical
+chapters (Part~\textsc{II}) build software that operates on sounds as
+high-dimensional vectors.  The creative chapters (Part~\textsc{III})
+reason about timbre, style, and composition in those terms.  This first
+part is about establishing the geometry --- the structure of the space
+that makes the technical work possible and the creative work coherent.
+
+The central claim is simple, and it will reappear in many guises:
+\emph{representing a signal means projecting it onto a set of reference
+vectors}.  The Fourier transform projects onto sinusoids.  The wavelet
+transform projects onto localized oscillations.  Principal component
+analysis projects onto data-derived directions of maximum variance.  A
+neural network projects onto weight vectors learned from data, then
+applies a nonlinearity and projects again.  The mathematics underlying
+all four is the same: an inner product, repeated.  What differs is the
+choice of reference vectors and whether they are designed by hand or
+learned from data.
+
+\marginnote{%
+\textbf{Notation.}  Vectors are denoted by bold lowercase letters
+$\xb$, $\yb$.  Matrices by bold uppercase, $\Wb$, $\mathbf{B}$.  The
+$n$-th component of vector $\xb$ is written $\xb[n]$.  The inner product
+of two vectors is $\inner{\xb}{\yb}$, and convolution is $\xb \conv \yb$.
+Appendix~\ref{ch:matrix_theory} reviews matrix conventions.}
+
+%------------------------------------------------------------------------
+\section{Vector spaces}
+%------------------------------------------------------------------------
+
+To think of a signal as a point in space, we need to say precisely what
+``space'' means.  A \emph{vector space} is a set $V$ on which two
+operations are defined --- addition of elements, and multiplication by
+scalars --- which satisfy a list of axioms.\sidenote{The full axiom list
+appears in Appendix~\ref{ch:matrix_theory}; for our purposes, what matters
+is that they let us add signals and scale them without leaving the space.}
+The elements of $V$ are called \emph{vectors}.  When the scalar field is
+the real numbers $\R$, we say $V$ is a real vector space; when it is the
+complex numbers $\C$, a complex vector space.
+
+A discrete-time signal of length $N$ is naturally an element of $\R^N$
+(or $\C^N$, if we allow complex samples).  The $n$-th component is the
+$n$-th sample.  Adding two signals samplewise is vector addition.
+Multiplying every sample by a constant is scalar multiplication.  The
+zero vector is the silent signal.
+
+In this book we work exclusively in finite dimensions.  The infinite-dim\-en\-sion\-al
+theory of Hilbert spaces is beautiful and important, but everything we
+need can be done in $\R^N$ or $\C^N$, and the finite case is what the
+computer manipulates anyway.
+
+%------------------------------------------------------------------------
+\section{Norm: the size of a signal}
+%------------------------------------------------------------------------
+
+To say one signal is louder than another, or that one is close to
+another, we need a notion of size and of distance.  A \emph{norm} on a
+vector space $V$ is a function $\norm{\cdot}: V \to \R$ satisfying
+\emph{(i)} $\norm{\xb} \ge 0$ with equality only at $\xb = \mathbf{0}$,
+\emph{(ii)} $\norm{\alpha \xb} = \abs{\alpha} \norm{\xb}$ for any scalar
+$\alpha$, and \emph{(iii)} the triangle inequality $\norm{\xb + \yb} \le
+\norm{\xb} + \norm{\yb}$.
+
+The norm we will use almost everywhere is the \emph{Euclidean} or
+\emph{$L^2$} norm,
+\begin{equation}
+    \norm{\xb}_2 \;=\; \sqrt{\sum_{n=0}^{N-1} \abs{\xb[n]}^2}.
+    \label{eq:l2norm}
+\end{equation}
+The square of this quantity, $\norm{\xb}_2^2$, has a physical
+interpretation when $\xb$ is an audio signal: it is the \emph{energy} of
+the signal.  We will often work with energy directly rather than with
+the norm, because it avoids the square root.
+
+\marginnote{%
+Other norms exist and matter.  The $L^1$ norm $\sum_n \abs{\xb[n]}$ is
+used in sparse coding because it prefers solutions with many zeros.  The
+$L^\infty$ norm $\max_n \abs{\xb[n]}$ is the peak amplitude.  We will
+meet $L^1$ again in Part~\textsc{III} when we discuss matching pursuit.}
+
+A vector space equipped with a norm is called a \emph{Banach space}.
+Banach spaces are what we need to talk about size and convergence.  We
+need one more piece of structure --- an inner product --- to talk about
+angles and projections.  That promotes a Banach space to a Hilbert space.
+
+%------------------------------------------------------------------------
+\section{Inner product: global similarity}
+%------------------------------------------------------------------------
+
+The inner product is the single most important operation in this book.
+For two real-valued signals $\xb$ and $\yb$ of length $N$,
+\begin{equation}
+    \inner{\xb}{\yb} \;=\; \sum_{n=0}^{N-1} \xb[n]\, \yb[n].
+    \label{eq:inner}
+\end{equation}
+For complex-valued signals, the second factor is conjugated:
+$\inner{\xb}{\yb} = \sum_n \xb[n]\, \overline{\yb[n]}$.
+
+Geometrically, the inner product measures \emph{similarity}.  The clean
+statement is the following.  Two vectors with the same magnitude have a
+large inner product when they point in the same direction, zero when
+they are perpendicular, and a large negative value when they point in
+opposite directions.\sidenote{The relation
+$\inner{\xb}{\yb} = \norm{\xb}\, \norm{\yb} \cos\theta$, where $\theta$
+is the angle between them, makes this precise.  When $\theta = 0$ the
+cosine is $1$; when $\theta = \pi/2$ it is zero; when $\theta = \pi$ it
+is $-1$.}  When two vectors are identical, their inner product is the
+square of their norm: $\inner{\xb}{\xb} = \norm{\xb}^2$.  When they are
+orthogonal ($\inner{\xb}{\yb} = 0$), they share nothing along each
+other's direction.
+
+The inner product is \emph{global}.  Every sample of $\xb$ is multiplied
+with every corresponding sample of $\yb$, and the products are summed
+into a single number.  No spatial or temporal locality is preserved ---
+the contribution of a sample at the beginning of the signal is
+indistinguishable, in the final sum, from the contribution of a sample
+at the end.  This is sometimes what we want (when comparing the overall
+frequency content of two signals, say) and sometimes not (when looking
+for a specific pattern at an unknown time).  When we want locality, we
+use convolution instead, which is the next section's subject.
+
+A vector space equipped with an inner product (and the norm derived
+from it via $\norm{\xb} = \sqrt{\inner{\xb}{\xb}}$) is called a
+\emph{Hilbert space}.  Hilbert spaces are the natural setting for
+analysis, synthesis, and learning.  Every space we work with in this book
+will be a Hilbert space.
+
+%------------------------------------------------------------------------
+\section{Convolution: local similarity}
+\label{sec:convolution}
+%------------------------------------------------------------------------
+
+A signal is rarely interesting in its entirety.  When we listen, we
+attend to local features --- the attack of a note, a particular harmonic
+fluctuation, a pause.  The mathematical operation that picks out local
+features is the \emph{convolution}.
+
+Given a signal $\xb$ and a short pattern $\mathbf{h}$ (called the
+\emph{kernel} or \emph{filter}) of length $M$, the convolution
+$\xb \conv \mathbf{h}$ is the sequence
+\begin{equation}
+    (\xb \conv \mathbf{h})[n]
+    \;=\;
+    \sum_{m=0}^{M-1} \xb[n+m]\, \mathbf{h}[m].
+    \label{eq:conv}
+\end{equation}
+For each output position $n$, the kernel is aligned with the signal
+starting at sample $n$, and the inner product is taken over just those
+$M$ samples.  This is the local version of the inner product from the
+previous section: instead of computing one number that summarises the
+entire signal, we compute many numbers, each summarising a small
+neighbourhood.
+
+\marginnote{%
+A small example.  If $\mathbf{h} = (1, -1)$, then
+$(\xb \conv \mathbf{h})[n] = \xb[n+1] - \xb[n]$, the discrete derivative.
+If $\mathbf{h} = (1, 1)/2$, we get a two-point smoother.  Choosing
+$\mathbf{h}$ chooses what features the convolution highlights.  This is
+precisely what a convolutional neural network learns to do: its kernels
+are exactly such patterns, but discovered from data rather than designed.}
+
+Convolution sits at the centre of both signal processing and modern
+machine learning.  In signal processing it underlies filtering,
+reverberation, pattern detection, and edge detection.  In machine
+learning it is the basis of convolutional neural networks, which we
+build in Part~\textsc{II}.  In both fields, convolution is doing the
+same thing: \emph{repeated inner products, slid along the signal}.
+
+The kernel $\mathbf{h}$ is itself a signal --- a short one, typically.
+Choosing the kernel is choosing what local feature to look for.  A
+kernel that resembles a quarter-period of a sinusoid will respond
+strongly where the signal looks like that fragment of sinusoid; this is
+the seed of Fourier analysis.  A kernel that resembles an edge will
+respond at sharp transitions; this is the seed of the Sobel filter and
+of the first layer of an image conv-net.  Different kernels reveal
+different features; the right kernel to use depends on what we are
+trying to discover.
+
+There is a deep theorem connecting convolution to Fourier analysis,
+namely that convolution in the time domain is equivalent to pointwise
+multiplication in the frequency domain.  We will state and prove it in
+Chapter~\ref{ch:apriori} when we have set up the Fourier transform;
+Appendix~\ref{ch:convolution_theorem} contains a fuller proof.  The
+practical implication is that convolution can be computed quickly via
+the FFT, which is why convolutional networks scale.
+
+%------------------------------------------------------------------------
+\section{Basis and projection}
+%------------------------------------------------------------------------
+
+We have inner products (global similarity) and convolutions (local
+similarity).  The next step is to use them to \emph{decompose} a signal
+into pieces.
+
+Given a set of vectors $\{\mathbf{b}_1, \mathbf{b}_2, \ldots,
+\mathbf{b}_K\}$ in a vector space $V$, the \emph{span} of the set is the
+collection of all linear combinations
+\(
+\sum_k \alpha_k \mathbf{b}_k
+\)
+that can be formed from them.  If every vector in $V$ can be written
+this way --- if the span of the set is all of $V$ --- and if no vector
+in the set is a linear combination of the others, the set is called a
+\emph{basis} for $V$.
+
+A basis is the minimal set of building blocks for the space.  In $\R^N$
+there are always exactly $N$ vectors in any basis; we can pick the
+``natural'' basis $\mathbf{e}_n$ (the $n$-th unit vector, equal to one
+at position $n$ and zero elsewhere) or any other set of $N$ linearly
+independent vectors.
+
+The point of having a basis is that any vector $\xb \in V$ can be
+written uniquely as
+\begin{equation}
+    \xb \;=\; \sum_{k=1}^{N} c_k\, \mathbf{b}_k.
+    \label{eq:expansion}
+\end{equation}
+The numbers $c_k$ are the \emph{coordinates} of $\xb$ in the basis
+$\{\mathbf{b}_k\}$.  They are what change when we change basis; the
+underlying vector $\xb$ does not.
+
+When the basis is \emph{orthonormal} --- meaning the basis vectors are
+mutually perpendicular and each has unit norm --- there is a beautifully
+simple formula for the coordinates:
+\begin{equation}
+    c_k \;=\; \inner{\xb}{\mathbf{b}_k}.
+    \label{eq:coord_orth}
+\end{equation}
+The coordinate $c_k$ is just the inner product of $\xb$ with the $k$-th
+basis vector.  Combining this with~\eqref{eq:expansion},
+\begin{equation}
+    \xb \;=\; \sum_{k=1}^{N} \inner{\xb}{\mathbf{b}_k}\, \mathbf{b}_k.
+    \label{eq:reconstruction}
+\end{equation}
+This is the single most important formula in classical signal processing.
+It says: to reconstruct $\xb$, compute its inner product with each basis
+vector (the \emph{analysis} step), then build $\xb$ back up by combining
+the basis vectors weighted by those inner products (the \emph{synthesis}
+step).  In an orthonormal basis, analysis and synthesis are exact
+inverses of one another.
+
+\marginnote{%
+When the basis is not orthonormal, equation~\eqref{eq:coord_orth} still
+makes sense as the \emph{projection} of $\xb$ onto the direction of
+$\mathbf{b}_k$, but the projections no longer give exact coordinates ---
+the basis vectors interfere.  An orthonormal basis decouples them.
+This is why so many useful representations (Fourier, the standard
+basis, principal components) are designed to be orthonormal.}
+
+We will see many examples of \eqref{eq:reconstruction} in disguise.
+The Fourier transform is this formula with $\mathbf{b}_k$ a sinusoid of
+frequency $k$.  The Discrete Wavelet Transform is this formula with
+$\mathbf{b}_k$ a scaled, shifted copy of a mother wavelet.  Principal
+component analysis is this formula with $\mathbf{b}_k$ the $k$-th
+eigenvector of the data covariance.  A neural network with linear
+activations is this formula with $\mathbf{b}_k$ a learned weight vector.
+
+\emph{The choice of basis is the design of the representation.}  When we
+pick sinusoids, we have decided that frequency is the property we want
+to expose.  When we pick wavelets, we have decided that local
+time-frequency structure matters.  When we let a network learn its
+basis, we have decided to let the data decide.  Each choice has
+consequences: it determines what the representation makes obvious, what
+it hides, and what kinds of operations are easy versus hard to express
+in it.  Part~\textsc{II} of this book builds the tools to make such
+choices; Part~\textsc{III} explores their compositional consequences.
+
+%------------------------------------------------------------------------
+\section{Analysis and synthesis as matrices}
+%------------------------------------------------------------------------
+
+Equations~\eqref{eq:coord_orth} and~\eqref{eq:reconstruction} both
+become cleaner when written in matrix form.  Let $\mathbf{B}$ be the
+matrix whose $k$-th \emph{row} is the basis vector $\mathbf{b}_k^\top$.
+Then computing all the inner products $\inner{\xb}{\mathbf{b}_k}$ at
+once is the same as multiplying $\xb$ by $\mathbf{B}$:
+\begin{equation}
+    \mathbf{c} \;=\; \mathbf{B}\, \xb \qquad \text{(analysis)}.
+    \label{eq:analysis_matrix}
+\end{equation}
+The vector $\mathbf{c}$ contains all the coordinates $c_k$.  Equivalently
+written, $\mathbf{c} = \Phi(\xb)$ where $\Phi$ is the \emph{analysis
+operator}.
+
+For the synthesis direction, if the basis is orthonormal, the inverse of
+$\mathbf{B}$ is its transpose (or, in the complex case, its Hermitian
+adjoint $\mathbf{B}^H$).  Multiplying~\eqref{eq:analysis_matrix} on the
+left by $\mathbf{B}^H$ recovers $\xb$:
+\begin{equation}
+    \xb \;=\; \mathbf{B}^H \mathbf{c} \;=\; \mathbf{B}^H\, \mathbf{B}\, \xb
+    \qquad \text{(synthesis)}.
+    \label{eq:synthesis_matrix}
+\end{equation}
+For non-orthonormal but still invertible $\mathbf{B}$, the synthesis
+uses $\mathbf{B}^{-1}$ rather than $\mathbf{B}^H$.
+
+So the entire analysis-synthesis cycle is just a pair of matrix-vector
+multiplications.  This is the bridge to the rest of the book.  The
+Fourier transform is exactly this with one specific choice of
+$\mathbf{B}$ (a matrix of complex sinusoids).  The DWT is this with a
+different specific choice (a matrix of wavelets at multiple scales).  A
+linear neural-network layer is this with $\mathbf{B}$ \emph{learned from
+data} instead of designed in advance.
+
+%------------------------------------------------------------------------
+\section{From basis to representation}
+\label{sec:representations}
+%------------------------------------------------------------------------
+
+The basis idea generalises in three important ways, and the
+generalisations are what make modern representations work.
+
+\paragraph{Relaxing linear independence.}
+In a classical basis, we insist that no basis vector is a linear
+combination of the others.  This is what makes the representation
+\emph{unique}: every $\xb$ has exactly one set of coordinates.  But
+uniqueness is not always what we want.  Sometimes we want a redundant
+set of vectors --- more than $N$ of them in an $N$-dimensional space ---
+because the redundancy can encode information about the signal that a
+minimal basis cannot.  Such sets are called \emph{frames} or
+\emph{dictionaries}.  Matching pursuit, which we will meet in
+Part~\textsc{III}, is a method for choosing a sparse subset of a
+dictionary to represent a signal.
+
+\paragraph{Allowing dimensionality change.}
+In a classical basis, the matrix $\mathbf{B}$ is square: $N$ basis
+vectors in an $N$-dimensional space.  If we allow $\mathbf{B}$ to be
+rectangular --- say $K \times N$ with $K < N$ --- we get a
+\emph{projection onto a subspace}.  The output has fewer dimensions than
+the input.  This is dimensionality reduction, and it is what PCA, the
+encoder of an autoencoder, and the early layers of a classifier all do.
+The inverse direction --- $N$ to $K$ with $K > N$ --- is dimensionality
+expansion, which is what the decoder of an autoencoder does, and what
+generative models do when they turn a small latent vector into a full
+image or audio file.
+
+\paragraph{Nonlinearity.}
+A pure projection $\xb \mapsto \mathbf{B}\xb$ is a linear operation;
+composing two linear operations gives another linear operation, so
+\emph{stacking} pure projections gives nothing new --- any depth of
+linear layers collapses to a single equivalent layer.  To get a deep
+representation that is more expressive than a shallow one, we need to
+insert a nonlinearity between the projections.  In modern neural
+networks, this is the ReLU function $\max(0, \cdot)$, the sigmoid
+$\sigma$, or any of a small zoo of others.  In the Scattering Transform
+(Chapter~\ref{ch:apriori}), it is the absolute value $\abs{\cdot}$ that
+plays this role.
+
+Putting all three together --- redundant dictionaries, varying
+dimensionality, nonlinear stages --- gives the basic shape of a modern
+representation:
+\begin{equation}
+    \mathbf{z}^{(k)} \;=\; f_k\!\left(\mathbf{B}_k\, \mathbf{z}^{(k-1)} + \mathbf{b}_k\right),
+    \qquad k = 1, 2, \ldots, L,
+    \label{eq:layered}
+\end{equation}
+with $\mathbf{z}^{(0)} = \xb$ the input, $\mathbf{B}_k$ the projection
+matrix of the $k$-th layer, $\mathbf{b}_k$ a bias vector (allowing the
+layer to be \emph{affine} rather than purely linear, which lets the
+representation work with non-zero-centred data), and $f_k$ the
+nonlinearity.
+
+\marginnote{%
+\textbf{Encoders and decoders.}  When the layers reduce dimensionality
+($\mathbf{B}_k$ progressively narrower) and end in a small latent
+vector, we call the whole stack an \emph{encoder}.  Reverse it ---
+layers that progressively expand dimensionality from a latent vector
+back to a full signal --- and we have a \emph{decoder}.  An
+autoencoder is an encoder followed by a decoder, trained so that the
+output reconstructs the input.}
+
+Equation~\eqref{eq:layered} is the structural backbone of essentially
+every neural network in this book.  Chapter~\ref{ch:learned} discusses
+how the $\mathbf{B}_k$ and $\mathbf{b}_k$ are \emph{learned} from data
+by gradient descent on a loss function.  In Part~\textsc{II} we will
+build the code that does this.
+
+%------------------------------------------------------------------------
+\section{What we have so far, and what comes next}
+%------------------------------------------------------------------------
+
+We have set up the conceptual frame:
+
+\begin{itemize}
+    \item Signals are vectors in a finite-dimensional Hilbert space.
+    \item The inner product measures global similarity between vectors.
+    \item Convolution is the inner product applied locally, kernel-by-kernel.
+    \item Representations are projections onto a chosen basis (or
+    dictionary), and reconstruction is the reverse operation.
+    \item The choice of basis is the design of the representation; it
+    determines what is made obvious and what is hidden.
+    \item Layered representations stack projections separated by
+    nonlinearities, allowing them to express far more than a single linear
+    projection can.
+\end{itemize}
+
+\noindent The next two chapters give specific instances.
+Chapter~\ref{ch:apriori} treats \emph{a-priori} representations --- those
+whose basis is designed in advance --- with the Fourier transform, the
+wavelet transform, and the Scattering Transform as our three main
+examples.  Chapter~\ref{ch:learned} treats \emph{learned} representations
+--- those whose basis is derived from data --- with principal component
+analysis, $k$-means clustering, matching pursuit, and neural networks.
+Chapter~\ref{ch:style_transfer} closes Part~\textsc{I} by working a
+single concrete problem --- musical style transfer --- through each of
+these representations in turn, showing how the choice changes what is
+possible.  This sets up the technical work of Part~\textsc{II}, where we
+build the code, and the compositional work of Part~\textsc{III}, where
+we use it.

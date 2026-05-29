@@ -1,0 +1,527 @@
+% chapters/03_learned_representations.tex
+%
+% Part I, Chapter 3.  Learned representations: PCA, k-means, matching
+% pursuit, neural networks (FC and conv).  Adapted from the geometric
+% tour's Chapter 3 with matching pursuit added (it's central to Part III)
+% and the "survey of architectures" section cut (deferred to Part II,
+% which builds those architectures in depth, and the closing chapter of
+% Part III, which explains what we deliberately didn't cover).
+
+\chapter{Learned representations}
+\labch{learned}
+
+\epigraph{All models are wrong, but some are useful.}{George E.~P.~Box}
+
+%------------------------------------------------------------------------
+\section{When the basis comes from data}
+%------------------------------------------------------------------------
+
+\noindent The previous chapter built three representations whose
+reference vectors --- sinusoids for Fourier, scaled and shifted wavelets
+for the DWT, products of those for Scattering --- were chosen by
+mathematicians in advance.  This works beautifully when we know what
+property we want to expose.  We want pitch, so we project onto
+sinusoids.  We want time-frequency structure, so we project onto
+wavelets.  The chosen reference vectors carry our prior knowledge about
+the signal.
+
+\marginnote{%
+\textbf{The bias-variance trade-off.}  Predefined bases are
+\emph{low-variance}: they don't depend on which data you fed them, so
+they don't overfit.  They're also \emph{high-bias}: if your signal
+doesn't decompose well into the chosen basis, no amount of clever
+analysis will help.  Learned bases reverse the trade-off.  This is the
+classical bias-variance picture, made concrete.}
+
+But what do we do when we don't know what to look for?  When we have a
+million labeled images of cats and dogs and want a representation that
+distinguishes them, we have no idea what mathematical function picks
+out the relevant cat-vs-dog features.  When we have orchestral recordings
+and want a representation that captures a composer's style, we cannot
+write down by hand what reference vectors would expose ``Mahler-ness.''
+The features are real but they are not in any catalogue we know how to
+consult.
+
+The natural move is to \emph{let the data choose the basis}.  Rather
+than designing the reference vectors mathematically, we look at many
+examples of signals and derive a set of vectors that, in some sense,
+captures what is common or what is distinguishing.  This is what
+\emph{learned representations} do.  The basis is no longer in a textbook;
+it lives in a parameter array computed from data.
+
+This chapter introduces four learned representations of increasing
+sophistication.  Principal Component Analysis (Section~\ref{sec:pca})
+finds the directions of greatest variance in a dataset.  $K$-means
+(Section~\ref{sec:kmeans}) finds prototypes that group similar
+examples.  Matching pursuit (Section~\ref{sec:mp}) builds a sparse,
+interpretable approximation of a signal from a large dictionary of
+candidates.  Neural networks (Section~\ref{sec:nn}) learn nonlinear,
+multi-layered representations whose components are themselves
+learned-from-data projections.
+
+In all four cases, the underlying structure is the same as in the
+previous chapter: project the signal onto reference vectors, possibly
+apply a nonlinearity, possibly stack layers.  The only difference is
+where the reference vectors come from.
+
+%------------------------------------------------------------------------
+\section{Principal Component Analysis}
+\label{sec:pca}
+%------------------------------------------------------------------------
+
+PCA is the simplest learned representation: a linear projection whose
+basis vectors are the directions of maximum variance in the data.
+
+Given a data matrix $\mathbf{X} \in \R^{N \times d}$ with one example per
+row (so $N$ examples of dimension $d$), PCA proceeds in three steps.
+
+\paragraph{1. Centre the data.}  Subtract the per-feature mean so that
+the columns of $\mathbf{X}$ have zero mean.  This is essential because
+the geometric machinery of PCA assumes the data is centred at the
+origin.
+
+\paragraph{2. Compute the covariance.}  Form
+\begin{equation}
+    \mathbf{C} \;=\; \frac{1}{N}\, \mathbf{X}^\top \mathbf{X}.
+\end{equation}
+The $(i, j)$ entry of $\mathbf{C}$ is the covariance between feature $i$
+and feature $j$.
+
+\paragraph{3. Diagonalise.}  Find the eigenvalues $\lambda_1 \ge
+\lambda_2 \ge \cdots \ge \lambda_d \ge 0$ and corresponding eigenvectors
+$\mathbf{e}_1, \ldots, \mathbf{e}_d$ of $\mathbf{C}$.  These eigenvectors
+are the \emph{principal components} --- the directions in feature space
+along which the data has the most variance.  The first eigenvector
+$\mathbf{e}_1$ is the single direction along which the data spreads
+most; $\mathbf{e}_2$ is the direction of next greatest spread
+perpendicular to $\mathbf{e}_1$; and so on.
+
+To get a $k$-dimensional representation we project onto the first $k$
+eigenvectors.  Let $\mathbf{E}_k \in \R^{d \times k}$ be the matrix
+whose columns are $\mathbf{e}_1, \ldots, \mathbf{e}_k$.  Then
+\begin{equation}
+    \mathbf{Z} \;=\; \mathbf{X}\, \mathbf{E}_k
+\end{equation}
+is the data expressed in the $k$-dimensional principal-component basis.
+
+\marginnote{%
+PCA is mathematically a singular value decomposition (SVD) of the data
+matrix $\mathbf{X}$ in disguise: the principal components are the right
+singular vectors of $\mathbf{X}$.  When we work with PCA in Part~II,
+the SVD is the practical computation.}
+
+\paragraph{PCA in the framework.}  Compare $\mathbf{Z} = \mathbf{X}\,
+\mathbf{E}_k$ with the analysis formula
+$\mathbf{c} = \mathbf{B}\, \xb$ from the previous chapter.  PCA is
+exactly that, with $\mathbf{B} = \mathbf{E}_k^\top$ (the principal-component
+matrix) and the data being analysed simultaneously rather than one
+example at a time.  The reference vectors are the eigenvectors.  The
+only thing that distinguishes PCA from the Fourier transform, at the
+level of mathematical structure, is that the basis vectors come from
+the data instead of from $e^{i 2 \pi k n / N}$.
+
+\paragraph{What PCA captures.}  PCA is a tool for finding low-dimensional
+linear structure in high-dimensional data.  When applied to natural
+images, its principal components often look like blurry blobs and
+gradients --- the most-variance directions in the space of $32 \times 32$
+RGB images.  When applied to speech features, the principal components
+capture coarse vowel-vs-consonant structure.  When applied to text
+embeddings, they capture broad semantic axes (topic, sentiment).
+
+What PCA cannot capture is nonlinear structure.  The data may lie on
+a curved manifold in feature space; PCA will fit it with a flat
+hyperplane and lose all the curvature.  For nonlinear structure we
+need either to engineer nonlinear features by hand (a hard problem) or
+to learn them with a network (the rest of this chapter).
+
+%------------------------------------------------------------------------
+\section{$K$-means and prototypes}
+\label{sec:kmeans}
+%------------------------------------------------------------------------
+
+$K$-means takes a different geometric view.  Rather than finding
+directions of variance, it finds \emph{prototypes}: a small set of
+representative points such that every other data point is close to one
+of them.
+
+\paragraph{The algorithm.}  Given data points $\xb_1, \ldots, \xb_N$
+and a chosen number of clusters $K$:
+
+\begin{enumerate}
+    \item Initialise $K$ prototype vectors $\boldsymbol\mu_1, \ldots,
+    \boldsymbol\mu_K$ (often by randomly picking $K$ of the data
+    points).
+
+    \item \emph{Assign} each data point $\xb_n$ to the nearest
+    prototype:
+    \[
+        C_n \;=\; \arg\min_k \norm{\xb_n - \boldsymbol\mu_k}.
+    \]
+
+    \item \emph{Update} each prototype to the mean of the data points
+    assigned to it:
+    \[
+        \boldsymbol\mu_k \;=\; \frac{1}{|\{n : C_n = k\}|}
+        \sum_{n : C_n = k} \xb_n.
+    \]
+
+    \item Repeat steps 2--3 until the assignments stop changing.
+\end{enumerate}
+
+\paragraph{$K$-means in the framework.}  $K$-means looks like a
+different kind of object from PCA --- a discrete clustering rather than
+a linear projection.  But viewed through our framework it is still a
+representation by reference vectors: every signal $\xb$ is summarised
+by the index $C(\xb)$ of its nearest prototype, and the prototypes
+$\{\boldsymbol\mu_k\}$ are the reference vectors.  The ``projection''
+is the assignment operation, which is \emph{not} a linear map but a
+piecewise-constant function of $\xb$.  This is our first nonlinear
+representation, but the nonlinearity is hidden in the
+\emph{arg-min}.
+
+\marginnote{%
+$K$-means and PCA are sometimes presented as alternatives, but they
+answer different questions.  PCA: ``in what direction does the data
+spread the most?''  $K$-means: ``what are the typical examples?''
+A composer's archive analysed with PCA might give you a few axes of
+stylistic variation.  Analysed with $K$-means, it might give you a
+handful of representative pieces.  Both are useful; the right tool
+depends on what you want to do.}
+
+A useful matrix formulation: let $\mathbf{M} \in \R^{K \times d}$ be the
+matrix whose rows are the prototypes, and let $\mathbf{C} \in \R^{N
+\times K}$ be the binary assignment matrix with $C_{nk} = 1$ if example
+$n$ is in cluster $k$ and zero otherwise.  Then the reconstruction
+$\hat{\mathbf{X}} = \mathbf{C}\, \mathbf{M}$ replaces each data point
+with its assigned prototype, and $K$-means minimises the reconstruction
+error $\norm{\mathbf{X} - \mathbf{C}\, \mathbf{M}}_F^2$.  This is
+structurally an extreme dimensionality reduction --- each example is
+reduced to one integer in $\{1, \ldots, K\}$.
+
+%------------------------------------------------------------------------
+\section{Matching pursuit and sparse dictionaries}
+\label{sec:mp}
+%------------------------------------------------------------------------
+
+The two representations so far --- PCA and $K$-means --- both insist on
+a small basis: $k$ eigenvectors or $K$ prototypes.  Matching pursuit
+takes the opposite tack: provide a \emph{large} dictionary of candidate
+reference vectors, and let the analysis algorithm choose a small subset
+of them per signal.  This is the right idea when no fixed-size basis
+would do justice to the variety of signals we want to represent.
+
+\paragraph{Setup.}  Let $\mathbf{D} \in \R^{d \times M}$ be a
+\emph{dictionary}: a matrix whose $M$ columns $\mathbf{d}_1, \ldots,
+\mathbf{d}_M$ are candidate reference vectors (atoms).  We allow $M$
+to be much larger than $d$; the dictionary is \emph{overcomplete}.
+Atoms could be Gabor wavelets at many scales and frequencies, samples
+from a corpus of audio recordings, or anything else relevant.
+
+The goal is to approximate a signal $\xb$ as a sparse linear combination
+of atoms:
+\begin{equation}
+    \xb \;\approx\; \sum_{k=1}^{K} \alpha_k\, \mathbf{d}_{i_k},
+    \qquad
+    K \ll M.
+\end{equation}
+We want to find which $K$ atoms (the indices $i_1, \ldots, i_K$) and
+which coefficients $\alpha_1, \ldots, \alpha_K$ minimise the
+approximation error.  Choosing the best subset of $K$ atoms out of $M$
+is combinatorially explosive --- there are $\binom{M}{K}$ subsets to
+consider.  In practice we use a \emph{greedy} algorithm.
+
+\paragraph{The matching pursuit algorithm.}  At each step we pick the
+atom that explains the largest fraction of what remains.
+
+\begin{enumerate}
+    \item Start with residual $\mathbf{r}_0 = \xb$.
+    \item For $k = 1, 2, \ldots, K$:
+    \begin{enumerate}
+        \item Find the atom most correlated with the current residual:
+        \[
+            i_k \;=\; \arg\max_i \; \abs{\inner{\mathbf{r}_{k-1}}{\mathbf{d}_i}}.
+        \]
+        \item Compute its coefficient: $\alpha_k = \inner{\mathbf{r}_{k-1}}{\mathbf{d}_{i_k}}$
+        (assuming dictionary atoms are unit-norm).
+        \item Subtract the projection: $\mathbf{r}_k = \mathbf{r}_{k-1}
+        - \alpha_k \mathbf{d}_{i_k}$.
+    \end{enumerate}
+    \item Stop when $\norm{\mathbf{r}_K}$ is small enough, or when $K$
+    reaches a budget.
+\end{enumerate}
+
+\noindent The algorithm produces an approximation $\hat\xb = \sum_k
+\alpha_k \mathbf{d}_{i_k}$ that uses only $K$ of the $M$ available
+atoms.
+
+\paragraph{Why this is a representation.}  Matching pursuit produces,
+for each input signal $\xb$, a sparse list of (atom, coefficient) pairs.
+This list \emph{is} the representation.  Unlike a dense Fourier
+spectrum or a flat PCA projection, matching pursuit returns only
+those components that are large; the rest are implicit zeros.  The
+representation is naturally \emph{interpretable}: each atom is a
+specific pattern, and the coefficient tells you how much of that
+pattern is in the signal.
+
+\marginnote{%
+Matching pursuit was introduced by Mallat and Zhang in 1993.  Its
+descendants include orthogonal matching pursuit (OMP), basis pursuit
+(which solves a related $L^1$ minimisation problem), and the broader
+field of sparse coding and compressed sensing.  When the dictionary
+itself is also learned from data, the algorithm is called
+\emph{dictionary learning} or \emph{sparse coding}; this borders on
+unsupervised neural-network methods.}
+
+\paragraph{Matching pursuit in the framework.}  Matching pursuit is a
+representation by reference vectors --- the atoms --- but the
+``projection'' is no longer a single matrix multiplication.  It is the
+output of a small algorithm (the greedy selection loop).  The basis is
+also no longer a basis in the strict sense: the dictionary is redundant,
+and we deliberately use only a few atoms per signal.
+
+This breaks the clean ``matrix in, matrix out'' picture of the previous
+chapter, but it gains two things in exchange.  First, \emph{sparsity}:
+the representation has very few non-zero components, which is exactly
+what we often want for compression and for interpretation.  Second,
+\emph{adaptivity}: each signal gets its own custom subset of atoms,
+matched to its content, rather than being squeezed through the same
+projection as every other signal.
+
+\paragraph{Why matching pursuit matters here.}  We will meet matching
+pursuit again in Part~III, where it plays the role of a learned-but-not-neural
+codec: a way to decompose orchestral sounds into a sequence of
+atom-indices that captures their timbre and structure.  These
+atom-indices then become the input to a transformer model that learns
+to generate music.  In this sense matching pursuit gives us the best
+of both worlds: an interpretable codec like Fourier, and a learned
+basis like a neural network.
+
+This pattern --- combine an a-priori transform with a learned model on
+its output --- is increasingly common.  It is the basis of AudioLM,
+MusicLM, and several other recent music-generation systems.  We will
+build our own version in Part~III.
+
+%------------------------------------------------------------------------
+\section{Neural networks}
+\label{sec:nn}
+%------------------------------------------------------------------------
+
+We come to the modern centre of mass.  A \emph{neural network} is a
+representation built from many layers, each of which is a learned
+linear projection followed by a nonlinearity.
+
+\paragraph{A single layer.}  The basic building block, repeated many
+times, is
+\begin{equation}
+    \zb \;=\; f(\Wb \xb + \mathbf{b}).
+    \label{eq:nn_layer}
+\end{equation}
+Here $\Wb$ is a learned matrix of weights, $\mathbf{b}$ is a learned
+bias vector that allows the projection to be affine rather than purely
+linear, and $f$ is a fixed nonlinearity applied to each component (most
+commonly ReLU, $f(x) = \max(0, x)$).
+
+The inner product structure is right there in $\Wb \xb$.  Each row of
+$\Wb$ is a reference vector $\wb_i$, and the $i$-th component of the
+output is
+\begin{equation}
+    z_i \;=\; f\!\left( \inner{\wb_i}{\xb} + b_i \right).
+\end{equation}
+This is the inner-product analysis of the previous chapter, with two
+modifications: the basis vectors $\wb_i$ are learned, and a nonlinearity
+$f$ is applied to each result.
+
+\paragraph{Logistic regression as a one-layer network.}  When the
+nonlinearity is the sigmoid $\sigma(x) = 1 / (1 + e^{-x})$ and the
+output is interpreted as a probability, equation~\eqref{eq:nn_layer} is
+exactly \emph{logistic regression} --- the classical statistical model
+for binary classification.  This is not a coincidence: a neural network
+is, layer for layer, a stack of generalised regressions, each producing
+features for the next.
+
+\paragraph{Multiple layers.}  Stacking layers gives a deep network:
+\begin{equation}
+    \zb^{(L)} \;=\; f_L\!\left( \Wb_L \, f_{L-1}\!\left( \Wb_{L-1}\,
+    \cdots f_1\!\left( \Wb_1 \xb + \mathbf{b}_1 \right) \cdots
+    + \mathbf{b}_{L-1} \right) + \mathbf{b}_L \right).
+    \label{eq:nn_deep}
+\end{equation}
+Without the nonlinearities $f_i$, this composition would collapse into
+a single linear transformation --- the product $\Wb_L \cdots \Wb_1$ ---
+giving us no more expressive power than a one-layer network.  The
+nonlinearity is what makes depth meaningful.  We met this argument
+already in the Scattering Transform, where the absolute value played
+the same role.
+
+\marginnote{%
+\textbf{The universal approximation theorem.}  A sufficiently wide
+two-layer network with a non-polynomial nonlinearity can approximate
+any continuous function on a compact domain to any desired accuracy.
+This is a celebrated theoretical result, and it sounds powerful, but
+it understates the role of depth.  A two-layer network may need
+exponentially many neurons to do what a deeper network does with
+polynomially many.  Depth is not just possible; it is efficient.}
+
+\paragraph{How the weights are learned.}  This is the algorithmic heart
+of modern machine learning.  Given a dataset of input-output pairs
+$\{(\xb_n, \yb_n)\}$, we define a \emph{loss function} $\mathcal{L}$
+that measures how badly the network's predictions match the targets.
+We then adjust the weights to reduce the loss by \emph{gradient
+descent}:
+\begin{equation}
+    \Wb_\ell \;\leftarrow\; \Wb_\ell \,-\, \eta\,
+    \frac{\partial \mathcal{L}}{\partial \Wb_\ell},
+\end{equation}
+with a learning rate $\eta$.  Computing the gradients
+$\partial \mathcal{L} / \partial \Wb_\ell$ for every layer is done by
+\emph{backpropagation}, which is the multivariate chain rule applied
+methodically from the output layer back to the input layer.  Part~II
+of this book derives backpropagation in detail, implements it in C++,
+and verifies it with numerical gradient checks.
+
+\paragraph{Encoders and decoders.}  We can use depth-with-nonlinearity
+to build two complementary structures:
+
+\begin{itemize}
+    \item An \emph{encoder} starts with a high-dimensional input and
+    produces a progressively lower-dimensional representation,
+    distilling the input to a compact latent code.  Each layer has
+    fewer outputs than inputs.
+    \item A \emph{decoder} reverses the process: starts with a small
+    latent vector and produces a high-dimensional output.  Each layer
+    has more outputs than inputs.
+\end{itemize}
+
+\noindent An \emph{autoencoder} chains the two: encoder, latent
+bottleneck, decoder, trained so the output reconstructs the input.
+The latent bottleneck forces the network to find a compact
+representation that loses as little information as possible.  When the
+encoder and decoder are both deep nonlinear networks, the autoencoder
+is a learned analogue of PCA --- with the same goal (dimensionality
+reduction) but able to capture curved manifolds rather than just flat
+hyperplanes.
+
+A \emph{variational autoencoder} extends the autoencoder to a
+generative model: the bottleneck is interpreted as a probability
+distribution, and we can sample new outputs by sampling from the
+latent distribution and running them through the decoder.  Part~II
+builds both, and the audio VAE chapter of Part~II uses one to morph
+between sounds.
+
+%------------------------------------------------------------------------
+\section{Convolutional neural networks}
+%------------------------------------------------------------------------
+
+A convolutional neural network applies the inner product locally, like
+the Scattering Transform of the previous chapter, but with the filters
+learned from data rather than designed by hand.  The architectural
+template is exactly the same:
+
+\begin{itemize}
+    \item Convolve the input with a bank of filters.
+    \item Apply a nonlinearity.
+    \item Possibly pool (spatial downsampling).
+    \item Repeat for several layers.
+    \item Finish with a few dense layers for classification.
+\end{itemize}
+
+\noindent What changes from the scattering picture is that the filters
+are no longer wavelets chosen for analytical convenience; they are
+free parameters trained jointly with the rest of the network.  Each
+filter is a small inner product applied at every location in the input:
+the same inner product, slid across the signal.
+
+\paragraph{Why share weights.}  The defining feature of a CNN compared
+to a fully-connected network is \emph{weight sharing}: the same filter
+weights are used at every spatial position.  This has three
+consequences.  It reduces the number of parameters dramatically (a
+$3 \times 3$ filter on an image of any size has only 9 weights, not 9
+weights per image location).  It builds in \emph{translation
+equivariance}: shifting the input shifts the output.  And it encodes
+a prior of locality: each output value depends on a small local
+neighbourhood, capturing the fact that pixel relationships are
+usually nearby.
+
+These three are not optional features; they are the architectural prior
+that makes CNNs work on images and audio while fully-connected networks
+struggle.
+
+\marginnote{%
+\textbf{Empirically interpretable.}  Train a CNN on natural images and
+the first-layer filters --- which are easy to visualise as small RGB
+patches --- come out looking like oriented edge detectors and
+colour-opponent blobs.  These are exactly the kinds of features that
+classical signal-processing theory tells us \emph{should} be useful for
+natural images.  Krizhevsky's AlexNet paper (2012) and Zeiler and
+Fergus's 2014 follow-up made this picture famous; we reproduce it in
+Part~II's CIFAR-10 example.}
+
+\paragraph{The hierarchy.}  In a multi-layer CNN, early layers learn
+low-level features (edges, colour patches, texture primitives), middle
+layers learn combinations (corners, simple shapes, repeating textures),
+and late layers learn task-specific concepts (object parts, faces,
+musical-instrument families).  This hierarchical organisation emerges
+naturally from gradient descent on a classification loss; nothing in
+the training procedure explicitly asks for it.
+
+The same hierarchical pattern appeared in the Scattering Transform:
+first-layer wavelet coefficients capture frequency content, second-layer
+coefficients capture modulations of that content.  The CNN learns the
+same kind of hierarchy, but discovers what the relevant features
+\emph{are} from the data rather than receiving them as wavelets.  This
+is the gain from learning, and it is the gain that explains why CNNs
+dominate image and audio tasks in practice.
+
+%------------------------------------------------------------------------
+\section{The unified picture}
+%------------------------------------------------------------------------
+
+We have now seen, across two chapters, a sequence of representations:
+
+\begin{itemize}
+    \item \textbf{DFT}: linear projection onto sinusoids.
+    \item \textbf{DWT}: linear projection onto scaled-shifted wavelets.
+    \item \textbf{Scattering}: multi-layer wavelet cascade with absolute
+    value as nonlinearity.
+    \item \textbf{PCA}: linear projection onto eigenvectors of the data
+    covariance.
+    \item \textbf{$K$-means}: piecewise-constant assignment to learned
+    prototypes.
+    \item \textbf{Matching pursuit}: sparse selection from a learned (or
+    designed) overcomplete dictionary.
+    \item \textbf{Fully-connected network}: stacked nonlinear projections
+    with learned dense weights.
+    \item \textbf{Convolutional network}: stacked nonlinear projections
+    with learned local weights, shared across spatial position.
+\end{itemize}
+
+\noindent Every one of these fits the template $\Phi(\xb) = f(\mathbf{B}
+\xb)$, possibly with several layers stacked, possibly with the
+projection $\mathbf{B}\xb$ replaced by a convolution.  The two
+axes of variation are: (1) where the reference vectors come from
+(predefined or learned), and (2) whether locality is enforced
+(global inner products versus local convolutions).  This gives a $2
+\times 2$ table:
+
+\begin{center}
+\begin{tabular}{l|cc}
+        & \emph{Global} (inner product) & \emph{Local} (convolution) \\ \hline
+\emph{Designed basis} & DFT, PCA, $K$-means & DWT, Scattering \\
+\emph{Learned basis}  & FC network, matching pursuit & CNN \\
+\end{tabular}
+\end{center}
+
+The progression of this book is along the diagonal: from designed-global
+(Chapter~\ref{ch:apriori}) through designed-local and learned-global
+(this chapter) to learned-local (the CNN, and the conv-VAE we will
+build in Part~II).  Each step adds capability; each step also adds
+opacity, because learned representations are harder to interpret than
+designed ones.
+
+The next chapter closes Part~I by working a concrete problem ---
+musical style transfer --- through each cell of this table.  We will
+see what \emph{the same problem looks like} when posed in the waveform
+(Fourier), in the spectrum (DFT), in the wavelet domain (DWT), via
+sparse atoms (matching pursuit), and via a learned latent space
+(autoencoder).  The exercise will make vivid how the choice of
+representation determines what is musically possible.
