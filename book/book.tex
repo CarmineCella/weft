@@ -8,10 +8,12 @@
     fontsize=10pt,
     twoside=true,        % proper book layout: even/odd pages
     secnumdepth=2,       % number chapters, sections, subsections
-    fontmethod=modern,   % unicode-math via lualatex; uses TeX Gyre Pagella
-                         % (we patched kao.sty's modern path to use TeX Gyre
-                         % Pagella + DejaVu instead of Libertinus, since
-                         % Pagella ships with every TeX Live install).
+    fontmethod=tex,      % Palatino via newpx + pdflatex.  Uses fonts
+                         % that ship with every standard TeX Live install
+                         % (no Libertinus, no Liberation Mono, no fontspec).
+                         % The preprocess_note.py script normalises the
+                         % notes' Unicode chars before pandoc, so pdflatex
+                         % is sufficient.
 ]{kaobook}
 
 % --- Language / quotes ---
@@ -150,9 +152,9 @@
 \addpart{Foundation}
 \pagelayout{margin}
 
-\input{01_signals_as_vectors.tex}
-\input{02_apriori_representations.tex}
-\input{03_learned_representations.tex}
+\input{chapters/01_signals_as_vectors.tex}
+\input{chapters/02_apriori_representations.tex}
+\input{chapters/03_learned_representations.tex}
 % \input{chapters/04_style_transfer_problem.tex}     % bridge to Part II
 
 
@@ -173,7 +175,7 @@
 % that need a pre-processing pass before LaTeX renders them cleanly.
 % See book/TODO_part2.md for the preprocessing plan.
 
-\input{generated/0b_why_cpp.tex}
+\input{generated/00b_why_cpp.tex}
 \input{generated/01_matrix.tex}
 \input{generated/02_backprop.tex}
 \input{generated/02b_one_weight.tex}

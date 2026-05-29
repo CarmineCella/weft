@@ -57,7 +57,10 @@ PANDOC_FLAGS := --from markdown+tex_math_dollars+raw_tex \
                 --template pandoc-template.latex
 
 LATEXMK       := latexmk
-LATEXMK_FLAGS := -lualatex -interaction=nonstopmode -outdir=$(BUILD_DIR)
+LATEXMK_FLAGS := -pdf -interaction=nonstopmode -outdir=$(BUILD_DIR)
+# Engine: pdflatex.  The preprocess_note.py script handles all Unicode
+# in the notes before pandoc, so pdflatex is sufficient (and faster
+# than lualatex).  Requires fontmethod=tex in book.tex (set there).
 
 #---------------------------------------------------------------------------
 .PHONY: all notes clean distclean
@@ -78,11 +81,25 @@ generated/%.tex: $(NOTES_DIR)/%.md pandoc-template.latex preprocess_note.py
 # passes for cross-references automatically.  We depend on the generated
 # tex (so editing a note triggers a rebuild) and on the hand-written
 # chapter files (so editing those does too).
+#
+# The leading `-` on the latexmk line tells make to ignore latexmk's
+# exit code.  latexmk will return nonzero whenever pdflatex emits any
+# error, including for undefined cross-references to chapters or
+# appendices not yet written -- but the PDF is produced anyway in those
+# cases.  We check for the actual PDF after the run; if it's there, the
+# build succeeded; if not, fail.
 $(BUILD_DIR)/book.pdf: book.tex $(GENERATED) $(CHAPTERS)
 	@mkdir -p $(BUILD_DIR)
-	$(LATEXMK) $(LATEXMK_FLAGS) book.tex
-	@echo
-	@echo "Built $(BUILD_DIR)/book.pdf"
+	-$(LATEXMK) $(LATEXMK_FLAGS) book.tex
+	@if [ -f $(BUILD_DIR)/book.pdf ]; then \
+	    echo ""; \
+	    echo "Built $(BUILD_DIR)/book.pdf"; \
+	    echo "(Any 'Undefined refs' messages above are warnings, not errors --"; \
+	    echo " they refer to chapters/appendices not yet written.)"; \
+	else \
+	    echo "BUILD FAILED: no PDF produced.  See $(BUILD_DIR)/book.log."; \
+	    exit 1; \
+	fi
 
 clean:
 	rm -rf generated
