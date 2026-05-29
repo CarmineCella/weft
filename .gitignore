@@ -1,5 +1,8 @@
 .DS_Store
-build/bin
+build/tests
+build/examples
 data/mnist/
+data/cifar-10-batches-bin
 data/SOL_flat/
+data/Tiny_SOL
 .vscode
