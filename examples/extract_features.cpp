@@ -105,10 +105,14 @@ int main(int argc, char** argv) {
     std::cout << "output:     " << out_path << "\n\n";
 
     // ---- Scan files ----
+    // recursive_directory_iterator handles both flat layouts (the old
+    // SOL_flat) and nested ones (TinySOL's Winds/Fl/ordinario/... tree).
+    // TinySOL filenames keep the instrument prefix (e.g. Fl-ord-A4-...),
+    // so parse_class() works unchanged.
     std::cout << "scanning..." << std::flush;
     std::vector<fs::path> wav_paths;
     try {
-        for (const auto& entry : fs::directory_iterator(data_dir))
+        for (const auto& entry : fs::recursive_directory_iterator(data_dir))
             if (entry.path().extension() == ".wav")
                 wav_paths.push_back(entry.path());
     } catch (const std::exception& e) {

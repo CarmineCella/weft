@@ -4,7 +4,8 @@ build/examples
 data/mnist/
 data/cifar-10-batches-bin
 data/SOL_flat/
-data/Tiny_SOL
+data/TinySOL_2020
+data/*.db
 book/build
 book/generated
 book/book.aux
