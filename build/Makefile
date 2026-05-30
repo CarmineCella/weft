@@ -129,7 +129,7 @@ distclean: clean book-clean
 # loop on themselves.
 
 # Each test .cpp -> its own executable in build/tests/.
-tests/%: $(TEST_DIR)/%.cpp $(HEADERS)
+test/%: $(TEST_DIR)/%.cpp $(HEADERS)
 	@mkdir -p tests
 	$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
 
@@ -137,3 +137,7 @@ tests/%: $(TEST_DIR)/%.cpp $(HEADERS)
 examples/%: $(EXAMPLE_DIR)/%.cpp $(HEADERS)
 	@mkdir -p examples
 	$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
+
+
+
+	
