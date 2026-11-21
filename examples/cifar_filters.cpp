@@ -57,46 +57,23 @@ int main(int argc, char** argv) {
     // Re-build the same conv architecture as cifar_conv, then load the
     // saved weights into it.  ConvNetwork::load() requires the network
     // to be pre-built with the matching shape (same as Network::load).
+    // add() returns a reference to the layer it created; we keep the one
+    // to the first Conv2D so that we can read its weight matrix.
     // -----------------------------------------------------------------
     ConvNetwork<float> conv;
-    conv.add<Conv2D>  (/*in=*/3,  /*out=*/32, /*k=*/5, /*stride=*/1, /*pad=*/2);
+    Conv2D<float>& first_conv =
+        conv.add<Conv2D>(/*in=*/3,  /*out=*/32, /*k=*/5, /*stride=*/1, /*pad=*/2);
     conv.add<ReLU4D>  ();
     conv.add<MaxPool2D>(2);
     conv.add<Conv2D>  (/*in=*/32, /*out=*/64, /*k=*/3, /*stride=*/1, /*pad=*/1);
     conv.add<ReLU4D>  ();
     conv.add<MaxPool2D>(2);
-
     try { conv.load(prefix + ".conv"); }
     catch (const std::exception& e) {
         std::cerr << "error loading " << prefix << ".conv: " << e.what() << "\n";
         return 1;
     }
     std::cout << "loaded " << prefix << ".conv\n";
-
-    // The first conv layer is at index 0.  We need its weight matrix.
-    // ConvNetwork doesn't expose layers directly (it owns unique_ptrs),
-    // so we do a small dynamic_cast through a typed accessor.  Since we
-    // KNOW the architecture (we just built it), this is safe.
-    // We added Conv2D first via add<Conv2D>, which returns a reference,
-    // but we threw that away above for brevity.  Rebuild + load doesn't
-    // give us that handle back.  Solution: store the reference at add()
-    // time so we can read its weights afterwards.
-    //
-    // (Refactored: do that in the actual flow below.)
-
-    // -----------------------------------------------------------------
-    // Do the architecture build again, this time keeping the Conv2D
-    // reference returned by add() so we can inspect its weight matrix.
-    // -----------------------------------------------------------------
-    ConvNetwork<float> conv2;
-    Conv2D<float>& first_conv =
-        conv2.add<Conv2D>(/*in=*/3,  /*out=*/32, /*k=*/5, /*stride=*/1, /*pad=*/2);
-    conv2.add<ReLU4D>  ();
-    conv2.add<MaxPool2D>(2);
-    conv2.add<Conv2D>  (/*in=*/32, /*out=*/64, /*k=*/3, /*stride=*/1, /*pad=*/1);
-    conv2.add<ReLU4D>  ();
-    conv2.add<MaxPool2D>(2);
-    conv2.load(prefix + ".conv");
 
     const Matrix<float>& W = first_conv.W();   // (32, 3 * 5 * 5) = (32, 75)
     if (W.rows() != OUT_C || W.cols() != IN_C * K * K) {

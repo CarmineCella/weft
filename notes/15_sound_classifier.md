@@ -1,104 +1,105 @@
-# 15 — Musical instrument classifier (SOL)
+# 15 — Musical instrument classifier (TinySOL)
 
-Putting the audio pipeline to work. SOL_flat is ~5000 WAV files, each
-a single note from an orchestral instrument; the filename's first
-dash-delimited token is the instrument class. The job is to predict
-the instrument from the audio.
+This chapter applies the audio pipeline to a classification task.
+TinySOL is 1,532 WAV files (fetch them with
+`data/download_TinySOL_2020.sh`), each a single note from one of 12
+orchestral instruments. The first dash-delimited token of the
+filename is the instrument class. The task is to predict the
+instrument from the audio.
 
 This is the first weft example that builds its own dataset from raw
-files, and it's split across **two tools** so the slow feature-
-extraction step doesn't repeat on every classifier iteration.
+files. It is split across two tools so that the slow feature
+extraction step does not repeat on every classifier iteration.
 
 ---
 
 ## 1. Why two tools
 
-Feature extraction is the slow part. Each WAV file gets framed,
-windowed, FFTed several dozen times, then (for MFCC) run through the
-mel filterbank and DCT. Across 5000 files this takes a couple of
-minutes on a laptop. The actual neural-network training on the
-extracted features takes a few seconds at most.
+Feature extraction is the slow part. Each WAV file is framed,
+windowed and passed through the FFT more than a hundred times, then
+(for MFCC) through the mel filterbank and the DCT. Across the 1,532
+files this takes 20 to 30 seconds on a laptop. Training on the
+extracted features takes from a fraction of a second to a few
+minutes, depending on the features (section 7).
 
-If we kept everything in one binary, every iteration on the classifier
-would re-do the slow extraction first. Wasteful.
-
-So the workflow splits:
+With everything in one binary, every change to the classifier would
+repeat the slow extraction first. The workflow is therefore split:
 
 ```
 extract_features <data_dir> <output.feat> [logmag|mfcc] [averaged|per_frame]
 sound_classifier <feature_file>
 ```
 
-You run the extractor once per (dataset × feature_type × mode)
-combination, then iterate on the model as many times as you like. This
-is the standard ETL-then-train pattern that essentially every real ML
-project ends up with.
+The extractor runs once per (dataset × feature_type × mode)
+combination. The model can then be changed and retrained as many
+times as needed. This is the standard ETL-then-train pattern, used in
+most machine-learning projects.
 
 ---
 
-## 2. Two extraction modes
+## 2. Extraction modes
 
 ### Averaged (one feature per file)
 
-The original mode: STFT, energy-weighted average across frames, one
-fixed-length vector per file. Compact, fast, and the baseline result.
-Network architecture is sized to the feature dimension.
+This is the original mode: STFT, then an energy-weighted average
+across frames, giving one fixed-length vector per file. It is compact
+and fast, and it gives the baseline result. The network architecture
+is sized to the feature dimension.
 
 ### Per-frame (one feature per non-silent frame)
 
 For each WAV file we keep every non-silent STFT frame as its own
-training example. Same feature dimension as averaged mode (2049 for
-logmag, 13 for MFCC), but ~20× more rows.
+training example. The feature dimension is the same as in averaged
+mode (2049 for logmag, 13 for MFCC), but there are about 135 times as
+many rows (207,633 frames from the 1,532 files).
 
-Why it matters:
+The consequences are:
 
-- More training data per file → the network's parameters are better
-  constrained, less overfitting.
+- There is more training data per file, so the network's parameters
+  are better constrained and it overfits less.
 - The network can learn from the instrument's temporal evolution
-  (attack vs sustain vs release) rather than only seeing the time-
-  averaged spectrum.
+  (attack, sustain and release) instead of seeing only the
+  time-averaged spectrum.
 - At inference, predictions are aggregated across all frames of a
   test file by averaging softmax outputs and taking argmax. This is
-  ensembling and typically buys 5-10 percentage points on its own.
-- The same per-frame infrastructure is what we'll need for the
-  autoencoder / morphing work.
+  ensembling, and on TinySOL it accounts for most of the 3 to 5 points
+  that per-frame mode gains.
+- The same per-frame features are what the audio VAE of
+  [chapter 19](19_audio_vae.md) trains on.
 
-Trade-off: cache file is ~20× larger, training is ~20× more
-iterations per epoch (though each iteration is the same cost since
-the architecture is unchanged).
+The cost is that the cache file is about 135 times larger (1.7 GB for
+logmag) and an epoch has as many times more iterations. Each
+iteration costs the same, since the architecture is unchanged.
 
-For real SOL the averaged mode plateaus around 75% test accuracy with
-log-mag features; per-frame typically pushes that into the 85%+
-range, with much of the gap coming from per-file ensembling rather
-than the larger training set.
-
----
-
-## 3. The file-leakage problem (and the fix)
-
-Per-frame mode introduces a subtle issue: frames from the same file
-are not independent. They share most of their spectral character.
-If you split frames at random into train/test, frames from the same
-SOL file end up on both sides, and the network can essentially
-"memorise" specific files at frame granularity. Test accuracy looks
-inflated.
-
-The fix is to split **by file_id**, not by frame: choose 20% of files
-to be test, all of their frames go to test, none of their frames go
-to train. The cache stores a `file_id` per row exactly for this
-purpose, and `group_train_test_split` in `Data.h` does the file-aware
-split.
-
-For averaged mode this distinction doesn't matter — each row is its
-own file by construction — but the same function handles both cases
-uniformly (in averaged mode file_ids are `{0, 1, 2, ...}` and the
-behaviour collapses to a regular random split).
+On TinySOL the averaged mode reaches about 95% test accuracy with
+log-mag features and 93% with MFCCs. Per-frame mode reaches about
+98% with either (section 7).
 
 ---
 
-## 4. Per-file aggregation at eval time
+## 3. File leakage and the split by file
 
-Once the network is trained, evaluating per-frame mode means:
+In per-frame mode, frames from the same file are not independent.
+They share most of their spectral character. If frames are split at
+random into train and test, frames from the same SOL file end up on
+both sides, and the network can memorise specific files at the level
+of frames. The test accuracy is then inflated.
+
+The fix is to split by file_id, not by frame: 20% of the files are
+chosen for the test set, and all of their frames go with them. The
+cache stores a `file_id` per row for this purpose, and
+`group_train_test_split` in `Data.h` does the split by file.
+
+For averaged mode the distinction does not matter, because each row
+is its own file by construction. The same function handles both
+cases: in averaged mode the file_ids are `{0, 1, 2, ...}` and the
+result is a regular random split.
+
+---
+
+## 4. Per-file aggregation at evaluation time
+
+Evaluating a trained network in per-frame mode has these steps:
 
 1. Forward-pass all test frames through the network in batches.
 2. Group the resulting softmax outputs by `file_id`.
@@ -106,36 +107,36 @@ Once the network is trained, evaluating per-frame mode means:
 4. Argmax on the averaged vector to get a per-file prediction.
 5. Compare to the file's true label.
 
-This is a textbook example of test-time ensembling. Each frame gives
-a (slightly noisy) probability distribution over classes; averaging
-across all frames of a file cancels out frame-level noise and gives a
-much sharper file-level prediction.
+This is test-time ensembling. Each frame gives a slightly noisy
+probability distribution over classes. Averaging across all frames of
+a file cancels the frame-level noise and gives a much sharper
+file-level prediction.
 
-The reported "test acc (per file)" reflects this aggregation.
+The reported "test acc (per file)" is computed with this aggregation.
 
 ---
 
 ## 5. Confusion matrix
 
 After training, we print a `K × K` confusion matrix over the test
-set: rows are true class, columns are predicted class. The diagonal
-shows correct counts; off-diagonal entries show specific confusions.
+set. Rows are the true class and columns are the predicted class. The
+diagonal holds the correct counts, and the off-diagonal entries show
+specific confusions.
 
-This is much more informative than a single accuracy number. With
-~15 instruments you see, for example:
+This is more informative than a single accuracy number. With 12
+instruments it can show, for example:
 
-- Violin and viola confused with each other at high rate → structural
-  problem with this representation (their overlapping pitch ranges +
-  similar spectral envelopes are nearly indistinguishable in
-  averaged-over-time features)
-- Brass instruments cross-confused but not confused with strings →
-  the network learned the broad timbre family but is fuzzy on
-  individuals
-- Scattered random off-diagonals → mostly model noise
+- Violin and viola confused with each other at a high rate. This is
+  a structural problem with the representation: their overlapping
+  pitch ranges and similar spectral envelopes are nearly
+  indistinguishable in features averaged over time.
+- Brass instruments confused with one another but not with strings.
+  The network has learned the broad timbre family but separates the
+  individual instruments poorly.
+- Scattered off-diagonal entries. These are mostly model noise.
 
-For SOL specifically, the dominant confusions are within instrument
-families. That's both diagnostic and pedagogically interesting: a
-human listener would have the same trouble with isolated notes.
+For SOL the dominant confusions are within instrument families. A
+human listener would have the same difficulty with isolated notes.
 
 ---
 
@@ -158,52 +159,60 @@ int32[n_samples]                       labels
 int32[n_samples]                       file_ids
 ```
 
-Header integers are little-endian (assembled byte-by-byte, host-
-endian-agnostic). The bulk payload is native byte order — if you
-extract on one machine and load on a different-endianness machine,
-the floats will be scrambled. Don't do that.
+Header integers are little-endian, assembled byte by byte, so they
+do not depend on the host's byte order. The bulk payload is in native
+byte order. A cache extracted on one machine and loaded on a machine
+with the other byte order has scrambled floats, so this must be
+avoided.
 
-Version was bumped from 1 to 2 to add `per_frame` and `file_ids`.
-v1 caches can't be loaded; just re-run `extract_features`.
-
----
-
-## 7. What to expect from the four combinations
-
-| feature | mode      | typical test accuracy | training time |
-|---------|-----------|-----------------------|---------------|
-| mfcc    | averaged  | 70-80%                | seconds       |
-| mfcc    | per_frame | 80-88%                | < 30s         |
-| logmag  | averaged  | 75-85%                | ~30s          |
-| logmag  | per_frame | 85-92%                | ~3 min        |
-
-(Per-frame logmag is the slowest because of the 2049-dim Dense first
-layer × 20× more frames. Still very feasible on a laptop.)
-
-The gap from averaged → per_frame is mostly per-file ensembling
-working as intended. The gap from mfcc → logmag is the higher-
-resolution feature giving the network more to work with.
+The version changed from 1 to 2 to add `per_frame` and `file_ids`.
+A v1 cache cannot be loaded and must be regenerated with
+`extract_features`.
 
 ---
 
-## 8. What's still not in here
+## 7. Results for each combination
 
-- **CQT (Constant-Q Transform)** — logarithmically-spaced bins for
-  better pitch invariance. Genuinely worth adding; would slot in as a
-  third feature type alongside `logmag` and `mfcc`.
-- **Per-class weighting** — if some instruments have many more samples
-  than others, the loss is dominated by majority classes.
-- **Data augmentation** — pitch-shifting, time-stretching, additive
-  noise. Standard moves to lift accuracy further.
-- **Spectrogram-based ConvNet** — instead of averaging-or-aggregating
-  frame-level features, feed the full (frames × bins) spectrogram to
-  a 2D ConvNet. The biggest jump available, and the natural way to
-  handle time in audio. On the roadmap once ConvNets are built.
+| feature | mode      | test accuracy | training time |
+|---------|-----------|---------------|---------------|
+| mfcc    | averaged  | 92.8%         | 0.1 s         |
+| mfcc    | per_frame | 98.0%         | 9 s           |
+| logmag  | averaged  | 95.1%         | 5 s           |
+| logmag  | per_frame | 97.7%         | 13 min        |
 
-The current pipeline composes everything else we have — WAV I/O, FFT,
-windowing, mel filterbank, DCT, Adam, dropout, train/eval mode,
-standardisation, group-aware splitting, a small binary serialisation
-format — into a working end-to-end classifier you can iterate on.
+These are single runs on TinySOL with the default settings. With 306
+test files one file is a third of a percentage point, and the
+initial weights are not seeded, so the last digit changes from run
+to run. Per-frame logmag is the slowest because a 2049-wide first
+layer is applied to 135 times as many rows.
+
+Per-frame mode gains 3 to 5 points over averaged mode. In averaged
+mode logmag is ahead of MFCC by 2 points. In per-frame mode the two
+are equal, and logmag costs a hundred times more training time.
+
+---
+
+## 8. What is not implemented
+
+- **CQT (Constant-Q Transform).** Logarithmically spaced bins give
+  better pitch invariance. It would be worth adding as a third
+  feature type alongside `logmag` and `mfcc`.
+- **Per-class weighting.** If some instruments have many more samples
+  than others, the loss is dominated by the majority classes.
+- **Data augmentation.** Pitch shifting, time stretching and additive
+  noise are standard ways to raise accuracy further.
+- **Spectrogram-based ConvNet.** Instead of averaging or aggregating
+  frame-level features, the full (frames × bins) spectrogram is fed
+  to a 2D ConvNet. This is the largest improvement available, and
+  the usual way to handle time in audio. ConvNets arrive in
+  [chapter 22](22_convnets.md) and are applied to spectrograms in
+  [chapter 23](23_convvae.md), but a spectrogram classifier is not
+  implemented.
+
+The current pipeline combines the other components built so far (WAV
+I/O, FFT, windowing, mel filterbank, DCT, Adam, dropout, train/eval
+mode, standardisation, group-aware splitting, a small binary
+serialisation format) into a complete classifier.
 
 
 ## Further reading

@@ -24,6 +24,7 @@
 // mirror of the lower; an application that edits magnitudes must keep
 // that symmetry (see rebuild_hermitian below).
 //
+#include "AudioFeatures.h"   // detail::hann_window
 #include "FFT.h"
 
 #include <cmath>
@@ -34,17 +35,6 @@
 
 namespace weft {
 
-namespace detail {
-
-template <typename T>
-inline std::vector<T> hann(std::size_t n) {
-    std::vector<T> w(n);
-    for (std::size_t i = 0; i < n; ++i)
-        w[i] = T(0.5) * (T(1) - std::cos(T(2) * pi_v<T> * i / (n - 1)));
-    return w;
-}
-
-} // namespace detail
 
 // Forward STFT.  Returns one full-length complex spectrum per frame.
 // frame_size must be a power of two (FFT requirement).
@@ -59,7 +49,7 @@ stft(const std::vector<T>& signal,
     if (hop_size == 0)
         throw std::invalid_argument("stft: hop_size must be > 0");
 
-    const auto window = detail::hann<T>(frame_size);
+    const auto window = detail::hann_window<T>(frame_size);
     std::vector<std::vector<std::complex<T>>> frames;
 
     if (signal.size() < frame_size) return frames;
@@ -92,7 +82,7 @@ istft(const std::vector<std::vector<std::complex<T>>>& frames,
     const std::size_t needed   = (n_frames - 1) * hop_size + frame_size;
     const std::size_t len      = (out_length == 0) ? needed : out_length;
 
-    const auto window = detail::hann<T>(frame_size);
+    const auto window = detail::hann_window<T>(frame_size);
 
     std::vector<T> out(len, T(0));
     std::vector<T> norm(len, T(0));   // accumulated synthesis window power

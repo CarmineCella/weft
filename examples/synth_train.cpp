@@ -404,8 +404,9 @@ int cmd_train(int argc, char** argv) {
     model.sample_rate = sample_rate;
     model.instruments.resize(inst_id.size());
     for (const auto& kv : inst_id) model.instruments[std::size_t(kv.second)] = kv.first;
-    // Typical sustain loudness per instrument: median over frames of the
-    // 75th-percentile-loud part of each note.  Used only by the generators.
+    // Typical sustain loudness per instrument: the median, over the
+    // instrument's notes, of each note's 75th-percentile loudness.  Used
+    // only by the generators.
     model.typical_loud.assign(inst_id.size(), 0.6f);
     for (std::size_t q = 0; q < inst_id.size(); ++q) {
         std::vector<float> v;

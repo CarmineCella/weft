@@ -1,54 +1,52 @@
 # 22 — Convolutional networks
 
-For the first twenty chapters we worked exclusively with dense (fully
+For the first twenty chapters we worked only with dense (fully
 connected) layers. Dense layers handle the MNIST classifier, the Iris
-classifier, the audio VAE on spectrograms — anything where the input is
-naturally a flat vector of features and you don't care which feature
-sits next to which. They are limited in a specific, important way: they
-have no notion of *spatial structure*. A dense layer treats every input
-neuron as exchangeable with every other one. Permute the columns of a
-batch of MNIST images and a dense MLP, retrained on the permuted data,
-will reach exactly the same accuracy. That is the giveaway that dense
-layers are not using anything about the *2-D arrangement* of pixels.
-For images, that's leaving most of the structure on the table.
+classifier, the audio VAE on spectrograms, and any other case where
+the input is a flat vector of features and it does not matter which
+feature sits next to which. They have one specific limitation: they
+have no notion of spatial structure. A dense layer treats every input
+neuron as exchangeable with every other one. Apply the same fixed
+permutation to the pixels of every MNIST image (the rows of the batch
+matrix) and a dense MLP, retrained on the permuted data, will reach
+the same accuracy. This shows that dense layers use nothing about the
+2-D arrangement of pixels. For images, that means most of the
+structure is unused.
 
-This chapter is about the layer that does use it: **convolution**. The
-goal is to motivate it honestly, derive its forward and backward math,
-explain the engineering trick (`im2col` + matmul) that makes it run
-fast on a CPU, and then train a small ConvNet on CIFAR-10 to see the
-payoff — not just the accuracy number, but the *learned first-layer
-kernels*, which are interpretable as images in their own right and tell
-you what the network has actually decided "an edge" looks like.
+This chapter is about the layer that does use it: **convolution**. We
+motivate it, derive its forward and backward math, explain the
+technique (`im2col` + matmul) that makes it run fast on a CPU, and
+then train a small ConvNet on CIFAR-10. We look at the accuracy and
+also at the learned first-layer kernels, which can be displayed as
+images and show what the network has learned to treat as an edge.
 
 
 ## 1. Why dense MLPs are wrong for images
 
-Three reasons, each separately damning:
-
-**Parameter explosion.** A 32×32 RGB CIFAR-10 image has 32·32·3 = 3072
+**Parameter count.** A 32×32 RGB CIFAR-10 image has 32·32·3 = 3072
 input pixels. A single dense layer with 1024 hidden units would have
-3072 × 1024 ≈ 3.1 million weights in the *first layer alone*. Most of
-those weights are answering questions like "what is the joint relevance
-of pixel (3, 7, red) and pixel (28, 14, blue)?" — questions that for
-natural images simply don't have meaningful answers. The weights are
-mostly wasted.
+3072 × 1024 ≈ 3.1 million weights in the first layer alone. Most of
+those weights relate pairs such as pixel (3, 7, red) and
+pixel (28, 14, blue), whose joint relevance has no meaning for natural
+images. The weights are mostly wasted.
 
 **No translation invariance.** Suppose we have a perfectly trained
-dense MLP that classifies cats correctly. We take a cat image, shift
-every pixel one column to the right (and wrap the rightmost column to
-the left, say). To a human, it's the same cat. To the dense MLP, every
-single input has changed: the pixel that *was* at index 5 of the input
-vector is now at index 6, and the weight matrix has no idea those two
-positions are spatially adjacent. The MLP has to learn the concept of
-"cat" *separately* at every possible translation. That's vastly
-inefficient and, in practice, doesn't generalise.
+dense MLP that classifies cats correctly. We take a cat image and
+shift every pixel one column to the right (wrapping the rightmost
+column to the left, say). To a human, it is the same cat. To the dense
+MLP, every input has changed: the pixel that was at index 5 of the
+input vector is now at index 6, and the weight matrix holds no
+information that those two positions are spatially adjacent. The MLP
+has to learn the concept of "cat" separately at every possible
+translation. That is very inefficient and, in practice, doesn't
+generalise.
 
-**No exploitation of locality.** Natural images have a strong
-property: pixels close together in space are far more likely to be
-related than pixels far apart. Edges, textures, object parts — all
-local. A dense layer cannot represent this prior; it has to discover
-locality from data, using millions of weights that mostly should be
-zero. The right thing is to *build the locality into the architecture*.
+**No use of locality.** In natural images, pixels close together in
+space are far more likely to be related than pixels far apart. Edges,
+textures and object parts are all local. A dense layer cannot
+represent this prior; it has to learn locality from data, using
+millions of weights that mostly should be zero. It is better to build
+the locality into the architecture.
 
 
 ## 2. The convolution operator
@@ -58,56 +56,55 @@ A 2-D convolution at one output position computes
     y[h, w]  =  sum over (kh, kw) of  x[h + kh, w + kw] · k[kh, kw]
 
 where `k` is a small kernel (3×3 or 5×5 are typical) and the same
-kernel `k` is applied at every output position `(h, w)`. Three
-properties fall out for free:
+kernel `k` is applied at every output position `(h, w)`. The operator
+has these properties:
 
 - **Local connectivity.** Each output value `y[h, w]` depends on a
-  small neighbourhood of the input — only the K² pixels in the kernel's
-  footprint — not on the whole image. A 3×3 kernel uses 9 input pixels
-  per output, regardless of how big the image is. The parameter
-  explosion goes away.
+  small neighbourhood of the input (only the K² pixels under the
+  kernel), not on the whole image. A 3×3 kernel uses 9 input pixels
+  per output, regardless of how big the image is. The parameter count
+  no longer grows with the image size.
 
 - **Weight sharing.** The same kernel `k` slides across the whole
-  image. There are K² weights total *for the entire layer*, not per
-  position. A 3×3 kernel has 9 numbers in it, period. (More precisely:
-  K² × C_in × C_out, but the *spatial* part is K² regardless of image
+  image. There are K² weights in total for the entire layer, not per
+  position. A 3×3 kernel has 9 numbers. (More precisely:
+  K² × C_in × C_out, but the spatial part is K² regardless of image
   size.)
 
-- **Translation equivariance.** Shift the input one pixel right; the
-  output shifts one pixel right. The kernel didn't change, the
-  computation didn't change. The network has the right structural
-  prior for natural images baked in.
+- **Translation equivariance.** Shift the input one pixel right and
+  the output shifts one pixel right. The kernel and the computation
+  are unchanged. The network has the right structural prior for
+  natural images built in.
 
-The third property is the deepest. Equivariance is not invariance —
-the network's *output* shifts when the input shifts, it doesn't stay
-the same. But that turns out to be what you want for the early layers,
-because the *final* layers (after pooling and flattening) can become
-invariant on top of equivariant features. Build up locality first,
-then collapse it.
+Translation equivariance is the most fundamental of these.
+Equivariance is not invariance: the network's output shifts when the
+input shifts, it does not stay the same. This is what we need in the
+early layers, because the final layers (after pooling and flattening)
+can become invariant on top of equivariant features.
 
 **Multi-channel extension.** Real images have channels (R, G, B), and
 intermediate feature maps have many channels (32, 64, sometimes
-hundreds). So the kernel is actually a 3-D object — `(C_in, K, K)` —
-that's applied to a `C_in`-channel patch and produces *one* scalar
-output. To produce `C_out` output channels, we use `C_out` independent
-3-D kernels. So a conv layer with C_in=3, C_out=32, K=5 has
+hundreds). So the kernel is a 3-D object, `(C_in, K, K)`, that is
+applied to a `C_in`-channel patch and produces one scalar output. To
+produce `C_out` output channels, we use `C_out` independent 3-D
+kernels. A conv layer with C_in=3, C_out=32, K=5 has
 
     32 × 3 × 5 × 5 = 2400 weights
 
-plus 32 bias values (one per output channel). Tiny compared to a dense
-layer's millions, and that's the point.
+plus 32 bias values (one per output channel). This is very small
+compared to the millions of weights of a dense layer.
 
 
 ## 3. Padding and stride
 
-Two knobs let convolution work with images of any size.
+Padding and stride let convolution work with images of any size.
 
 **Padding** adds zero-pixels around the input border so the output can
 have the same spatial dimensions as the input. A 3×3 kernel with no
 padding (`p = 0`) takes a 28×28 input to a 26×26 output (it can't be
-centred on the boundary pixels). With `p = 1`, you get a 28×28 input to
-28×28 output — "same" padding. Whether you want that depends on the
-architecture; it's common to use it in early layers so the spatial
+centred on the boundary pixels). With `p = 1`, a 28×28 input gives a
+28×28 output ("same" padding). Whether to use it depends on the
+architecture; it is common in early layers, so that the spatial
 dimensions only shrink at the pooling steps, not inside the conv
 itself.
 
@@ -120,24 +117,25 @@ The combined output formula is
     H_out = (H_in + 2p - K) / s  +  1
 
 and the same for W. A 32×32 input with K=5, p=2, s=1 gives
-H_out = (32 + 4 − 5) / 1 + 1 = 32 — preserved. K=3, p=1, s=1 also
-preserves. K=3, p=1, s=2 halves: H_out = (32 + 2 − 3) / 2 + 1 = 16.
+H_out = (32 + 4 − 5) / 1 + 1 = 32, so the size is preserved. K=3, p=1,
+s=1 also preserves it. K=3, p=1, s=2 halves it:
+H_out = (32 + 2 − 3) / 2 + 1 = 16.
 
 
 ## 4. im2col: making convolution fast on a CPU
 
-The math above describes the *operation*. Writing it as a literal
-implementation — six nested loops over (n, out_C, h_out, w_out, in_C,
-kh, kw) — works, but is slow. The CPU's cache doesn't enjoy seven-deep
-loop nests, and we've already invested significant work into making
-`Matrix::operator*` fast (parallel rows, optional BLAS dispatch). It
-would be nice to *reuse* the matmul for convolution.
+The math above describes the operation. A direct implementation, with
+seven nested loops over (n, out_C, h_out, w_out, in_C, kh, kw), works
+but is slow. Seven-deep loop nests use the cache poorly, and we have
+already put significant work into making `Matrix::operator*` fast
+(parallel rows, optional BLAS dispatch). We would like to reuse the
+matmul for convolution.
 
-We can. The trick is called **im2col**, short for image-to-column. The
-idea: rearrange the input so that the convolution becomes a single
-matrix multiplication.
+The technique that allows this is called **im2col**, short for
+image-to-column. It rearranges the input so that the convolution
+becomes a single matrix multiplication.
 
-Specifically: for every output position `(n, h_out, w_out)`, the input
+For every output position `(n, h_out, w_out)`, the input
 patch under the kernel is a 3-D chunk of shape `(C_in, K, K)`. Flatten
 that chunk into a column of length `C_in · K · K`. Stack the columns
 side by side across all output positions:
@@ -145,84 +143,85 @@ side by side across all output positions:
     im2col matrix:  (C_in · K · K)  ×  (N · H_out · W_out)
 
 Now reshape the kernel from `(C_out, C_in, K, K)` into a matrix of
-shape `(C_out, C_in · K · K)` — one row per output channel, the row
-being that channel's flattened kernel. Then
+shape `(C_out, C_in · K · K)`, with one row per output channel, the
+row being that channel's flattened kernel. Then
 
     Z = W · im2col            shape: (C_out, N · H_out · W_out)
 
-and the entire convolution is *one* matrix multiply. We get all our
-prior matmul optimisations (`std::thread` parallelisation, optional
-BLAS) for free. This is exactly what cuDNN does on GPUs.
+and the entire convolution is one matrix multiply. All our earlier
+matmul optimisations (`std::thread` parallelisation, optional BLAS)
+apply without further work. This is the approach the Caffe framework
+made standard, and one of the algorithms GPU libraries such as cuDNN
+choose from.
 
 The cost is the memory of the temporary `im2col` matrix, which is K²
-times larger than the input. For our scales — CIFAR-10 with small
-batches — this is comfortably within memory. For very large images or
+times larger than the input. At our scale (CIFAR-10 with small
+batches) this fits easily in memory. For very large images or
 deep networks, more sophisticated schemes (Winograd, FFT-convolution)
 become competitive; we don't need them.
 
-**Backward via col2im.** The backward pass reverses the trick. Given
+**Backward via col2im.** The backward pass reverses the procedure. Given
 the gradient `dY` of shape `(N, C_out, H_out, W_out)`:
 
 1. Reshape `dY` into `dZ` of shape `(C_out, N · H_out · W_out)`.
-2. Parameter gradients are straightforward matmuls:
+2. Parameter gradients are matmuls:
    `dW = dZ · im2col^T`  (kernel gradient),
    `db = sum-along-columns of dZ`  (bias gradient).
 3. For the gradient w.r.t. the input, compute `dCol = W^T · dZ`. This
    has the shape of the original im2col matrix.
-4. **col2im** folds `dCol` back into the input shape, *accumulating*
+4. **col2im** folds `dCol` back into the input shape, accumulating
    the contributions at every input pixel that was touched by more
    than one output position. When stride is less than kernel size,
-   that's most pixels.
+   that is most pixels.
 
-The accumulation is the subtle part. If you write `=` instead of `+=`
-in the col2im loop, the gradient computation is silently wrong for
-every conv layer with stride < K. The numerical gradient check in
-`tests/test_conv2d.cpp` is exactly what catches this kind of bug.
+The accumulation is easy to get wrong. If you write `=` instead of
+`+=` in the col2im loop, the gradient is wrong, with no error
+reported, for every conv layer with stride < K. The numerical gradient
+check in `tests/test_conv2d.cpp` catches this kind of bug.
 
 
 ## 5. Pooling
 
-After every conv layer (or every couple) we want to *reduce* the
-spatial size — both because we want to build invariance to small shifts
-on top of the equivariant features, and because it cuts the
-computational cost of subsequent layers. The standard tool is
-**max-pooling**: take a window (typically 2×2) and emit the maximum
-value.
+After every conv layer (or every couple) we reduce the spatial size,
+both to build invariance to small shifts on top of the equivariant
+features and to cut the computational cost of subsequent layers. The
+standard tool is **max-pooling**: take a window (typically 2×2) and
+emit the maximum value.
 
-Forward is obvious. Backward is the part worth understanding: the
-output depended on *one* input pixel per window (the one with the max
+The forward pass needs no explanation. In the backward pass, the
+output depended on one input pixel per window (the one with the max
 value). Every other pixel in the window contributed nothing, so the
-gradient `dY` for that output cell flows entirely to the winning input
-pixel and nowhere else. We store the winning index during forward and
-look it up during backward.
+gradient `dY` for that output cell goes entirely to that input pixel.
+We store its index during forward and look it up during backward.
 
-With non-overlapping windows (stride = pool size, the typical
-"halve everything" case), each input pixel wins at most once. With
-overlapping pooling (stride < pool size), an input pixel can win in
-multiple output windows, and the gradients accumulate. Same `+=` issue
-as conv backward; the same test pattern catches it.
+With non-overlapping windows (stride = pool size, the typical case
+that halves each dimension), each input pixel is the maximum at most
+once. With overlapping pooling (stride < pool size), an input pixel
+can be the maximum in multiple output windows, and the gradients
+accumulate. This is the same `+=` issue as in conv backward, and the
+same test pattern catches it.
 
 Max-pool has zero learnable parameters and runs in O(N · C · H · W).
-Cheap, robust, and the workhorse of every conv classifier.
+It is cheap and robust, and every conv classifier uses it.
 
 
-## 6. The conv-to-dense bridge
+## 6. Connecting conv to dense
 
 Putting convolution and pooling together: a small conv stack reduces a
-32×32×3 image to a `(C, H', W')` feature map — say `(64, 8, 8)`. To
-predict a class probability vector, we need a *vector* output, not a
-3-D feature map. The standard move is **flatten**: turn the 3-D feature
+32×32×3 image to a `(C, H', W')` feature map, say `(64, 8, 8)`. To
+predict a class probability vector, we need a vector output, not a
+3-D feature map. The standard step is **flatten**: turn the 3-D feature
 map into a 1-D vector and feed it to a dense classifier.
 
-In our library, this is the moment where the data structure changes —
-`Tensor4D` becomes `Matrix`. We do this with an explicit free function
-`flatten(Tensor4D) -> Matrix`, *not* a hidden reshape inside a unified
+In our library, this is where the data structure changes: `Tensor4D`
+becomes `Matrix`. We do this with an explicit free function
+`flatten(Tensor4D) -> Matrix`, not a hidden reshape inside a unified
 tensor type. The conv stack is one `ConvNetwork`; the dense head is
-another `Network`; the example wires them together. Why this is the
-right choice for a teaching library is discussed at length in
-[chapter 21](21_from_matrices_to_tensors.md).
+another `Network`; the example connects them.
+[Chapter 21](21_from_matrices_to_tensors.md) discusses why this is the
+right choice for a teaching library.
 
-The classic AlexNet shape, in our library, looks exactly like this:
+The classic AlexNet shape, in our library, looks like this:
 
 ```cpp
 ConvNetwork<float> conv;
@@ -230,7 +229,8 @@ conv.add<Conv2D>(  3, 32, 5, 1, 2);  conv.add<ReLU4D>();  conv.add<MaxPool2D>(2)
 conv.add<Conv2D>( 32, 64, 3, 1, 1);  conv.add<ReLU4D>();  conv.add<MaxPool2D>(2);
 
 Network<float> dense;
-dense.add<Dense>(64 * 8 * 8, 10);
+dense.add<Dense>(64 * 8 * 8, 256);  dense.add<ReLU>();  dense.add<Dropout>(0.5f);
+dense.add<Dense>(256, 10);
 dense.add<Softmax>();
 ```
 
@@ -242,58 +242,61 @@ Matrix<float>   flat  = flatten(feat);              // (4096, N)
 Matrix<float>   probs = dense.forward(flat);        // (10, N)
 ```
 
-And the backward mirrors it exactly, with `unflatten` doing the reverse
+The backward pass mirrors it, with `unflatten` doing the reverse
 reshape on the gradient.
 
 
 ## 7. What the library provides
 
-The conv work in this chapter added five new headers:
+The conv work in this chapter and the previous one added these
+headers:
 
-- **`Tensor4D.h`** — the 4-D dense tensor in NCHW layout, with
+- **`Tensor4D.h`**: the 4-D dense tensor in NCHW layout, with
   element access, `apply`, `fill`, randomisation, and a `hadamard`
   free function for element-wise products in backward computations.
   Covered in [chapter 21](21_from_matrices_to_tensors.md).
 
-- **`ConvLayer.h`** — the abstract base class for conv-stack layers,
+- **`ConvLayer.h`**: the abstract base class for conv-stack layers,
   parallel to `Layer` for the dense world.
 
-- **`ConvNetwork.h`** — the container, parallel to `Network`.
+- **`ConvNetwork.h`**: the container, parallel to `Network`.
   Supports `add<L>(args...)`, `forward`/`backward`/`update`,
   `summary()`, `save`/`load` (with a distinct `WCNV` magic so a conv
   file cannot be loaded into a dense network by mistake).
 
-- **`Conv2D.h`** — the convolution itself, with He initialisation, the
+- **`Conv2D.h`**: the convolution itself, with He initialisation, the
   im2col forward and col2im backward, configurable kernel size, stride,
-  and padding. Verified by numerical gradient check on `dX`, `dW`,
-  `db` in two stride configurations.
+  and padding. Verified by numerical gradient check on `dX`, `dW` and
+  `db` at stride 1, and on `dX` again at stride 2.
 
-- **`ReLU4D.h`**, **`MaxPool2D.h`**, **`Flatten.h`** — the supporting
-  cast. `MaxPool2D` carries a numerical gradient check too, because
-  its backward (routing through the cached argmax) is exactly the kind
-  of indexing logic that's easy to get wrong.
+- **`ReLU4D.h`**, **`MaxPool2D.h`**, **`Flatten.h`**: the supporting
+  layers. `MaxPool2D` has a numerical gradient check too, because
+  its backward (routing through the cached argmax) is the kind of
+  indexing logic that is easy to get wrong.
 
-The whole conv library lives behind tests that pass at full numerical
+- **`CIFAR10.h`**: the loader for the CIFAR-10 binary files
+  (`load_cifar10`, `cifar10_train_paths`, `cifar10_test_paths`).
+
+The whole conv library is covered by tests that pass at full numerical
 precision (double-precision gradient checks, 1e-6 relative tolerance).
-If those pass, the math is right; if they fail, no architectural
-experiment will rescue it.
+If those pass, the math is right. If they fail, no change of
+architecture will compensate.
 
 
 ## 8. The CIFAR-10 classifier
 
-CIFAR-10 is the standard "step up from MNIST" image dataset: 60,000
-32×32 colour images split into 50,000 training and 10,000 test, with
-10 classes (airplane, automobile, bird, cat, deer, dog, frog, horse,
-ship, truck). It's exactly the right size to be challenging without
-needing a GPU: a small ConvNet trained on CPU can reach ~75-80% test
-accuracy in something like an hour.
+CIFAR-10 is the standard image dataset one step harder than MNIST:
+60,000 32×32 colour images split into 50,000 training and 10,000 test,
+with 10 classes (airplane, automobile, bird, cat, deer, dog, frog,
+horse, ship, truck). It is hard enough to be a real test and small
+enough not to need a GPU: a small ConvNet trained on CPU reaches about
+72% test accuracy in under half an hour.
 
-We deliberately *skipped* MNIST for the conv classifier. The dense MLP
+We deliberately skipped MNIST for the conv classifier. The dense MLP
 chapter already classified MNIST at ~98% test accuracy; a conv version
-would just be making the same point in a more complicated way. Going
-straight to CIFAR-10 shows the genuine win of convolution — on data
-where a dense MLP struggles to get above ~50% accuracy, the small
-ConvNet reaches well above 70%.
+would make the same point in a more complicated way. CIFAR-10 shows
+the advantage of convolution: on data where a dense MLP struggles to
+get above ~50% accuracy, the small ConvNet reaches well above 70%.
 
 **The architecture** we use is `cifar_conv.cpp`:
 
@@ -306,100 +309,111 @@ input  (N, 3, 32, 32)
   ReLU4D
   MaxPool2D(2)                  -> (N, 64, 8, 8)
 ---- flatten ----                -> (4096, N)
-  Dense(4096, 10)
+  Dense(4096, 256)
+  ReLU
+  Dropout(0.5)
+  Dense(256, 10)
   Softmax
 ```
 
-Two design choices worth pointing at:
+The dense part has a hidden layer and dropout because the simpler
+version, a single `Dense(4096, 10)`, overfitted badly: 99% accuracy
+on the training set and 60% on the test set.
+
+On the design choices:
 
 - **5×5 kernels in the first layer**, 3×3 in the second. The first
   layer is the one we visualise, and 5×5 RGB tiles are much more
   legible than 3×3 ones. The deeper layer can use the smaller kernel
   because it operates on richer features (32 channels rather than 3).
-  This is the same logic that led Krizhevsky's AlexNet to use 11×11 at
+  This is the same reasoning that led Krizhevsky's AlexNet to use 11×11 at
   the first layer (working on 224×224 images), 5×5 next, then 3×3.
 
-- **Two conv blocks**, not three. A third block would push accuracy
-  slightly higher (78-82% range) but adds another hour of CPU training
-  for a marginal improvement. The architecture above is the smallest
-  one that demonstrates the full conv arc — locality, hierarchy,
-  pooling, dense head — without the iteration time becoming
-  frustrating. It's a pedagogical choice; a production CIFAR-10 model
-  would use ResNet or something larger.
+- **Two conv blocks**, not three. A third block would raise accuracy
+  slightly (78-82% range) but adds another hour of CPU training for a
+  marginal improvement. The architecture above is the smallest one
+  that shows all the elements of a conv network (locality, hierarchy,
+  pooling, dense head) while keeping the iteration time short. It is
+  a pedagogical choice; a production CIFAR-10 model would use ResNet
+  or something larger.
 
 **Training.** Adam optimizer (lr = 1e-3, defaults), batch size 64, 15
-epochs, He-initialised conv kernels, zero-initialised biases, no data
-augmentation. Run it with
+epochs, He-initialised conv kernels, zero-initialised biases, and the
+standard CIFAR augmentation (random horizontal flip, random shift of
+up to 4 pixels). Run it with
 
 ```sh
 ./examples/cifar_conv  ../data/cifar-10-batches-bin  15  cifar_model
 ```
 
-and on an Apple M3 with `make BLAS=1` it should take roughly 60-90
-minutes and produce a model that reaches around 72-78% test accuracy.
+and on our machine, built with `make BLAS=1`, it takes about 26
+minutes and produces a model that reaches 72% test accuracy.
 The training prints loss, train accuracy, and test accuracy each epoch,
-and saves a checkpoint after each one — Ctrl-C is safe.
+and saves a checkpoint after each one, so Ctrl-C is safe.
 
 
-## 9. The payoff: visualising what the first layer learned
+## 9. Visualising what the first layer learned
 
-The whole point of going to CIFAR rather than MNIST was the
+The main reason for using CIFAR rather than MNIST was the
 visualisation. The companion example `cifar_filters.cpp` loads the
 trained model, extracts the first conv layer's 32 5×5×3 filters, and
 arranges them in a 4×8 grid BMP. Each filter is normalised
 independently to fill [0, 255] so weak and strong filters are both
 visible.
 
-What you should see, after a successful training run:
+What the first layer of a well-trained image network shows:
 
 - **Oriented edge detectors** at various angles (horizontal,
   diagonal, vertical). These look like dark/light gradients across the
-  kernel — high values on one side, low on the other. The kernel is
-  effectively a small derivative filter in some direction.
-- **Color-opponent blobs.** Red-on-green, blue-on-yellow. These are
-  the network discovering colour structure on its own — nothing in
-  the training told it that RGB pixels have any particular meaning,
-  but with enough natural images the colour-opponency falls out of
-  what's discriminative.
+  kernel, with high values on one side and low on the other. The
+  kernel is effectively a small derivative filter in some direction.
+- **Color-opponent blobs.** Red-on-green, blue-on-yellow. The network
+  learns this colour structure from the data: nothing in the training
+  told it that RGB pixels have any particular meaning, but with
+  enough natural images colour opponency appears because it is
+  discriminative.
 - **Low-frequency centre-surround patterns.** Some filters look like
-  blurry blobs, picking up overall brightness or colour in a region.
-- **Maybe a few dead filters** — uniform grey tiles that never
-  activated and never learned. This is normal; on a small budget of
-  filters, a few often end up at random init.
+  blurry blobs that respond to overall brightness or colour in a
+  region.
+- **A few filters that learned nothing**, which stay close to their
+  random initial values and look like coloured noise.
 
-This is exactly the picture Krizhevsky's AlexNet paper (2012) [@krizhevsky2012imagenet] and
-Zeiler & Fergus's *Visualizing and Understanding Convolutional
-Networks* (2014) [@zeiler2014visualizing] made famous. Our version, trained on CPU on a much
-smaller architecture and dataset, shows the same qualitative pattern.
-That's not a coincidence — the structure falls out of the operator and
-the data, not the depth or scale.
+Our 15-epoch model shows this only faintly. In the run reported above
+most of the 32 tiles still look like coloured noise at this size, with
+structure visible in a few. Longer training makes the patterns
+clearer; the accuracy figure, not the picture, is the reliable
+evidence that the layer has learned something.
+
+This is the picture that Krizhevsky's AlexNet paper (2012)
+[@krizhevsky2012imagenet] and Zeiler & Fergus's *Visualizing and
+Understanding Convolutional Networks* (2014) [@zeiler2014visualizing]
+made well known. Our version, trained on CPU on a much smaller
+architecture and dataset, shows the same qualitative pattern. The
+structure comes from the operator and the data, not from the depth or
+scale.
 
 The deeper layer is harder to visualise as raw weights, because its
 filters operate on the 32-channel output of the first layer rather
-than on RGB. Each second-layer kernel is `(32, 3, 3)` — not directly
-an image. Techniques for visualising deeper layers (activation
-maximisation, deconvolutional inversion) exist but are out of scope
-here. For now, the point is made: the first layer learns *features*,
-and those features look like edges and colour patches because that's
-what is locally informative in natural images.
+than on RGB. Each second-layer kernel is `(32, 3, 3)`, which is not
+directly an image. Techniques for visualising deeper layers
+(activation maximisation, deconvolutional inversion) exist but are out
+of scope here. The first layer learns features, and those features
+look like edges and colour patches because that is what is locally
+informative in natural images.
 
 
-## 10. What's next
+## 10. Later chapters
 
-The conv arc continues into audio. The same Conv2D layer, applied to
-log-magnitude spectrograms instead of CIFAR images, gives us a
-**ConvVAE for sound** — the same generative architecture as the dense
-audio VAE from [chapter 19](19_audio_vae.md), but with the magnitude-blur
-problem of the dense version largely fixed by local spatial structure
-in the encoder and decoder. That's [chapter 23](23_convvae.md) (still to
-come): the architecture, the training, the morphs and interpolations,
-and an honest comparison against the dense version. We should hear the
-difference.
-
-After ConvVAE the architecture path goes one more direction —
-**attention** — and then the capstone, the matching-pursuit + attention
-generative audio system. The work to get to that point is now mostly
-mechanical, because the foundation is in place.
+The same Conv2D layer, applied to spectrograms instead of CIFAR
+images, gives a **ConvVAE for sound**: the generative architecture of
+the dense audio VAE from [chapter 19](19_audio_vae.md), with
+convolutional layers in the encoder and decoder. That is
+[chapter 23](23_convvae.md): the architecture, the training, the three
+applications, and an account of why the audio is still poor.
+[Chapter 24](24_differentiable_synthesis.md) then takes a different
+route to clean sound, a network that drives a synthesiser. Chapters
+25 to 27 build attention and a transformer, and chapters 28 and 29
+apply it to recorded sound.
 
 
 ## Further reading

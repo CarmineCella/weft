@@ -31,11 +31,14 @@
 //       glides from the controls of A to the controls of B
 //   synth_fit blend  <a.ctl> <b.ctl> <out.wav> [mix]
 //       a fixed mixture of the two control sets (mix = 0.5 by default)
+//   synth_fit synthetic <out.wav> [sine|random]
+//       write a two-second test note with known harmonic amplitudes
 //   synth_fit render <in.ctl> <out.wav> [semitones] [glide_semitones]
 //       re-renders the controls at a transposed pitch, optionally gliding
 //       by a further glide_semitones over the length of the note
 
 #include "Adam.h"
+#include "FFT.h"
 #include "FilteredNoise.h"
 #include "HarmonicSynth.h"
 #include "Matrix.h"
@@ -46,6 +49,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <random>
+#include <complex>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -66,14 +71,14 @@ constexpr std::size_t NOISE_BANDS  = 65;
 //   a = 2 * sigmoid(x)^ln(10) + 1e-7
 // Always positive, at most 2, and close to exponential in x for small
 // values, so equal steps in x are roughly equal steps in decibels.
-const float LOG10 = 2.302585093f;
+const float LN10 = 2.302585093f;
 inline float act(float x) {
     const float s = 1.0f / (1.0f + std::exp(-x));
-    return 2.0f * std::pow(s, LOG10) + 1e-7f;
+    return 2.0f * std::pow(s, LN10) + 1e-7f;
 }
 inline float act_deriv(float x) {
     const float s = 1.0f / (1.0f + std::exp(-x));
-    return 2.0f * LOG10 * std::pow(s, LOG10) * (1.0f - s);
+    return 2.0f * LN10 * std::pow(s, LN10) * (1.0f - s);
 }
 
 // The fitted controls of one note.
@@ -192,6 +197,68 @@ Controls combine(const Controls& a, const Controls& b, MixFn mix) {
             c.M(q, t) = (1.0f - m) * a.M(q, t) + m * b.M(q, t);
     }
     return c;
+}
+
+// How far a resynthesis is from its target, in a way that ignores phase:
+// take the magnitude spectrograms of both (Hann window 4096, hop 1024) and
+// return  sum (|X| - |Y|)^2 / sum |X|^2.  Zero means identical
+// spectrograms; 0.01 means the difference holds 1% of the target's energy.
+double spectrogram_difference(const std::vector<float>& x, const std::vector<float>& y) {
+    const std::size_t N = 4096, H = 1024;
+    if (x.size() < N || y.size() < N) return 0.0;
+    std::vector<float> w(N);
+    for (std::size_t i = 0; i < N; ++i)
+        w[i] = 0.5f * (1.0f - std::cos(2.0f * 3.14159265f * float(i) / float(N)));
+    std::vector<std::complex<float>> a(N), b(N);
+    double num = 0.0, den = 0.0;
+    const std::size_t n = std::min(x.size(), y.size());
+    for (std::size_t s = 0; s + N <= n; s += H) {
+        for (std::size_t i = 0; i < N; ++i) {
+            a[i] = std::complex<float>(x[s + i] * w[i], 0.0f);
+            b[i] = std::complex<float>(y[s + i] * w[i], 0.0f);
+        }
+        fft(a); fft(b);
+        for (std::size_t k = 0; k <= N / 2; ++k) {
+            const double ma = std::abs(a[k]), mb = std::abs(b[k]);
+            num += (ma - mb) * (ma - mb);
+            den += ma * ma;
+        }
+    }
+    return den > 0.0 ? num / den : 0.0;
+}
+
+// A test note with a known answer: twenty harmonics of 110 Hz (A2) with
+// fixed amplitudes, two seconds long.  With phase_mode "sine" every
+// harmonic starts in sine phase, which the synthesiser can reproduce
+// exactly; with "random" each gets a random starting phase, which it
+// cannot.  Fitting these two notes is how the two rules about the pitch
+// period in cmd_fit were found (see the chapter).
+int cmd_synthetic(int argc, char** argv) {
+    if (argc < 3) {
+        std::cerr << "usage: synth_fit synthetic <out.wav> [sine|random]\n";
+        return 1;
+    }
+    const bool random_phase = (argc > 3) && std::string(argv[3]) == "random";
+    const float sr = 44100.0f;
+    const std::size_t n = std::size_t(2.0f * sr);
+    const float amps[20] = {0.02f, 0.02f, 0.05f, 0.15f, 0.30f, 0.10f, 0.05f, 0.04f, 0.03f, 0.03f,
+                            0.01f, 0.01f, 0.01f, 0.01f, 0.01f, 0.01f, 0.01f, 0.01f, 0.01f, 0.01f};
+    std::mt19937 rng(0);
+    std::uniform_real_distribution<float> uni(0.0f, 6.2831853f);
+    std::vector<float> x(n, 0.0f);
+    for (int k = 0; k < 20; ++k) {
+        const float ph = random_phase ? uni(rng) : 0.0f;
+        for (std::size_t i = 0; i < n; ++i)
+            x[i] += amps[k] * std::sin(6.2831853f * 110.0f * float(k + 1) * float(i) / sr + ph);
+    }
+    for (std::size_t i = 0; i < n; ++i) {            // 50 ms attack, 200 ms release
+        const float t = float(i) / sr;
+        x[i] *= std::min(1.0f, std::min(t / 0.05f, (2.0f - t) / 0.2f));
+    }
+    save_wav(argv[2], x, 44100);
+    std::cout << "wrote " << argv[2] << "  (harmonics 3-6 have amplitudes 0.05, 0.15, 0.30, 0.10; "
+              << (random_phase ? "random" : "sine") << " phases)\n";
+    return 0;
 }
 
 int cmd_fit(int argc, char** argv) {
@@ -369,8 +436,21 @@ int cmd_fit(int argc, char** argv) {
     std::cout << "\nfinal loss " << std::setprecision(4) << last
               << ";  energy: target " << energy(target) << ", resynthesis "
               << energy(y) << " (harmonic " << energy(harmonic) << ", noise "
-              << energy(noise_part) << ")\n";
+              << energy(noise_part) << ")\n"
+              << "spectrogram difference (energy of the difference of the two "
+                 "magnitude spectrograms / energy of the target's): "
+              << std::setprecision(2) << 100.0 * spectrogram_difference(target, y) << "%\n";
 
+    if (K >= 6 && T > 8) {
+        std::cout << "median fitted amplitude of harmonics 3-6 over the middle half of the note:";
+        for (std::size_t k = 2; k < 6; ++k) {
+            std::vector<float> v;
+            for (std::size_t t = T / 4; t < 3 * T / 4; ++t) v.push_back(c.A(k, t));
+            std::sort(v.begin(), v.end());
+            std::cout << " " << std::setprecision(3) << v[v.size() / 2];
+        }
+        std::cout << "\n";
+    }
     save_wav(prefix + "_resynth.wav",  y,          wav.sample_rate);
     save_wav(prefix + "_harmonic.wav", harmonic,   wav.sample_rate);
     save_wav(prefix + "_noise.wav",    noise_part, wav.sample_rate);
@@ -425,6 +505,7 @@ int main(int argc, char** argv) {
     const std::string cmd = (argc > 1) ? argv[1] : "";
     try {
         if (cmd == "fit")    return cmd_fit(argc, argv);
+        if (cmd == "synthetic") return cmd_synthetic(argc, argv);
         if (cmd == "morph")  return cmd_mix(argc, argv, true);
         if (cmd == "blend")  return cmd_mix(argc, argv, false);
         if (cmd == "render") return cmd_render(argc, argv);
@@ -436,6 +517,7 @@ int main(int argc, char** argv) {
                  "  synth_fit fit    <in.wav> <note|Hz> <prefix> [iterations]\n"
                  "  synth_fit morph  <a.ctl> <b.ctl> <out.wav>\n"
                  "  synth_fit blend  <a.ctl> <b.ctl> <out.wav> [mix]\n"
-                 "  synth_fit render <in.ctl> <out.wav> [semitones] [glide_semitones]\n";
+                 "  synth_fit render <in.ctl> <out.wav> [semitones] [glide_semitones]\n"
+                 "  synth_fit synthetic <out.wav> [sine|random]\n";
     return 1;
 }

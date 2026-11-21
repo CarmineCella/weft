@@ -20,7 +20,8 @@
 // to squash.  The apps clamp to >= 0 before exp-inverting to magnitude.
 //
 // Usage:
-//   train_audio_vae <feature.feat> <model_prefix> [epochs]
+//   train_audio_vae <feature.feat> <model_prefix> [epochs] [subsample]
+//       subsample = N keeps every Nth frame (default 1: all frames)
 // Writes:
 //   <model_prefix>.enc , <model_prefix>.dec
 //

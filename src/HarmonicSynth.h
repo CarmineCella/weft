@@ -77,9 +77,10 @@ public:
         Tn_ = Tn;
         n_  = n_samples;
 
-        // Per-sample fundamental and running phase.  The phase is kept in
-        // double whatever T is: it grows to thousands of radians and a
-        // float would lose the low bits that the high harmonics need.
+        // Per-sample fundamental and running phase.  The phase is
+        // accumulated in double whatever T is (and wrapped to stay below
+        // 2 pi): its rounding error is amplified by the harmonic number, up
+        // to 100 times for the top harmonics.
         f0s_.resize(n_);
         phase_.resize(n_);
         const double two_pi = 6.283185307179586476925;

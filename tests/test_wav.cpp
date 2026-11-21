@@ -1,6 +1,6 @@
 // test_wav.cpp
 //
-// Tests for the WAV reader.  We write tiny synthetic WAV files to /tmp
+// Tests for the WAV reader and writer.  We write tiny synthetic WAV files to /tmp
 // and read them back.  Verifies sample rate, length, channel mixdown,
 // unknown-chunk skipping, and the standard error paths.
 //

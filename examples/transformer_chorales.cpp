@@ -36,9 +36,11 @@
 //
 // Usage:
 //   transformer_chorales train    <data_dir> <model_prefix> [epochs] [block]
-//   transformer_chorales generate <model_prefix> <out.mid> [n_steps] [temperature]
+//   transformer_chorales generate <model_prefix> <out.mid> [n_steps] [temperature] [seed]
 //   transformer_chorales markov   <data_dir> <out.mid> [n_steps] [seed]
 //       the per-voice Markov baseline, for comparison by ear
+//   transformer_chorales stats    <label> <file.mid | dir> [...]
+//       consonance, voice crossing, parallel fifths and note length
 //
 // `epochs` default 5, `block` default 128 tokens (32 time-steps),
 // `n_steps` default 256 time-steps (~16 bars at 4/4), `temperature`
@@ -56,6 +58,7 @@
 #include "ScaledDotProductAttention.h"
 #include "SinusoidalPositionalEncoding.h"
 #include "Softmax.h"
+#include "TokenTransformer.h"
 #include "TransformerEncoderBlock.h"
 
 #include <algorithm>
@@ -114,8 +117,12 @@ static std::vector<int> midi_to_tokens(const midi::File& f) {
     const int T = (max_end + hop - 1) / hop;
     if (T <= 0) return {};
 
-    // Per-voice timeline: voice[v][t] = pitch (or -1 = rest)
-    std::vector<std::vector<int>> voice(N_VOICES, std::vector<int>(T, -1));
+    // Per-voice timeline: voice[v][t] = sounding pitch (or -1 = rest), and
+    // onset[v][t] = true where a note BEGINS.  The onset flag is what
+    // distinguishes one long note from the same pitch struck twice; without
+    // it every repeated note would be merged into its predecessor.
+    std::vector<std::vector<int>>  voice(N_VOICES, std::vector<int>(T, -1));
+    std::vector<std::vector<char>> onset(N_VOICES, std::vector<char>(T, 0));
     for (std::size_t v = 0; v < N_VOICES; ++v) {
         for (const auto& n : f.tracks[v]) {
             const int s = (n.start_tick + hop / 2) / hop;
@@ -123,11 +130,12 @@ static std::vector<int> midi_to_tokens(const midi::File& f) {
                               (n.start_tick + n.duration_tick + hop / 2) / hop));
             for (int t = s; t < e; ++t)
                 voice[v][t] = n.pitch;
+            if (s < T) onset[v][s] = 1;
         }
     }
 
-    // Emit tokens.  REST if -1; HOLD if same as previous step; else the
-    // pitch number as an attack.
+    // Emit tokens.  REST if nothing sounds; the pitch number where a note
+    // begins; HOLD where the note that began earlier is still sounding.
     std::vector<int> out;
     out.reserve(static_cast<std::size_t>(T) * N_VOICES + 2);
     out.push_back(TOK_BOS);
@@ -136,7 +144,7 @@ static std::vector<int> midi_to_tokens(const midi::File& f) {
             const int p = voice[v][t];
             if (p < 0) {
                 out.push_back(TOK_REST);
-            } else if (t > 0 && voice[v][t - 1] == p) {
+            } else if (t > 0 && !onset[v][t] && voice[v][t - 1] == p) {
                 out.push_back(TOK_HOLD);
             } else {
                 out.push_back(p);                            // attack at pitch p
@@ -209,77 +217,15 @@ static midi::File tokens_to_midi(const std::vector<int>& toks,
 // Model
 // =========================================================================
 
-struct CharLM {
-    Embedding<float>                    embed;
-    SinusoidalPositionalEncoding<float> pe;
-    std::vector<TransformerEncoderBlock<float>> blocks;
-    LayerNorm<float>                    final_ln;
-    Dense<float>                        head;
-    Softmax<float>                      softmax;
-
-    CharLM()
-        : embed(VOCAB_SIZE, D_MODEL),
-          pe(D_MODEL, MAX_SEQ),
-          final_ln(D_MODEL),
-          head(D_MODEL, VOCAB_SIZE)
-    {
-        blocks.reserve(N_LAYERS);
-        for (std::size_t i = 0; i < N_LAYERS; ++i) {
-            blocks.emplace_back(D_MODEL, N_HEADS, D_FF);
-            blocks.back().set_causal(true);     // autoregressive
-        }
-    }
-
-    // Forward returns Softmax probabilities over the vocabulary, shape
-    // (VOCAB_SIZE x seq_len).  Caches intermediates for backward.
-    Matrix<float> forward(const std::vector<int>& tokens) {
-        Matrix<float> x = embed.forward(tokens);   // (d_model x L)
-        x = pe.forward(x);
-        for (auto& blk : blocks) x = blk.forward(x);
-        x = final_ln.forward(x);
-        Matrix<float> logits = head.forward(x);    // (vocab x L)
-        return softmax.forward(logits);
-    }
-
-    void backward(const Matrix<float>& dProbs) {
-        Matrix<float> dLogits = softmax.backward(dProbs);
-        Matrix<float> dX      = head.backward(dLogits);
-        dX = final_ln.backward(dX);
-        for (auto it = blocks.rbegin(); it != blocks.rend(); ++it)
-            dX = it->backward(dX);
-        dX = pe.backward(dX);
-        embed.backward(dX);
-    }
-
-    void update(Optimizer<float>& opt) {
-        embed.update(opt);
-        for (auto& blk : blocks) blk.update(opt);
-        final_ln.update(opt);
-        head.update(opt);
-    }
-
-    void set_training(bool t) {
-        for (auto& blk : blocks) blk.set_training(t);
-        final_ln.set_training(t);
-        head.set_training(t);
-    }
-
-    void save(const std::string& prefix) {
-        std::ofstream out(prefix + ".clm", std::ios::binary);
-        if (!out) throw std::runtime_error("cannot create " + prefix + ".clm");
-        embed.save_params(out);
-        for (auto& blk : blocks) blk.save_params(out);
-        final_ln.save_params(out);
-        head.save_params(out);
-    }
-    void load(const std::string& prefix) {
-        std::ifstream in(prefix + ".clm", std::ios::binary);
-        if (!in) throw std::runtime_error("cannot open " + prefix + ".clm");
-        embed.load_params(in);
-        for (auto& blk : blocks) blk.load_params(in);
-        final_ln.load_params(in);
-        head.load_params(in);
-    }
+// The model itself is TokenTransformer (src/TokenTransformer.h): token
+// embedding, positional encoding, N_LAYERS causal blocks, a final
+// LayerNorm and a Dense layer back to the vocabulary.  This struct only
+// fixes its sizes for the chorale task and keeps the .clm file extension.
+struct ChoraleLM : TokenTransformer<float> {
+    ChoraleLM() : TokenTransformer<float>(VOCAB_SIZE, D_MODEL, N_HEADS, N_LAYERS,
+                                       D_FF, MAX_SEQ) {}
+    void save(const std::string& prefix) { TokenTransformer<float>::save(prefix + ".clm"); }
+    void load(const std::string& prefix) { TokenTransformer<float>::load(prefix + ".clm"); }
 };
 
 // =========================================================================
@@ -325,7 +271,7 @@ static int sample_token(const Matrix<float>& probs, std::size_t col,
 // n_time_steps voice tokens).  Returns the full token stream including
 // the priming BOS.
 static std::vector<int>
-sample_sequence(CharLM& model, std::size_t n_time_steps,
+sample_sequence(ChoraleLM& model, std::size_t n_time_steps,
                 float temperature, unsigned seed)
 {
     model.set_training(false);
@@ -437,26 +383,31 @@ static int cmd_train(int argc, char** argv) {
     // the held-out chorales.
     //   unigram : P(token), ignoring all context.
     //   Markov  : P(token | the same voice's token one time step earlier),
-    //             i.e. a first-order Markov chain per voice.  In the flat
-    //             S A T B stream that is the token 4 positions back.
+    //             a first-order Markov chain with one transition table per
+    //             voice.  In the flat S A T B stream the previous token of
+    //             the same voice is the one 4 positions back.  This is the
+    //             model the `markov` command samples from.
     {
-        std::vector<double> uni(VOCAB_SIZE, 1.0);                    // add-one smoothing
-        std::vector<double> big(VOCAB_SIZE * VOCAB_SIZE, 1.0);
-        double uni_total = VOCAB_SIZE;
-        std::vector<double> row_total(VOCAB_SIZE, double(VOCAB_SIZE));
+        const std::size_t V = VOCAB_SIZE;
+        std::vector<double> uni(V, 1.0);                             // add-one smoothing
+        double uni_total = double(V);
+        std::vector<std::vector<double>> big(N_VOICES, std::vector<double>(V * V, 1.0));
+        std::vector<std::vector<double>> row_total(N_VOICES, std::vector<double>(V, double(V)));
         for (const auto& seq : corpus)
-            for (std::size_t t = 1; t < seq.size(); ++t) {
+            for (std::size_t t = 1; t + 1 < seq.size(); ++t) {
                 uni[seq[t]] += 1.0; uni_total += 1.0;
+                const std::size_t v = (t - 1) % N_VOICES;
                 const int prev = (t >= 5) ? seq[t - 4] : TOK_BOS;
-                big[prev * VOCAB_SIZE + seq[t]] += 1.0;
-                row_total[prev] += 1.0;
+                big[v][prev * V + seq[t]] += 1.0;
+                row_total[v][prev] += 1.0;
             }
         double h_uni = 0.0, h_big = 0.0; std::size_t n = 0;
         for (const auto& seq : held_out)
-            for (std::size_t t = 1; t < seq.size(); ++t) {
+            for (std::size_t t = 1; t + 1 < seq.size(); ++t) {
                 h_uni -= std::log(uni[seq[t]] / uni_total);
+                const std::size_t v = (t - 1) % N_VOICES;
                 const int prev = (t >= 5) ? seq[t - 4] : TOK_BOS;
-                h_big -= std::log(big[prev * VOCAB_SIZE + seq[t]] / row_total[prev]);
+                h_big -= std::log(big[v][prev * V + seq[t]] / row_total[v][prev]);
                 ++n;
             }
         std::cout << std::fixed << std::setprecision(4)
@@ -473,7 +424,7 @@ static int cmd_train(int argc, char** argv) {
     }
 
     // ---- model + optimiser ----
-    CharLM model;
+    ChoraleLM model;
     CrossEntropy<float> ce;
     Adam<float>         opt(3e-4f);     // lower LR; transformers don't like 1e-3
 
@@ -576,7 +527,7 @@ static int cmd_train(int argc, char** argv) {
 static int cmd_generate(int argc, char** argv) {
     if (argc < 4) {
         std::cerr << "usage: transformer_chorales generate "
-                     "<model_prefix> <out.mid> [n_steps] [temperature]\n";
+                     "<model_prefix> <out.mid> [n_steps] [temperature] [seed]\n";
         return 1;
     }
     const std::string prefix = argv[2];
@@ -592,7 +543,7 @@ static int cmd_generate(int argc, char** argv) {
               << "  temperature:  " << temp   << "\n"
               << "  seed:         " << seed   << "\n\n";
 
-    CharLM model;
+    ChoraleLM model;
     try { model.load(prefix); }
     catch (const std::exception& e) {
         std::cerr << "load failed: " << e.what() << "\n"; return 1;
@@ -673,6 +624,105 @@ static int cmd_markov(int argc, char** argv) {
     return 0;
 }
 
+// Numbers that describe a four-voice chorale, so that generated chorales
+// can be compared with Bach's and with the Markov baseline's without
+// listening.  All are computed on the 16th-note grid, over the time steps
+// at which all four voices sound.
+//
+//   consonant : how often an upper voice forms a unison, third, fifth,
+//               sixth or octave with the bass (intervals 0, 3, 4, 7, 8, 9
+//               semitones modulo 12)
+//   crossed   : how often two neighbouring voices are in the wrong order
+//               (S below A, A below T, or T below B)
+//   parallel  : of the moves in which two voices both change pitch, how
+//               many go from a perfect fifth or octave to the same interval
+//   attack    : average number of quarter notes between attacks in a voice
+static int cmd_stats(int argc, char** argv) {
+    if (argc < 4) {
+        std::cerr << "usage: transformer_chorales stats <label> <file.mid | dir> [...]\n";
+        return 1;
+    }
+    const std::string label = argv[2];
+    std::vector<fs::path> paths;
+    for (int i = 3; i < argc; ++i) {
+        const fs::path p = argv[i];
+        if (fs::is_directory(p)) {
+            for (const auto& e : fs::recursive_directory_iterator(p))
+                if (e.path().extension() == ".mid") paths.push_back(e.path());
+        } else {
+            paths.push_back(p);
+        }
+    }
+    std::sort(paths.begin(), paths.end());
+
+    double cons = 0, cross = 0, par = 0, dur = 0;
+    std::size_t files = 0;
+    for (const auto& path : paths) {
+        midi::File f;
+        try { f = midi::read(path.string()); } catch (const std::exception&) { continue; }
+        if (f.tracks.size() < N_VOICES) continue;
+        const int hop = std::max(1, f.ticks_per_quarter / 4);
+        int max_end = 0;
+        for (std::size_t v = 0; v < N_VOICES; ++v)
+            for (const auto& n : f.tracks[v])
+                max_end = std::max(max_end, n.start_tick + n.duration_tick);
+        const int T = (max_end + hop - 1) / hop;
+        if (T < 8) continue;
+        std::vector<std::vector<int>> g(N_VOICES, std::vector<int>(T, -1));
+        std::size_t attacks = 0;
+        for (std::size_t v = 0; v < N_VOICES; ++v)
+            for (const auto& n : f.tracks[v]) {
+                const int s = (n.start_tick + hop / 2) / hop;
+                const int e = std::min<int>(T, std::max(s + 1,
+                                  (n.start_tick + n.duration_tick + hop / 2) / hop));
+                for (int t = s; t < e; ++t) g[v][t] = n.pitch;
+                ++attacks;
+            }
+        // Time steps at which all four voices sound.
+        std::vector<int> full;
+        for (int t = 0; t < T; ++t) {
+            bool all = true;
+            for (std::size_t v = 0; v < N_VOICES; ++v) if (g[v][t] < 0) all = false;
+            if (all) full.push_back(t);
+        }
+        if (full.empty()) continue;
+
+        std::size_t n_cons = 0, n_cross = 0;
+        for (int t : full) {
+            for (std::size_t v = 0; v < 3; ++v) {
+                const int iv = ((g[v][t] - g[3][t]) % 12 + 12) % 12;
+                if (iv == 0 || iv == 3 || iv == 4 || iv == 7 || iv == 8 || iv == 9) ++n_cons;
+            }
+            if (g[0][t] < g[1][t] || g[1][t] < g[2][t] || g[2][t] < g[3][t]) ++n_cross;
+        }
+        std::size_t moves = 0, parallels = 0;
+        for (std::size_t k = 1; k < full.size(); ++k) {
+            const int t0 = full[k - 1], t1 = full[k];
+            for (std::size_t a = 0; a < N_VOICES; ++a)
+                for (std::size_t b = a + 1; b < N_VOICES; ++b) {
+                    if (g[a][t0] == g[a][t1] || g[b][t0] == g[b][t1]) continue;
+                    ++moves;
+                    const int i0 = ((g[a][t0] - g[b][t0]) % 12 + 12) % 12;
+                    const int i1 = ((g[a][t1] - g[b][t1]) % 12 + 12) % 12;
+                    if (i0 == i1 && (i1 == 0 || i1 == 7)) ++parallels;
+                }
+        }
+        cons  += double(n_cons) / double(3 * full.size());
+        cross += double(n_cross) / double(full.size());
+        par   += moves ? double(parallels) / double(moves) : 0.0;
+        dur   += double(T) * N_VOICES / double(std::max<std::size_t>(1, attacks)) / 4.0;
+        ++files;
+    }
+    if (files == 0) { std::cerr << "no usable MIDI files\n"; return 1; }
+    std::cout << std::left << std::setw(14) << label << std::right << " n=" << std::setw(3) << files
+              << std::fixed << std::setprecision(1)
+              << "   consonant " << std::setw(5) << 100.0 * cons / files << "%"
+              << "   crossed " << std::setw(5) << 100.0 * cross / files << "%"
+              << "   parallel 5ths/8ves " << std::setw(4) << 100.0 * par / files << "%"
+              << "   quarter notes per attack " << std::setprecision(2) << dur / files << "\n";
+    return 0;
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr <<
@@ -682,14 +732,16 @@ int main(int argc, char** argv) {
             "  transformer_chorales generate <model_prefix> <out.mid> "
             "[n_steps] [temperature] [seed]\n"
             "  transformer_chorales markov   <data_dir> <out.mid> "
-            "[n_steps] [seed]\n";
+            "[n_steps] [seed]\n"
+            "  transformer_chorales stats    <label> <file.mid | dir> [...]\n";
         return 1;
     }
     const std::string cmd = argv[1];
     if (cmd == "train")    return cmd_train   (argc, argv);
     if (cmd == "generate") return cmd_generate(argc, argv);
     if (cmd == "markov")   return cmd_markov  (argc, argv);
+    if (cmd == "stats")    return cmd_stats   (argc, argv);
     std::cerr << "unknown command: " << cmd
-              << " (try 'train', 'generate' or 'markov')\n";
+              << " (try 'train', 'generate', 'markov' or 'stats')\n";
     return 1;
 }

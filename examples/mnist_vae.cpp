@@ -42,6 +42,7 @@
 //   vae_latent_grid.bmp      -- decode a grid of z over the 2D plane:
 //                               the whole digit manifold, laid out
 //                               continuously.  THE demo.
+//   vae_interpolation.bmp    -- a morph between two digits through mu
 //   vae_samples.bmp          -- digits decoded from z ~ N(0, I)
 //
 // Usage:  mnist_vae [data_dir]   (default ../data/mnist)

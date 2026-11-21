@@ -6,7 +6,12 @@
 //
 // Usage:
 //
-//     CachedFeatures cache { X, labels, class_names, "mfcc" };
+//     CachedFeatures cache;
+//     cache.X            = X;              // feature_dim x n_samples
+//     cache.labels       = labels;
+//     cache.class_names  = class_names;
+//     cache.feature_type = "mfcc";
+//     cache.file_ids     = file_ids;       // one per column; required
 //     save_features("sol_mfcc.feat", cache);
 //     // ... later, possibly in a different program ...
 //     auto loaded = load_features("sol_mfcc.feat");

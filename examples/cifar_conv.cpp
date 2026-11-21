@@ -282,7 +282,7 @@ int main(int argc, char** argv) {
     const auto t0 = std::chrono::steady_clock::now();
 
     // Augmentation RNG.  Seeded fixed so reruns are reproducible; the
-    // shuffle uses its own seed (the epoch number) above.
+    // shuffle uses its own seed (the epoch number) below.
     std::mt19937 aug_rng(12345);
 
     for (int epoch = 0; epoch < EPOCHS; ++epoch) {

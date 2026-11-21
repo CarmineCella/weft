@@ -5,7 +5,7 @@
 // and what it should produce.
 //
 // Build & run:
-//     g++ -std=c++17 test_matrix.cpp -o test_matrix && ./test_matrix
+//     cd build && make && ./tests/test_matrix
 //
 #include "Matrix.h"
 

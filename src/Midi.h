@@ -13,8 +13,8 @@
 //           clock stays correct).
 //
 //   WRITE:  Always emits Format 1 with the supplied tracks in order.
-//           Each track gets a single tempo at time 0 (track 0 only),
-//           then note-on / note-off pairs in absolute-time order,
+//           Track 0 gets a single tempo event at time 0; every track
+//           then gets note-on / note-off pairs in absolute-time order,
 //           encoded with variable-length delta times.
 //
 // MIDI's wire format is straightforward but pedantic:

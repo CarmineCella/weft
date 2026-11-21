@@ -28,6 +28,7 @@
 //   mp_analyze info <in.atoms>
 //       statistics of an atom list
 
+#include "AtomFile.h"
 #include "MatchingPursuit.h"
 #include "Wav.h"
 
@@ -45,58 +46,6 @@
 using namespace weft;
 
 namespace {
-
-// An atom list with what is needed to interpret it.
-struct AtomFile {
-    std::uint32_t            sample_rate = 44100;
-    std::uint32_t            n_samples   = 0;
-    std::vector<std::size_t> window_lengths;
-    std::vector<Atom>        atoms;
-};
-
-void save_atoms(const std::string& path, const AtomFile& f) {
-    std::ofstream o(path, std::ios::binary);
-    if (!o) throw std::runtime_error("cannot write " + path);
-    auto u32 = [&](std::uint32_t v) { o.write(reinterpret_cast<const char*>(&v), 4); };
-    o.write("WATM", 4);
-    u32(f.sample_rate);
-    u32(f.n_samples);
-    u32(static_cast<std::uint32_t>(f.window_lengths.size()));
-    for (std::size_t N : f.window_lengths) u32(static_cast<std::uint32_t>(N));
-    u32(static_cast<std::uint32_t>(f.atoms.size()));
-    for (const Atom& a : f.atoms) {
-        u32(a.scale);
-        o.write(reinterpret_cast<const char*>(&a.start), 4);
-        u32(a.bin);
-        o.write(reinterpret_cast<const char*>(&a.amp), 4);
-        o.write(reinterpret_cast<const char*>(&a.phase), 4);
-    }
-}
-
-AtomFile load_atoms(const std::string& path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) throw std::runtime_error("cannot open " + path);
-    auto u32 = [&]() { std::uint32_t v = 0; in.read(reinterpret_cast<char*>(&v), 4); return v; };
-    char magic[4];
-    in.read(magic, 4);
-    if (std::string(magic, 4) != "WATM") throw std::runtime_error("not an atom file: " + path);
-    AtomFile f;
-    f.sample_rate = u32();
-    f.n_samples   = u32();
-    const std::uint32_t ns = u32();
-    for (std::uint32_t i = 0; i < ns; ++i) f.window_lengths.push_back(u32());
-    const std::uint32_t na = u32();
-    f.atoms.resize(na);
-    for (Atom& a : f.atoms) {
-        a.scale = u32();
-        in.read(reinterpret_cast<char*>(&a.start), 4);
-        a.bin = u32();
-        in.read(reinterpret_cast<char*>(&a.amp), 4);
-        in.read(reinterpret_cast<char*>(&a.phase), 4);
-    }
-    if (!in) throw std::runtime_error("short read in " + path);
-    return f;
-}
 
 int cmd_decompose(int argc, char** argv) {
     if (argc < 4) {
@@ -189,9 +138,10 @@ int cmd_render(int argc, char** argv) {
         }
     } else if (mode == "stretch") {
         // Move each atom's centre; the atom itself (length, frequency,
-        // amplitude) is unchanged, so pitch and timbre are preserved.  The
-        // phase is advanced so that a partial which continued from one atom
-        // into the next still lines up at the new distance.
+        // amplitude) is unchanged, so pitch and timbre are preserved.  An
+        // atom is cos(w (n - start) + phase); for it to remain a slice of
+        // the same endless cosine cos(w n + theta) after its start moves by
+        // `shift`, its phase must advance by w * shift.
         const double factor = (value > 0.0) ? value : 2.0;
         n_samples = std::size_t(double(n_samples) * factor);
         for (Atom a : f.atoms) {
@@ -201,8 +151,8 @@ int cmd_render(int argc, char** argv) {
             const long new_start = std::lround(moved - 0.5 * N);
             const double shift = double(new_start - a.start);
             a.phase = static_cast<float>(std::fmod(
-                double(a.phase) + 2.0 * 3.14159265358979 * double(a.bin) / N *
-                (shift - shift / factor), 2.0 * 3.14159265358979));
+                double(a.phase) + 2.0 * 3.14159265358979 * double(a.bin) / N * shift,
+                2.0 * 3.14159265358979));
             a.start = static_cast<std::int32_t>(new_start);
             atoms.push_back(a);
         }

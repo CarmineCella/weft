@@ -1,6 +1,7 @@
 // test_audio_features.cpp
 //
-// Tests for hann_window, mel_filterbank, dct2, logmag_spectrum, mfcc.
+// Tests for hann_window, mel_filterbank, dct2, logmag_spectrum, mfcc and
+// their per-frame versions (logmag_spectrum_frames, mfcc_frames).
 //
 #include "AudioFeatures.h"
 
@@ -40,7 +41,7 @@ int main() {
         check(close(w[0], 0.0f) && close(w[7], 0.0f),
               "hann: zero at endpoints");
         // The maximum of a Hann window of length N is at index (N-1)/2;
-        // for N=8 that's between index 3 and 4, both equal to ~0.97.
+        // for N=8 that's between index 3 and 4, both equal to 0.95.
         check(w[3] > 0.9f && w[4] > 0.9f,        "hann: peaks near middle");
     }
 

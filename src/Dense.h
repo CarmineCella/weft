@@ -36,7 +36,7 @@ public:
     {
         // He initialisation: stddev = sqrt(2 / fan_in).
         // Keeps activation variances roughly constant across layers when
-        // paired with ReLU (we'll dig into this when we add ReLU).
+        // paired with ReLU (He et al., 2015).
         const T stddev = std::sqrt(T(2) / static_cast<T>(in_features));
         W_.randomizeNormal(T(0), stddev);
     }
@@ -54,7 +54,7 @@ public:
     // backward:
     //   dW = dZ * X^T             (sum over the batch happens inside the matmul)
     //   db = dZ.sumColumns()      (explicit sum over the batch)
-    //   dX = W^T * dZ             (sent upstream)
+    //   dX = W^T * dZ             (passed down to the layer below)
     // ------------------------------------------------------------------
     Matrix<T> backward(const Matrix<T>& dZ) override {
         dW_ = dZ * X_cache_.transpose();
@@ -70,7 +70,7 @@ public:
         opt.step(b_, db_);
     }
 
-    // ------- accessors (used by tests; later, by the optimizer) -------
+    // ------- accessors (used by tests and examples to read or set parameters) -------
     Matrix<T>&       W()        { return W_; }
     const Matrix<T>& W()  const { return W_; }
     Matrix<T>&       b()        { return b_; }

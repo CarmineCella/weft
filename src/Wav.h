@@ -1,6 +1,6 @@
 #pragma once
 //
-// Wav.h -- read 16-bit PCM RIFF/WAV files into a vector of floats.
+// Wav.h -- read and write 16-bit PCM RIFF/WAV files as vectors of floats.
 //
 // The subset of the format we handle:
 //   - PCM linear coding   (format code 1)
@@ -18,12 +18,10 @@
 // because real-world WAVs often have metadata chunks (LIST, INFO, ...)
 // interleaved.  Unknown chunks are skipped over.
 //
-// Endianness:  we assume a little-endian host (x86, ARM Apple Silicon,
-// 99% of what anyone runs in 2026).  All multi-byte values are read by
-// hand from raw bytes so the parse itself is host-endian-agnostic; the
-// only place we lean on host endianness is treating int16_t as a value
-// after we've assembled the bytes -- and we use the explicit cast from
-// uint16_t to int16_t which is well-defined for the bit pattern.
+// Endianness:  no assumption about the host.  All multi-byte values are
+// assembled by hand from raw bytes, and the 16-bit samples are converted
+// with an explicit cast from uint16_t to int16_t, which is well defined
+// for the bit pattern.
 //
 #include "Endian.h"
 

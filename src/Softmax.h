@@ -19,7 +19,9 @@
 //
 // Note: in classification networks Softmax is normally paired with cross-
 // entropy loss; the *combined* gradient is just (S - target), much simpler
-// than the standalone backward.  The Loss class will use that shortcut.
+// than the standalone backward.  weft keeps the two classes separate:
+// CrossEntropy::backward chained through this backward equals (S - T)/N,
+// which tests/test_crossentropy.cpp verifies.
 // This standalone backward is correct on its own and verified by the
 // numerical gradient check in tests/test_softmax.cpp.
 //

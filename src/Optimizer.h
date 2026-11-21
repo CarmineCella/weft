@@ -3,7 +3,7 @@
 // Optimizer.h  --  abstract base class for parameter-update strategies.
 //
 //   step(param, grad)  :  apply one update to `param` using `grad`.
-//                         Stateful optimisers (Adam, RMSProp, ...) use the
+//                         Stateful optimisers (Adam here) use the
 //                         address of `param` as the identity key for their
 //                         per-parameter state, with lazy allocation on
 //                         first contact.

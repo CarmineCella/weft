@@ -2,7 +2,7 @@
 //
 // Scan a directory of WAV files, compute features for each one, and
 // save the resulting feature dataset to a binary file that
-// sound_classifier (or future autoencoder tools) can read.
+// sound_classifier and the audio VAE trainers can read.
 //
 // Usage:
 //     extract_features <data_dir> <output.feat> [logmag|mfcc] [averaged|per_frame]
@@ -11,7 +11,7 @@
 //   averaged   (default)  one feature vector per file (energy-weighted
 //                         across frames).  Compact, fast.
 //   per_frame              one feature vector per non-silent STFT frame.
-//                         ~20x more rows; required for the morphing AE
+//                         ~135x more rows on TinySOL; required for the audio VAE
 //                         and gives a meaningful boost to classifier
 //                         accuracy via per-file vote aggregation.
 //

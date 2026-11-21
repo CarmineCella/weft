@@ -18,7 +18,7 @@
 //      lr     = 1e-3   (sometimes 3e-4 for very deep nets)
 //      beta1  = 0.9    (EMA decay for the 1st moment)
 //      beta2  = 0.999  (EMA decay for the 2nd moment)
-//      eps    = 1e-8   (numerical guard for the sqrt)
+//      eps    = 1e-8   (numerical guard added to the denominator)
 //
 // State (m, v, t) is allocated lazily the first time a given parameter is
 // seen, and is keyed on the parameter's address.  As long as the layer's

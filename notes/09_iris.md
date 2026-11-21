@@ -1,36 +1,36 @@
 # 9 — IRIS: the first end-to-end classifier
 
-This chapter walks through the IRIS example end-to-end and the new tools the
-library acquired to make it possible.
+This chapter goes through the IRIS example from start to finish, and the
+tools added to the library for it.
 
-The example lives at `examples/iris_classifier.cpp`. The library tools it
-relies on are:
+The example is in `examples/iris_classifier.cpp`. It uses these library
+tools:
 
-- `Matrix::selectColumns(indices)` — slice a matrix by column indices.
-- `Standardizer` — fit per-feature mean/std on training data, apply to
-  both train and test.
-- `one_hot`, `train_test_split`, `shuffled_indices`, `accuracy` — free
+- `Matrix::selectColumns(indices)`: slices a matrix by column indices.
+- `Standardizer`: fits per-feature mean/std on training data and applies
+  them to both train and test.
+- `one_hot`, `train_test_split`, `shuffled_indices`, `accuracy`: free
   functions in `Data.h`.
 
 ---
 
 ## 1. The standard ML pipeline
 
-Almost every supervised-learning example follows the same six steps. IRIS
-is the smallest interesting instance of this pattern; MNIST, the audio
-classifier, and the autoencoder will follow the same skeleton.
+Almost every supervised-learning example follows the same steps. IRIS
+is the smallest instance of this pattern. MNIST, the audio classifier,
+and the autoencoder follow the same structure.
 
 1. **Load** the raw data into matrices (features × examples).
 2. **One-hot encode** the class labels into a `(num_classes × N)` target
    matrix.
 3. **Split** into train/test (random, with a fixed seed).
-4. **Standardise** features — fit the scaler on TRAIN ONLY, then apply to
-   both splits.
+4. **Standardise** features: fit the scaler on the training split only,
+   then apply it to both splits.
 5. **Train** with mini-batch SGD, shuffling each epoch.
 6. **Evaluate** with accuracy on the held-out test set.
 
-The last four steps are essentially mechanical once the data is loaded.
-The library's `Data.h` and `Standardizer.h` cover them.
+Once the data is loaded, the last four steps are mechanical. The
+library's `Data.h` and `Standardizer.h` cover them.
 
 ---
 
@@ -40,35 +40,35 @@ Raw IRIS features have very different scales: sepal length is in `[4.3, 7.9]`,
 petal width is in `[0.1, 2.5]`. A gradient update step has the same
 learning rate for every weight, so a weight attached to a large-scale
 feature receives a much larger raw gradient than one attached to a
-small-scale feature, simply because of the input magnitudes. This forces
-the optimiser to take small steps to avoid blowing up the large-scale
-features, and learning crawls on everything else.
+small-scale feature, only because of the input magnitudes. The optimiser
+must then take small steps so that the weights on the large-scale
+features do not diverge, and learning is slow for all the others.
 
-Standardising — subtract per-feature mean, divide by per-feature std —
-puts all features on roughly the same scale (`mean ≈ 0`, `std ≈ 1`).
-Suddenly every weight sees comparable inputs and a single learning rate
-works well across all of them.
+Standardising (subtracting the per-feature mean and dividing by the
+per-feature std) puts all features on roughly the same scale
+(`mean ≈ 0`, `std ≈ 1`). Every weight then receives comparable inputs,
+and a single learning rate works well for all of them.
 
-This generalises:
+The same applies to other data:
 
 - **Images**: typically scale pixels to `[0, 1]` or standardise per
   channel.
 - **Audio**: often log-mel spectrograms then standardise.
 - **Tabular**: standardise numeric features; one-hot encode categoricals.
 
-`Standardizer` is the simplest case; we'll add specialised preprocessors
+`Standardizer` is the simplest case. We add specialised preprocessors
 later if needed.
 
 ---
 
 ## 3. The "fit on train only" rule
 
-The single most common subtle bug in ML pipelines is computing the mean
-and std on the *entire* dataset (train + test together) and using those
+The most common subtle bug in ML pipelines is computing the mean and std
+on the entire dataset (train and test together) and using those
 statistics to standardise both splits. This is called **data leakage**:
-statistics of the test set bleed into preprocessing, which lets the
-training process implicitly "see" test data. The test accuracy ends up
-optimistic and you don't notice until production.
+statistics of the test set enter the preprocessing, so the training
+process implicitly uses test data. The test accuracy is then optimistic,
+and the error goes unnoticed until production.
 
 `Standardizer`'s API encourages the right pattern:
 
@@ -79,9 +79,9 @@ Matrix<float> X_test_std  = sc.transform(X_test);        // apply (same params)
 ```
 
 `fit_transform` learns mean/std from the data it's given; `transform`
-just applies the learned parameters. We never call `fit` on the test
+only applies the learned parameters. We never call `fit` on the test
 data. The same scaler instance is used for both, so the test inputs are
-mapped into the same space the training inputs live in.
+mapped into the same space as the training inputs.
 
 ---
 
@@ -109,33 +109,33 @@ for (int epoch = 0; epoch < epochs; ++epoch) {
 }
 ```
 
-Three things matter here:
+The important choices are:
 
 - **Mini-batches** (rather than the full dataset or single examples).
-  Full-batch gradient descent is too memory-hungry for big datasets and
-  has fewer updates per epoch; pure stochastic gradient descent (one
-  example at a time) has too noisy a gradient. Mini-batches are the
-  middle ground — 16, 32, 64 are typical for small problems; 128–512 for
+  Full-batch gradient descent needs too much memory for big datasets
+  and makes fewer updates per epoch. Pure stochastic gradient descent
+  (one example at a time) has too noisy a gradient. Mini-batches are in
+  between: 16, 32, 64 are typical for small problems, 128–512 for
   larger ones.
 - **Shuffle every epoch**. Without it, the network sees the same batches
-  in the same order every time. Even though SGD is "stochastic" already
-  (because each batch is just a noisy estimate of the true gradient),
-  the noise from a deterministic batch order is correlated across
-  epochs, which makes convergence slower and can settle the optimiser
-  into bad local patterns.
+  in the same order every time. SGD is already stochastic, because each
+  batch gives a noisy estimate of the true gradient, but the noise from
+  a deterministic batch order is correlated across epochs. This slows
+  convergence and can settle the optimiser into bad local patterns.
 - **Use the same `shuffled_indices` seed strategy across runs** so
-  results are reproducible. The example uses the epoch number as the
-  seed, which gives different orders per epoch but is fully
-  deterministic.
+  the batch order is reproducible. The example uses the epoch number as
+  the seed, which gives different orders per epoch but the same orders
+  on every run. (The weight initialisation is not seeded, so final
+  numbers still vary from run to run; see section 7.)
 
 ---
 
 ## 5. Accuracy as the eval metric
 
 For classification, the natural evaluation metric is the fraction of
-examples where the model's predicted class equals the true class. That's
-just `argmax-per-column` of predictions vs `argmax-per-column` of
-one-hot targets:
+examples where the model's predicted class equals the true class. It
+compares the `argmax-per-column` of the predictions with the
+`argmax-per-column` of the one-hot targets:
 
 ```cpp
 T accuracy(predictions, targets):
@@ -147,99 +147,104 @@ T accuracy(predictions, targets):
 ```
 
 The implementation in `Data.h` works whether `predictions` is post-softmax
-probabilities or raw logits — only the ranking of values matters.
+probabilities or raw logits, because only the ranking of the values
+matters.
 
-Loss and accuracy are not the same thing! Loss is a continuous, smooth
-measure used for gradient descent. Accuracy is what you actually care
-about. They usually move together, but it's possible for loss to keep
-going down (the model becomes more confidently right where it was
-already right) while accuracy plateaus.
+Loss and accuracy are not the same thing. Loss is a continuous, smooth
+measure used for gradient descent. Accuracy is the quantity of interest.
+They usually move together, but the loss can keep decreasing (the model
+becomes more confidently right where it was already right) while
+accuracy stays flat.
 
 ---
 
-## 6. What the example actually shows
+## 6. What the example shows
 
 ```
 loaded 150 examples, 4 features, 3 classes
 split: 120 train, 30 test  (seed=1)
 features standardised (mean ~ 0, std ~ 1 on train)
 
-architecture: Dense(4,16) -> ReLU -> Dense(16,3) -> Softmax
+architecture:
+    Dense(4, 16)
+    ReLU
+    Dense(16, 3)
+    Softmax
 loss:         cross-entropy
 optimiser:    plain SGD, lr=0.1, batch_size=16
 training for 100 epochs
 
   epoch   train_loss   train_acc   test_loss   test_acc
   -----   ----------   ---------   ---------   --------
-      0       1.2618      0.4250      1.2937     0.4000
-     10       0.2062      0.9500      0.1208     1.0000
-     20       0.1320      0.9667      0.0751     1.0000
+      0       1.7867      0.1917      1.8254     0.2333
+     10       0.2084      0.9250      0.1847     1.0000
+     20       0.1401      0.9500      0.1188     0.9667
      ...
-    100       0.0506      0.9917      0.0611     0.9667
+    100       0.0588      0.9833      0.0476     1.0000
 
-final test accuracy: 0.9667  (29/30 correct)
+final test accuracy: 1.0000  (30/30 correct)
 ```
 
-Two things to look at:
+In this output:
 
-- The model's untrained baseline is ~40% accuracy. Random guessing would
-  give ~33% (1/3 classes). The slight advantage at epoch 0 is just luck
-  in how the random initial weights happened to split the inputs.
-- The gap between final train accuracy (99.2%) and test accuracy (96.7%)
-  is a mild form of overfitting. With 120 training examples and a network
-  of ~80 parameters, the network has enough capacity to memorise some
-  examples that don't generalise. For IRIS this is harmless; for MNIST it
-  will be the central practical problem we have to solve, with techniques
-  like Dropout, weight decay, and early stopping.
+- The untrained network is at 23% accuracy, below the 33% that random
+  guessing among three classes would give. This has no significance: it
+  is the result of the random initial weights. Ten epochs later it is
+  at 100%.
+- Your numbers will differ. The split and the batch order are seeded,
+  but the initial weights are not, so every run starts from different
+  weights. This is deliberate, and the next section discusses the
+  consequences.
 
 ---
 
 ## 7. The seed-variance warning
 
-The seed used to split train/test changes the result more than you might
-expect:
+Over twenty runs of the example, the final test accuracy takes several
+values:
 
-| seed | test accuracy |
-|-----:|:--------------|
-|    0 | 0.9333 |
-|    1 | 0.9667 |
-|    7 | 0.9333 |
-|   42 | 0.8667 |
-|  123 | 1.0000 |
+| test accuracy | runs out of 20 |
+|:--------------|---------------:|
+| 30/30 = 1.0000 | 15 |
+| 29/30 = 0.9667 |  4 |
+| 28/30 = 0.9333 |  1 |
 
-Same model, same training, same data — just a different 30 examples in
-the test set. On small test sets a single accuracy number is essentially
-noise. Two implications:
+The model, the data, the split and the batch order are the same; only
+the random initial weights differ. With 30 test examples, one example is
+3.3 percentage points, and a difference of one or two examples between
+runs is ordinary. A different train/test split moves the number at
+least as much. On a small test set a single accuracy number is mostly
+noise. Therefore:
 
 - Never report a single test accuracy from a tiny test set without
   noting the variance.
 - For real evaluation, use **k-fold cross-validation**: split the data
   into k disjoint folds, train k models leaving one fold out each time,
-  and average the per-fold accuracies. Reduces variance and uses every
-  example for both training and evaluation. We'll add a `kfold` helper
-  in `Data.h` when we hit problems where this variance actually obscures
-  real differences.
+  and average the per-fold accuracies. This reduces variance and uses
+  every example for both training and evaluation. The library does not
+  have a `kfold` helper; the larger datasets of the following chapters
+  have test sets big enough not to need one.
 
 ---
 
-## 8. What's next
+## 8. From IRIS to MNIST
 
-Now that we have a working classifier, the next milestone scales up:
-**MNIST** (handwritten digits). 60,000 training images × 784 pixels × 10
-classes. Two things IRIS got away with will start to bite:
+The next example is larger: MNIST (handwritten digits), with 60,000
+training images × 784 pixels × 10 classes. It needs additions that IRIS
+did not:
 
-- **Capacity outstrips the data more aggressively**, so we'll need
-  regularisation. → **Dropout** (and a training/eval mode flag on
+- **Regularisation.** The model capacity exceeds the data by a larger
+  margin, so we need Dropout (and a training/eval mode flag on
   `Layer`).
-- **Plain SGD will be slower** than Adam on a problem this size. Both
-  optimisers are already available; the practical win shows up on
-  MNIST.
+- **A faster optimiser.** Plain SGD is slower than Adam on a problem
+  this size. The next chapter adds Adam; its practical advantage
+  appears on MNIST.
 
 We can skip k-fold cross-validation: with 10,000 test examples, a single
 accuracy number is no longer noisy.
 
-After MNIST: orchestral instrument sounds, then the autoencoder, then
-ConvNets.
+After MNIST come orchestral instrument sounds, then the autoencoder,
+then ConvNets.
 
 
 ## Further reading

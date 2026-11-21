@@ -1,7 +1,8 @@
 // test_data.cpp
 //
 // Tests for the new data-handling utilities:
-//   Matrix::selectColumns, Standardizer, one_hot, train_test_split, accuracy.
+//   Matrix::selectColumns, Standardizer, one_hot, train_test_split,
+//   group_train_test_split, accuracy.
 //
 #include "Matrix.h"
 #include "Standardizer.h"

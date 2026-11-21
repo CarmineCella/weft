@@ -5,14 +5,18 @@
 // A layer plays two roles:
 //
 //   forward(X)   :  X         ->  Y                 (compute output)
-//   backward(dY) :  dL/dY     ->  dL/dX             (route gradient upstream)
+//   backward(dY) :  dL/dY     ->  dL/dX             (pass the gradient down)
 //                                                   and, internally, compute
 //                                                   dL/dW, dL/db, ... for any
 //                                                   trainable parameters.
 //
-//   update(lr)   :  apply the gradients stored in backward() with a plain
-//                   gradient-descent step.  Layers with no parameters (e.g.
+//   update(opt)  :  hand each trainable parameter and its gradient to the
+//                   optimiser.  Layers with no parameters (e.g.
 //                   activations) just do nothing.
+//
+// It also carries a training/inference flag (set_training), a one-line
+// description (describe) and parameter serialisation (save_params /
+// load_params).
 //
 // All layers are templated on the scalar type T (float / double).
 //
@@ -41,7 +45,7 @@ public:
     // Default is a no-op for parameter-less layers (activations).
     virtual void update(Optimizer<T>& /*opt*/) {}
 
-    // Training-vs-inference mode.  Some layers (Dropout, later BatchNorm)
+    // Training-vs-inference mode.  Some layers (Dropout here; batch normalisation is the other usual example)
     // compute different things at training time than at inference time.
     // Defaults to training mode -- you only ever explicitly switch to eval.
     virtual void set_training(bool t) { training_ = t; }

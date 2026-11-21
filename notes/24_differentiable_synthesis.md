@@ -1,43 +1,41 @@
 # 24 — Differentiable synthesis: a network that plays a synthesiser
 
 The audio VAEs of chapters [19](19_audio_vae.md) and
-[23](23_convvae.md) work, in the sense that they train, their latent
-spaces are smooth, and the three applications run. But listen to the
-results next to the recordings they came from and the verdict is
-plain: they sound poor. The reason is not a bug and more epochs would
-not fix it. We asked a small network to *regenerate a spectrum* from
-32 numbers, and then we had to turn that spectrum back into a
-waveform. Each step costs fidelity: squared error makes the network
-output the average of plausible spectra, which smears sharp harmonic
-peaks into a haze; the magnitudes are paired with the phases of a
-different sound; and in the convolutional model 64 mel bands are
+[23](23_convvae.md) train, their latent spaces are smooth, and the
+three applications run. Next to the recordings they came from,
+however, the results sound poor. The cause is not a bug, and more
+epochs would not fix it. We asked a small network to regenerate a
+spectrum from 32 numbers, and then we had to turn that spectrum back
+into a waveform. Each step loses fidelity. Squared error makes the
+network output the average of plausible spectra, which blurs sharp
+harmonic peaks. The magnitudes are paired with the phases of a
+different sound. In the convolutional model 64 mel bands are
 stretched back to 2049 bins.
 
-This chapter takes a different route to the same goal. Instead of asking
-the network for sound, we ask it for the *controls* of a synthesiser
-that can only make plausible sounds in the first place. The
-synthesiser is classical signal processing: a bank of sinusoids at
-multiples of a fundamental, plus filtered noise. It has no trainable
-parameters. The network never outputs a single audio sample. But
-because every operation in the synthesiser is differentiable, the
-error measured on the *audio* can flow back through it and tell the
-network how to change the controls.
+This chapter takes a different approach to the same goal. We do not
+ask the network for sound. We ask it for the controls of a
+synthesiser that can only make plausible sounds. The synthesiser is
+classical signal processing: a bank of sinusoids at multiples of a
+fundamental, plus filtered noise. It has no trainable parameters. The
+network never outputs an audio sample. Every operation in the
+synthesiser is differentiable, so the error measured on the audio can
+be propagated back through it to tell the network how to change the
+controls.
 
 The idea is known as differentiable digital signal processing, or
-DDSP [@engel2020ddsp], and the synthesiser inside it is much older:
-it is the harmonic-plus-noise model of spectral modelling synthesis
-[@serra1990sms]. That is the
-point of this chapter. It is the place where the neural networks we have
-been building meet the signal processing that audio people already
-know, and each does the part it is good at.
+DDSP [@engel2020ddsp]. The synthesiser inside it is much older: it is
+the harmonic-plus-noise model of spectral modelling synthesis
+[@serra1990sms]. This chapter combines the neural networks of the
+earlier chapters with signal processing that is standard in audio
+work. Each does the part it is suited to.
 
 
 ## 1. The harmonic part
 
 A pitched instrument tone is, to a good approximation, a sum of
-partials at `f0, 2 f0, 3 f0, ...`. What distinguishes a flute from a
-cello playing the same note is how loud each partial is and how that
-changes in time. So the harmonic synthesiser takes
+partials at `f0, 2 f0, 3 f0, ...`. A flute and a cello playing the
+same note differ in how loud each partial is and how that changes in
+time. The harmonic synthesiser therefore takes
 
 ```
 f0[t]      fundamental frequency in Hz, one per control frame
@@ -56,9 +54,9 @@ interpolated linearly up to the sample rate. A harmonic whose
 frequency reaches the Nyquist limit is silenced, so the output never
 aliases. All of this is `HarmonicSynth<T>`.
 
-The backward pass is easy for a reason worth noticing: **the output is
-linear in the amplitudes.** Write the interpolation weight of frame
-`t` as `w_t[n]`; then
+The backward pass is easy because the output is linear in the
+amplitudes. Write the interpolation weight of frame `t` as `w_t[n]`.
+Then
 
 ```
 y[n] = sum_{k,t}  A[k,t] * w_t[n] * sin((k+1) phi[n])
@@ -72,24 +70,25 @@ signal:
 dA[k, t] = sum_n  dy[n] * w_t[n] * sin((k+1) phi[n])
 ```
 
-No gradient flows to `f0`. Pitch is an input here, not something
-learned (section 4 explains where it comes from).
+No gradient flows to `f0`. Pitch is an input here and is not learned
+(section 4 explains where it comes from).
 
-One implementation detail: the sines are not computed with `sin()`.
-From `sin(phi)` and `cos(phi)` the recurrence
+The sines are not computed with `sin()`. From `sin(phi)` and
+`cos(phi)` the recurrence
 `sin((k+1)x) = 2 cos(x) sin(kx) - sin((k-1)x)` gives every harmonic
-with one multiplication each. And the running phase is kept in
-`double` even when the library is instantiated with `float`: it is
-multiplied by the harmonic number, and a float would lose exactly the
-low bits that the high harmonics need.
+with one multiplication each. The running phase is accumulated in
+`double` even when the library is instantiated with `float`. Its
+rounding error is amplified by the harmonic number, up to a hundred
+times for the top harmonics, and a float would lose the low bits they
+need.
 
 
 ## 2. The noise part
 
 Not everything in an instrument tone is periodic. The breath of a
 flute, the bow noise of a cello and the hiss inside an attack cannot
-be built from harmonics. `FilteredNoise<T>` supplies them: white noise
-shaped by a filter that changes over time.
+be built from harmonics. `FilteredNoise<T>` produces them as white
+noise shaped by a filter that changes over time.
 
 ```
 M[b, t]    gain of frequency band b at frame t       (B x T)
@@ -98,36 +97,37 @@ M[b, t]    gain of frequency band b at frame t       (B x T)
 The `B` bands (we use 65) are spread evenly from 0 Hz to Nyquist, and
 the gain at an FFT bin is interpolated from the two nearest bands, so
 `M` is a smooth spectral envelope with `B` control points. The filter
-is applied in the short-time Fourier domain: cut a fixed, seeded noise
-signal into overlapping windowed frames, FFT each, multiply by the
-gains, inverse FFT, window again and overlap-add. Analysis and
-synthesis both use a square-root Hann window, so that their product is
-a Hann window and, at 50% overlap, unit gains return the noise
-unchanged.
+is applied in the short-time Fourier domain. A fixed, seeded noise
+signal is cut into overlapping windowed frames. Each frame is
+transformed with the FFT, multiplied by the gains, transformed back,
+windowed again and overlap-added. Analysis and synthesis both use a
+square-root Hann window, so that their product is a Hann window and,
+at 50% overlap, unit gains return the noise unchanged.
 
-Like the harmonic part, the output is linear in the controls, and the
-backward is the adjoint of the forward: window the upstream gradient
-under each frame, FFT it, and correlate with that frame's noise
-spectrum. Bins `k` and `N-k` share one gain, so their gradients add.
+As in the harmonic part, the output is linear in the controls, and
+the backward pass is the adjoint of the forward pass: window the
+upstream gradient under each frame, FFT it, and correlate with that
+frame's noise spectrum. Bins `k` and `N-k` share one gain, so their
+gradients add.
 
-The two parts are simply summed. The whole synthesiser therefore has
+The two parts are summed. The whole synthesiser therefore has
 `K + B` numbers per control frame, 165 in our configuration, and is
 linear in all of them.
 
 
-## 3. A loss the ear would agree with
+## 3. The spectral loss
 
-Now we need to compare the synthesiser's output with a recording.
-Comparing sample by sample is the wrong test. Two sine waves of the
+The synthesiser's output must be compared with a recording. A
+sample-by-sample comparison is the wrong test. Two sine waves of the
 same frequency and loudness but different starting phase sound
 identical, yet their sample-wise difference can be as large as the
 signals themselves. Our synthesiser starts every harmonic in sine
-phase; a real instrument does not. A waveform loss would spend all its
-effort on a difference nobody can hear.
+phase, and a real instrument does not. A waveform loss would be
+dominated by a difference that cannot be heard.
 
-What the ear compares is closer to the *magnitude* of the short-time
-spectrum. `SpectralLoss<T>` does that. For one FFT size `N`, with a
-Hann window and hop `N/4`:
+What the ear compares is closer to the magnitude of the short-time
+spectrum. `SpectralLoss<T>` compares that. For one FFT size `N`, with
+a Hann window and hop `N/4`:
 
 ```
 S_y = | STFT(y) | / sum(window)          (same for the target x)
@@ -145,8 +145,8 @@ loss gives 0.198 for the phase shift and 2.83 for the pitch change.
 The sample-wise error cannot tell the two cases apart.
 
 One FFT size is a compromise: long windows resolve frequency and blur
-time, short windows do the opposite. So the loss is summed over
-several sizes. This is what "multi-scale" means.
+time, and short windows do the opposite. The loss is therefore summed
+over several sizes. This is what "multi-scale" means.
 
 **Backward.** For one frame the spectrum is
 
@@ -164,42 +164,42 @@ d|Y[k]| / dy[i]
 Collect the per-bin loss gradients `g[k] = dL/d|Y[k]|` into
 `C[k] = g[k] * conj(Y[k]) / |Y[k]|`, zero outside bins `0..N/2`. The
 frame's gradient is then `w[i] * Re(FFT(C)[i])`, and the frames
-overlap-add into the gradient of the whole signal. One FFT per frame,
-the same cost as the forward. All three backward passes, and the chain
-of synthesiser into loss, agree with finite differences to about
-`1e-8` in `tests/test_synth.cpp`.
+overlap-add into the gradient of the whole signal. This takes one FFT
+per frame, the same cost as the forward pass. All three backward
+passes, and the chain of synthesiser into loss, agree with finite
+differences to about `1e-8` in `tests/test_synth.cpp`.
 
 
 ## 4. Pitch is an input
 
-The synthesiser needs `f0`, and a small error there is expensive. If
-`f0` is off by 10 cents (0.6%), partial 40 is off by the same 0.6%,
-which at 17 kHz is 100 Hz: several FFT bins away from where the real
-partial is. The synthesised partial and the recorded one then do not
-overlap at all, and no choice of amplitude can make them match.
+The synthesiser needs `f0`, and a small error there has a large
+effect. If `f0` is off by 10 cents (0.6%), partial 40 is off by the
+same 0.6%, which at 17 kHz is 100 Hz, several FFT bins away from the
+real partial. The synthesised partial and the recorded one then do
+not overlap, and no choice of amplitude can make them match.
 
 For the instrument samples we use, the note name is in the file name
 (`Fl-ord-A4-mf.wav`), and `note_to_hz` turns it into a frequency. That
-is correct to the nearest semitone only; players tune a little sharp
-or flat and string players add vibrato. So `refine_f0` starts from the
-nominal pitch and, frame by frame, searches 60 cents either side of it
-for the fundamental whose harmonics best line up with the peaks of the
-measured spectrum, by adding the spectrum's magnitude at
-`f, 2f, 3f, ...` for each candidate. Because the search is confined to
-less than a semitone around a known pitch there is no octave
-ambiguity, which is the hard part of general pitch tracking and the
-reason we do not need a full pitch tracker.
+is correct to the nearest semitone only: players tune a little sharp
+or flat and string players add vibrato. `refine_f0` therefore starts
+from the nominal pitch and, frame by frame, searches 60 cents either
+side of it for the fundamental whose harmonics best match the peaks
+of the measured spectrum. For each candidate it adds the spectrum's
+magnitude at `f, 2f, 3f, ...`. The search is confined to less than a
+semitone around a known pitch, so there is no octave ambiguity.
+Octave ambiguity is the hard part of general pitch tracking, and its
+absence is the reason we do not need a full pitch tracker.
 
 
-## 5. First experiment: no network at all
+## 5. First experiment: no network
 
-Before training a network to produce the controls, it is worth
-asking how good the synthesiser can sound at all. `synth_fit` answers
-that. It treats the controls themselves as the parameters: the
-amplitude of every harmonic and the gain of every noise band at every
-frame, about 60,000 numbers for a six-second note. The loop is the
-one every example in this book uses, with the synthesiser where the
-network would be:
+Before training a network to produce the controls, we measure how
+good the synthesiser can sound. `synth_fit` does this. It treats the
+controls themselves as the parameters: the amplitude of every
+harmonic and the gain of every noise band at every frame, about
+60,000 numbers for a six-second note. The loop is the one used by
+every example in this book, with the synthesiser in place of the
+network:
 
 ```
 controls -> HarmonicSynth + FilteredNoise -> audio
@@ -208,67 +208,72 @@ dL/d(audio) -> synthesiser backward -> dL/d(controls) -> Adam
 ```
 
 Whatever a network later predicts, it cannot do better than controls
-fitted directly to the target. This is the ceiling.
+fitted directly to the target. This is the upper limit.
 
 ```
 synth_fit fit  Fl-ord-A4-mf.wav  A4  flute
 ```
 
-Four hundred iterations take about two minutes per note. Measured on
-the spectrogram, the difference between the resynthesis and the
-recording is under 0.5% of the energy for flute, clarinet, trumpet,
-violin and bassoon, and 3% for a cello note with wide vibrato. The
-noise part turns out to be small for these sustained tones, under
-half a percent of the energy.
+Four hundred iterations take about two minutes per note. At the end
+the program prints the **spectrogram difference**: the energy of the
+difference between the magnitude spectrograms of the resynthesis and
+of the recording, divided by the energy of the recording's. It is
+under 0.5% for flute, clarinet, trumpet, violin, trombone, bassoon
+and a low cello note, and 3% for a cello note with wide vibrato. The
+noise part is small for these sustained tones, under half a percent
+of the energy.
 
-It is important to say what this is. **It is analysis and
-resynthesis**, the same family as the phase vocoder
-[@flanagan1966phase] and sinusoidal modelling
-[@mcaulay1986sinusoidal]: measure a sound's partials, then rebuild it from them.
-Gradient descent is an unusual way to do the analysis, but nothing
-here is beyond what classical methods already do, and
+This is analysis and resynthesis, the same family as the phase
+vocoder [@flanagan1966phase] and sinusoidal modelling
+[@mcaulay1986sinusoidal]: measure a sound's partials, then rebuild it
+from them. Gradient descent is an unusual way to do the analysis, but
+nothing here goes beyond what classical methods already do.
 `synth_fit morph` and `synth_fit blend`, which interpolate between
 the fitted controls of two notes, are the classical cross-synthesis
-of two sets of partials. What the network adds comes in section 7.
+of two sets of partials. What the network adds is described in
+section 8.
 
 
-## 6. Two traps, both about the period
+## 6. The pitch period sets the time scale
 
 The first fits of low notes were bad. A bassoon A2 came out with its
 harmonics switching on and off from frame to frame, and a spectrum
-that no longer matched the recording. The diagnosis is instructive because the first
-three explanations were wrong.
+that no longer matched the recording. The first three explanations
+we tried were wrong.
 
-It was not pitch: a long FFT shows the bassoon's partials at exactly
-110.00 Hz. It was not the optimiser's settings. And it was not the
-missing phases, which we could test directly with a synthetic note
-that the synthesiser can reproduce *exactly* (twenty harmonics of
-110 Hz, in sine phase). The fit of that note flickered too. So the
-loss surface itself had bad solutions, and two things created them.
+The pitch was not the cause: a long FFT shows the bassoon's partials
+at 110.00 Hz. The optimiser's settings were not the cause. The
+missing phases were not the cause either. We tested this with a
+synthetic note that the synthesiser can reproduce exactly (twenty
+harmonics of 110 Hz, in sine phase; `synth_fit synthetic` writes it).
+The fit of that note flickered too, and its spectrogram difference
+was 16%. The loss surface itself therefore had bad solutions. The
+causes were the following.
 
-**Controls that move too fast.** A control frame lasts 11.6 ms; one
-period of A2 lasts 9 ms. If a harmonic's amplitude may change as fast
-as the waveform repeats, switching it on and off becomes another way
-of shaping the waveform, and the optimiser uses it. The fix is to
-store the controls at *knots* spaced so that one knot spans about four
-periods of the note, and interpolate between them. For A4 the rule
-changes nothing; for A2 it places a knot every fourth frame. With that
-alone, the synthetic note's amplitudes came out steady.
+**Controls that move too fast.** A control frame lasts 11.6 ms and
+one period of A2 lasts 9 ms. If a harmonic's amplitude may change as
+fast as the waveform repeats, switching it on and off becomes another
+way of shaping the waveform, and the optimiser uses it. The fix is to
+store the controls at knots spaced so that one knot spans about four
+periods of the note, and to interpolate between them. For A4 the rule
+changes nothing. For A2 it places a knot every fourth frame. With
+that change alone, the synthetic note's amplitudes came out steady
+and the spectrogram difference fell to 0.1%.
 
 **Windows that are too short.** A window shorter than a few periods
 cannot separate neighbouring harmonics. What it measures then depends
-on their relative *phases*, and those the synthesiser does not
-control. Given a synthetic note with random phases, the fit returned
-0.078 and 0.047 for two harmonics whose true amplitudes were 0.05 and
-0.15: it had traded correct amplitudes for a better waveform shape.
-The fix is to use only FFT sizes of at least 2.5 periods: 256 to 4096
-for A4, 1024 to 8192 for A2. With both fixes the same note is
+on their relative phases, which the synthesiser does not control.
+Given the same synthetic note with random phases, the fit returned
+0.000 and 0.040 for two harmonics whose true amplitudes were 0.15 and
+0.10. It had given up correct amplitudes to obtain a better waveform
+shape. The fix is to use only FFT sizes of at least 2.5 periods: 256
+to 4096 for A4, 1024 to 8192 for A2. With both fixes the same note is
 recovered as 0.050, 0.150, 0.300, 0.100, which are the true values,
 and the bassoon's resynthesis matches the recording to 0.4%.
 
-Both rules say the same thing: *the time scale of the model has to be
-set by the pitch period, not by a fixed number of milliseconds.* They
-carry over unchanged to the network.
+Both rules state that the time scale of the model has to be set by
+the pitch period and not by a fixed number of milliseconds. They
+apply unchanged to the network.
 
 
 ## 7. The network
@@ -284,23 +289,26 @@ of any instrument. For every control frame it reads 26 numbers:
 - **Instrument**: a learned 16-dimensional vector, one per instrument.
 
 The instrument vector is our first use of `Embedding<T>`, a lookup
-table of trainable vectors indexed by an integer. Its forward copies
-the selected column; its backward adds the incoming gradient into that
-column. Nothing tells the network what a flute is: twelve vectors
-start as random numbers and are moved by the same gradient descent as
-every other parameter until they are useful.
+table of trainable vectors indexed by an integer. Its forward pass
+copies the selected column. Its backward pass adds the incoming
+gradient into that column. Nothing tells the network what a flute is.
+Twelve vectors start as random numbers and are moved by the same
+gradient descent as every other parameter until they are useful.
 
-The network itself is the plainest in the book, three hidden layers
+The network itself is the simplest in the book: three hidden layers
 of 256 units with ReLU, 181,000 parameters in all. It outputs 166
 numbers per frame, which a small "head" turns into controls:
 
 ```
-amp   = act(o[0])                         one overall amplitude
+amp   = act(o[0] - 3)                     one overall amplitude
 h_k   = act(o[1+k])   below Nyquist, else 0
 A_k   = amp * h_k / sum_j h_j             harmonic amplitudes
-M_b   = act(o[1+K+b])                     noise band gains
+M_b   = act(o[1+K+b] - 5)                 noise band gains
 act(x) = 2 * sigmoid(x)^ln(10) + 1e-7
 ```
+
+The two offsets make an untrained network, whose outputs are near
+zero, start quiet.
 
 Splitting the harmonics into "how loud overall" and "how the loudness
 is shared" lets the network learn timbre separately from dynamics.
@@ -311,8 +319,8 @@ steps in decibels.
 One training step takes a batch of notes, cuts a random 1.5-second
 crop from each, runs the network once over all their frames, and then
 runs the synthesiser and the loss for each note on its own thread. The
-gradients come back through the synthesiser, through the head, into
-the network and into the instrument vectors.
+gradients are propagated back through the synthesiser, through the
+head, into the network and into the instrument vectors.
 
 ```
 synth_train train  data/TinySOL_2020  synth_model  60
@@ -326,8 +334,8 @@ on the training notes and from 2.87 to 2.37 on the held-out ones.
 ## 8. What the network adds
 
 A direct fit can only rebuild the note it was fitted to. The network
-has learned a *function* from pitch, loudness and instrument to
-sound, and a function can be evaluated where there is no recording.
+has learned a function from pitch, loudness and instrument to sound,
+and a function can be evaluated where there is no recording.
 
 ```
 synth_train resynth synth_model  cello.wav  A4  Fl   out.wav
@@ -348,30 +356,30 @@ synth_train phrase  synth_model  ClBb  out.wav
   new. So are notes outside an instrument's range, such as a flute at
   A2.
 
-None of this is concatenated from recordings. Every sample comes out
-of the oscillators and the noise filter.
+None of this is concatenated from recordings. Every sample is
+produced by the oscillators and the noise filter.
 
 
-## 9. What this is and is not
+## 9. Results and limitations
 
-Compared with the VAEs the difference is immediate: the output is
-clean. There is no phase problem because the synthesiser generates
-coherent sinusoids, and no inversion problem because there is no
-spectrogram to invert. The loudness envelope and the pitch, vibrato
-included, are reproduced closely.
+Compared with the VAEs, the output is clean. There is no phase
+problem because the synthesiser generates coherent sinusoids, and no
+inversion problem because there is no spectrogram to invert. The
+loudness envelope and the pitch, vibrato included, are reproduced
+closely.
 
-The timbre is less faithful than a direct fit, and the numbers say by
-how much: 2.4 for the network on unseen notes against 1.0 to 1.6 for
-the direct fits. The network has learned a somewhat generic version of
-each instrument. On held-out notes the trumpet and trombone are close
-to the recordings; the clarinet comes out with a full set of
-harmonics although a real clarinet's even harmonics are weak; a
-pianissimo flute is too bright; a fortissimo double bass is 7 dB too
-quiet. A longer run would narrow the gap. It would not close it,
-because a network that must explain every note with one function is
-solving a harder problem than a fit of one note.
+The timbre is less faithful than a direct fit. The figures are 2.4
+for the network on unseen notes against 0.4 to 1.6 for the direct
+fits. The network has learned a somewhat generic version of each
+instrument. On held-out notes the trumpet and trombone are close to
+the recordings. The clarinet comes out with a full set of harmonics
+although a real clarinet's even harmonics are weak. A pianissimo
+flute is too bright. A fortissimo double bass is 7 dB too quiet. A
+longer run would reduce the difference but not remove it, because a
+network that must explain every note with one function is solving a
+harder problem than a fit of one note.
 
-The limits of the approach are built into the synthesiser:
+The limits of the approach come from the synthesiser:
 
 - **One pitched voice.** A chord, a drum, a noisy texture or a
   recording of several instruments is outside what a harmonic series
@@ -379,24 +387,22 @@ The limits of the approach are built into the synthesiser:
 - **Pitch has to be known.** We read it from the file name and refine
   it. Applying the model to an arbitrary recording needs a real pitch
   tracker.
-- **It tends towards the well-behaved.** A harmonic synthesiser
-  driven by smooth controls sounds like a very good additive
-  synthesiser: stable, clean, and without the roughness of a real
-  attack.
+- **The sound is regular.** A harmonic synthesiser driven by smooth
+  controls sounds like a very good additive synthesiser: stable,
+  clean, and without the roughness of a real attack.
 
-What we have is not a new kind of sound. It is a connection: the
-synthesiser is the one signal processing has used for decades, the
-training loop is the one we have used since chapter 9, and the only new idea is that
-the first can be placed inside the second. The network supplies what
-the classical method lacks, a mapping from musical intentions to
-synthesis parameters, and the synthesiser supplies what the network
-lacks, a guarantee that whatever comes out is a sound.
+The method does not produce a new kind of sound. The synthesiser is
+the one signal processing has used for decades, the training loop is
+the one we have used since chapter 9, and the only new idea is that
+the first can be placed inside the second. The network supplies a
+mapping from musical intentions to synthesis parameters, which the
+classical method lacks. The synthesiser supplies a guarantee that
+whatever comes out is a sound, which the network lacks.
 
 The next chapters return to architecture. Everything so far has
-processed one frame, one patch or one image at a time. Attention is
-how a network relates the elements of a *sequence* to one another,
-and it is what the generative models at the end of the book are built
-from.
+processed one frame, one patch or one image at a time. Attention
+relates the elements of a sequence to one another, and the generative
+models at the end of the book are built from it.
 
 
 ## Further reading

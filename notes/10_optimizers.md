@@ -1,29 +1,31 @@
 # 10 — Optimizers (SGD and Adam)
 
-So far every layer's update method has been plain stochastic gradient
-descent baked into the layer itself. Adam (and friends) need
-per-parameter state, so we need a cleaner separation. This chapter covers
-the refactor, the two ideas behind Adam, and why it usually wins.
+So far the only optimiser we have passed to `net.update(opt)` is plain
+stochastic gradient descent. Adam and similar optimisers need
+per-parameter state, which is why the update is in a separate
+`Optimizer` object and not in the layer. This chapter covers that
+separation, the ideas behind Adam, and why it usually performs better.
 
 ---
 
 ## 1. Why plain SGD struggles
 
-Plain SGD updates `param ← param − lr · g`. Two structural weaknesses:
+Plain SGD updates `param ← param − lr · g`. It has structural
+weaknesses.
 
 **One learning rate for every parameter.** Gradient magnitudes can vary
-by orders of magnitude across parameters of the same network — early
+by orders of magnitude across parameters of the same network: early
 layers vs. late layers, weights vs. biases, parameters that interact with
 sparse vs. dense features. A single learning rate has to be small enough
-not to blow up on the largest gradients, which means everything else
-moves too slowly.
+not to diverge on the largest gradients, so all the other parameters
+move too slowly.
 
 **No memory between steps.** Each step uses only the current minibatch's
-gradient. A consistent signal pointing one way step after step gets the
-same treatment as a noisy oscillation; SGD treats every gradient as
-authoritative even if it's mostly variance.
+gradient. A gradient that points the same way step after step is treated
+like a noisy oscillation. SGD applies every gradient in full, even if it
+is mostly variance.
 
-Adam fixes each with a different idea, then combines them.
+Adam addresses each weakness with a different idea and combines them.
 
 ---
 
@@ -38,15 +40,15 @@ m_t  =  β₁ · m_{t-1}  +  (1 − β₁) · g_t      β₁ ≈ 0.9
 `m` is the recent average gradient direction. Steps in consistent
 directions accumulate; oscillating directions cancel and `m` stays small.
 
-Then update with `m_t` instead of `g_t`. Conceptually it gives the
-optimiser inertia — in a long valley you accelerate, on a noisy plateau
-you don't get yanked around by individual minibatches.
+The update then uses `m_t` instead of `g_t`. The optimiser speeds up
+where the gradient direction stays the same over many steps, and
+individual minibatches have little effect where the gradient is noisy.
 
 ---
 
 ## 3. RMSProp — per-parameter step sizes
 
-Track an exponential moving average of *squared* gradients, per
+Track an exponential moving average of squared gradients, per
 parameter:
 
 ```
@@ -54,15 +56,15 @@ v_t  =  β₂ · v_{t-1}  +  (1 − β₂) · g_t²     β₂ ≈ 0.999
 ```
 
 Then scale each parameter's update by `1 / √v_t`. Parameters with
-consistently *large* gradients get *small* steps. Parameters with
-consistently *small* gradients get *large* steps. The optimiser
-self-calibrates the effective learning rate per parameter.
+consistently large gradients get small steps. Parameters with
+consistently small gradients get large steps. The optimiser thus sets
+the effective learning rate for each parameter.
 
 ---
 
 ## 4. Adam = momentum + RMSProp + bias correction
 
-Combine them:
+Combining the two:
 
 ```
 m_t  =  β₁ · m_{t-1}  +  (1 − β₁) · g_t            // 1st moment
@@ -70,9 +72,9 @@ v_t  =  β₂ · v_{t-1}  +  (1 − β₂) · g_t²           // 2nd moment
 param ←  param  −  lr · m_t / (√v_t + ε)
 ```
 
-There's one subtlety. `m` and `v` start at zero, so for the first few
-steps they're biased toward zero — `m_1 = (1 − β₁) · g_1` is much smaller
-than `g_1`. Without correction, early steps would be tiny.
+`m` and `v` start at zero, so for the first few steps they are biased
+toward zero: `m_1 = (1 − β₁) · g_1` is much smaller than `g_1`. Without
+correction, early steps would be very small.
 
 The fix is a **bias correction**:
 
@@ -84,25 +86,24 @@ param ←  param  −  lr · m̂_t / (√v̂_t + ε)
 
 At `t = 1`, the divisors `(1 − β)` cancel the `(1 − β)` factor in the
 EMA, so the first-step update is `lr · sign(g)` regardless of gradient
-magnitude. As `t` grows, `βᵗ → 0` and the correction factors approach 1
-— corrections fade out and the formula becomes the plain EMA. Beautifully
-clean: a single algebraic factor that smoothly transitions from
-"bias-correct hard early on" to "trust the EMA later."
+magnitude. As `t` grows, `βᵗ → 0` and the correction factors approach 1,
+so the correction disappears and the formula becomes the plain EMA. A
+single algebraic factor gives a strong correction early on and none
+later.
 
-### What Adam intuitively does
+### What Adam does
 
-A concrete way to see why Adam is well-behaved: `m / √v` has magnitude
-roughly `1` whenever the gradient direction is consistent (signal),
-regardless of the gradient's absolute scale. When the gradient is noisy
-(random direction step to step), `m` averages to roughly 0 while `v`
-stays large, so `m / √v` shrinks. So **Adam effectively translates "how
-consistent is this direction?" into a step size**:
+The ratio `m / √v` has magnitude roughly `1` whenever the gradient
+direction is consistent (signal), regardless of the gradient's absolute
+scale. When the gradient is noisy (random direction from step to step),
+`m` averages to roughly 0 while `v` stays large, so `m / √v` shrinks.
+Adam therefore turns the consistency of the direction into a step size:
 
 - Consistent direction, any magnitude  →  step size ≈ `lr`
 - Inconsistent direction  →  step size shrinks toward 0
-- Decoupled from raw gradient magnitude
+- The step size does not depend on the raw gradient magnitude
 
-This is why Adam works well across a huge range of problems without
+This is why Adam works well across a wide range of problems without
 careful learning-rate tuning per parameter.
 
 ### Typical hyperparameters
@@ -112,18 +113,18 @@ careful learning-rate tuning per parameter.
 | `lr`    | 1e-3   | base step size; sometimes 3e-4 for deep nets |
 | `β₁`    | 0.9    | EMA decay for the 1st moment (momentum) |
 | `β₂`    | 0.999  | EMA decay for the 2nd moment (adaptive lr) |
-| `ε`     | 1e-8   | numerical guard inside the sqrt |
+| `ε`     | 1e-8   | numerical guard added to the denominator (outside the sqrt) |
 
-These defaults work surprisingly often. The most-tuned knob is `lr`.
+These defaults often work. The hyperparameter tuned most often is `lr`.
 
 ---
 
 ## 5. The Optimizer abstraction
 
-Adam needs per-parameter state — `m`, `v`, and `t` — and the same
-optimiser instance has to own that state for *all* of a network's
-parameters. So update logic doesn't live inside individual layers; it
-lives in an Optimizer.
+Adam needs per-parameter state (`m`, `v`, and `t`), and the same
+optimiser instance has to own that state for all of a network's
+parameters. The update logic is therefore in an Optimizer, not in the
+individual layers.
 
 ```cpp
 class Optimizer<T> {
@@ -132,7 +133,7 @@ class Optimizer<T> {
 ```
 
 Stateful optimisers key their state on `&param` (the parameter's
-address), with lazy allocation on first contact:
+address), with lazy allocation on first use:
 
 ```cpp
 class Adam : public Optimizer<T> {
@@ -148,7 +149,7 @@ class Adam : public Optimizer<T> {
 };
 ```
 
-A layer's `update` just hands its parameters to the optimiser, one at a
+A layer's `update` passes its parameters to the optimiser, one at a
 time:
 
 ```cpp
@@ -158,9 +159,9 @@ void Dense::update(Optimizer<T>& opt) override {
 }
 ```
 
-The layer encapsulates *what* its parameters are; the optimiser decides
-*how* they get updated. Parameter-less layers (activations) inherit a
-no-op default. `Network::update` forwards the optimiser to every layer.
+The layer knows what its parameters are; the optimiser decides how they
+are updated. Parameter-less layers (activations) inherit a no-op
+default. `Network::update` forwards the optimiser to every layer.
 
 ### In the training loop
 
@@ -197,38 +198,35 @@ The gradient in `y` is 100× larger than in `x`. After 100 steps from
 | SGD (lr = 0.01)     | 1.67       |
 | Adam (lr = 0.1)     | 0.08       |
 
-22× lower loss. SGD's single learning rate has to be conservative enough
-not to oscillate on `y`, which leaves `x` essentially frozen. Adam
-adapts both axes independently and handles them at once.
+Adam's loss is 22× lower. SGD's single learning rate has to be small
+enough not to oscillate on `y`, so `x` hardly moves. Adam adapts the two
+axes independently and makes progress on both.
 
-On IRIS the difference is less dramatic — the problem is well-scaled and
-small enough that SGD does fine — but Adam reaches lower training loss
-faster (epoch 100 train loss: SGD 0.05, Adam 0.02). Both hit ~96.7% test
-accuracy. The real payoff for Adam shows up on larger, less well-behaved
-problems; MNIST will start to show the difference more, and a ConvNet on
-ImageNet-style data would show it dramatically.
+On IRIS the difference would be small: the problem is well-scaled and
+small enough that SGD is sufficient, which is why that example keeps
+SGD. Adam's advantage appears on larger, less well-behaved problems, and
+every example from MNIST onwards uses it.
 
 ---
 
 ## 7. Practical recommendations
 
-- **Start with Adam at `lr = 1e-3`.** Default β1/β2/ε. Works almost
-  always for an initial trained model.
+- **Start with Adam at `lr = 1e-3`.** Keep the default β1/β2/ε. This
+  almost always works for a first trained model.
 - **Switch to SGD with a tuned schedule for the last few epochs** if
-  you're squeezing out the final 0.5% of accuracy. Plain SGD + decay
-  often generalises a touch better at the end of training (a real
-  empirical finding, see e.g. "SWA" — Stochastic Weight Averaging).
-  We're not at this level of polish yet.
+  you need the final 0.5% of accuracy. Plain SGD + decay is often
+  reported to generalise slightly better at the end of training. None
+  of the examples in this book is tuned to that level.
 - **The `lr` for Adam is much less sensitive than for SGD** because the
-  adaptive part normalises gradient magnitudes. The reciprocal-of-this
-  insight is also true: if Adam is going wrong, the learning rate is
-  almost always the first thing to halve.
+  adaptive part normalises gradient magnitudes. Conversely, if Adam is
+  not working, the learning rate is almost always the first thing to
+  halve.
 
 ---
 
-## 8. What's next
+## 8. What MNIST still needs
 
-The pieces we're missing for MNIST:
+MNIST still needs:
 
 - **Train/eval mode flag** on Layer, so layers like Dropout can behave
   differently between training and inference.
@@ -236,8 +234,8 @@ The pieces we're missing for MNIST:
   pass through during inference.
 - **MNIST data loader** for the IDX binary format.
 
-Then we train the MNIST classifier, which is where Adam over SGD will
-start mattering visibly.
+Then we train the MNIST classifier, where the advantage of Adam over SGD
+becomes visible.
 
 
 ## Further reading

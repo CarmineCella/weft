@@ -7,7 +7,7 @@
 // --------
 // A spectrogram describes a sound with a fixed grid: every frame, every
 // bin, one number each, whether anything is happening there or not.
-// Matching pursuit describes it with a LIST: "a 93 ms tone at 440 Hz
+// Matching pursuit describes it with a LIST: "a 186 ms tone at 440 Hz
 // starting at 1.20 s with this amplitude; a 3 ms click at 2.05 s; ...".
 // Each entry is an *atom*, a short windowed sinusoid, and the sound is
 // approximated by their sum.  A few thousand atoms can stand for hundreds

@@ -1,13 +1,13 @@
 # 5 — Non-linearities (ReLU and Softmax)
 
-A network of `Dense` layers alone can only learn *linear* functions, no
-matter how deep it is. This chapter explains why, then builds and explains the
-two activations we need for our first classifier: `ReLU` for hidden layers
+A network of `Dense` layers alone can only learn linear functions, no
+matter how deep it is. This chapter explains why, then builds the two
+activations we need for our first classifier: `ReLU` for hidden layers
 and `Softmax` for the output of a multi-class classifier.
 
 ---
 
-## 1. Why nonlinearities are not optional
+## 1. Why nonlinearities are necessary
 
 Stack two `Dense` layers with nothing between them:
 
@@ -24,26 +24,26 @@ Z = W₂·(W₁·X + b₁) + b₂
   = W'·X + b'
 ```
 
-The two-layer "network" is mathematically identical to **one** Dense layer
+The two-layer network is mathematically identical to one Dense layer
 with `W' = W₂·W₁` and `b' = W₂·b₁ + b₂`. The same algebra extends to any
 depth: composing affine functions yields an affine function. An affine
-model can only learn linear decision boundaries — straight lines or
-hyperplanes — so it can't represent XOR, curves, or hierarchical features.
+model can only learn linear decision boundaries (straight lines or
+hyperplanes), so it can't represent XOR, curves, or hierarchical
+features.
 
-Any non-linear function between layers breaks this collapse. The simplest
-such function that works extraordinarily well in practice is **ReLU**.
+Any non-linear function between layers prevents this collapse. The
+simplest one that works very well in practice is **ReLU**.
 
 ---
 
-## 2. ReLU — as simple as it gets
+## 2. ReLU
 
 ```
 ReLU(z) = max(0, z)      element-wise
 ```
 
-Negative entries become zero; non-negative entries pass through. Shape is
-preserved (the operation is element-wise, so input and output have the
-same shape).
+Negative entries become zero; non-negative entries pass through. The
+shape is preserved, because the operation is element-wise.
 
 ### Backward
 
@@ -56,37 +56,38 @@ dReLU/dz = 1   if z > 0
           have measure zero in practice and the choice does not matter)
 ```
 
-Because the operation is element-wise, the Jacobian is *diagonal* — every
-output depends only on the corresponding input — so backward collapses to
-a Hadamard product:
+Because the operation is element-wise, every output depends only on the
+corresponding input, so the Jacobian is diagonal and backward reduces
+to a Hadamard product:
 
 ```
 dZ = dA ⊙ mask,    where mask[i,j] = 1 if Z[i,j] > 0 else 0
 ```
 
-In words: route the upstream gradient through wherever the input was
-positive, zero out everywhere else. Sometimes called a "gating" function
-for this reason — it gates the gradient flow based on the forward sign
-pattern.
+In words: pass the upstream gradient through wherever the input was
+positive, and set it to zero everywhere else. ReLU is sometimes called
+a "gating" function for this reason: it gates the gradient flow based
+on the forward sign pattern.
 
 ### Why it works so well
 
-A short list of practical reasons ReLU has dominated since ~2012:
+ReLU has dominated since ~2012 for practical reasons:
 
-- Element-wise and dead cheap to compute and differentiate.
+- Element-wise and very cheap to compute and differentiate.
 - No saturation in the positive direction (compare with `sigmoid` and
-  `tanh`, which flatten out for large inputs and kill the gradient).
+  `tanh`, which flatten out for large inputs, so their gradient
+  vanishes).
 - Encourages sparse activations: at any given time, many units output
   exactly zero, which acts as an implicit form of regularisation.
 
-A failure mode worth flagging: a unit can get stuck in the dead region
-(always outputting 0, always receiving 0 gradient — "dying ReLU"). Variants
-like Leaky ReLU and ELU address this. We'll add Leaky ReLU later if we
-need it; plain ReLU is fine for IRIS.
+ReLU has a failure mode: a unit can get stuck in the dead region
+(always outputting 0, always receiving 0 gradient), which is called
+"dying ReLU". Variants like Leaky ReLU and ELU address this. We'll add
+Leaky ReLU later if we need it; plain ReLU is fine for IRIS.
 
 ---
 
-## 3. Softmax — turning scores into probabilities
+## 3. Softmax, from scores to probabilities
 
 For multi-class classification, the final layer needs to output a
 probability distribution over `K` classes. Softmax does that. For each
@@ -96,20 +97,20 @@ example (each column):
 softmax(z)ᵢ = exp(zᵢ) / Σₖ exp(zₖ)
 ```
 
-Three properties drop out immediately:
+It follows directly that:
 
 - Each output is in `(0, 1)`.
 - Outputs sum to 1.
 - The largest logit becomes the largest probability (monotonicity).
 
-So we get a valid probability distribution where the network's "vote" for
-the most likely class is highest. Note Softmax is per-column — unlike
-ReLU, every output depends on every input *within an example*.
+So we get a valid probability distribution in which the class the
+network scores highest has the highest probability. Softmax is
+per-column: unlike ReLU, every output depends on every input within an
+example.
 
-### 3a. The numerical stability trick (log-sum-exp shift)
+### 3a. Numerical stability (log-sum-exp shift)
 
-`exp(z)` for `z = 1000` overflows. The fix uses an algebraic identity that
-is worth seeing once:
+`exp(z)` for `z = 1000` overflows. The fix uses an algebraic identity:
 
 ```
 softmax(z) = softmax(z − c)    for any constant c
@@ -118,23 +119,24 @@ softmax(z) = softmax(z − c)    for any constant c
 Proof: multiply numerator and denominator of `softmax(z − c)` by `exp(c)`;
 the factors cancel and you are back at `softmax(z)`.
 
-So we can shift all logits by *any* constant without changing the answer.
-The standard trick is to shift by the column max:
+So we can shift all logits by any constant without changing the answer.
+The standard choice is to shift by the column max:
 
 ```
 m = max(z)
 softmax(z)ᵢ = exp(zᵢ − m) / Σₖ exp(zₖ − m)
 ```
 
-After shifting, the largest exponent is `exp(0) = 1` — no overflow. The
-rest are `exp(negative) ∈ (0, 1]` — no overflow. Tiny terms may underflow
-to 0, but that is the correct answer. This shift is mandatory for any
-real-world Softmax; every framework does it.
+After shifting, the largest exponent is `exp(0) = 1`, which does not
+overflow. The rest are `exp(negative) ∈ (0, 1]`, which do not overflow
+either. Tiny terms may underflow to 0, but that is the correct answer.
+This shift is mandatory for any real-world Softmax; every framework
+does it.
 
-### 3b. The Jacobian — the first non-trivial backward
+### 3b. The Jacobian
 
-This is the first layer where every output depends on every input, so the
-Jacobian is *not* diagonal. The derivation is worth doing once.
+This is the first layer where every output depends on every input, so
+the Jacobian is not diagonal. We derive it in full.
 
 Fix one column (one example). Let `s = softmax(z)`, so `sᵢ = e^{zᵢ} / D`
 with `D = Σₖ e^{zₖ}`. By the quotient rule:
@@ -172,34 +174,34 @@ Chain rule for `∂L/∂zⱼ`:
        = sⱼ · [(∂L/∂sⱼ) − dot]            where dot = Σᵢ sᵢ · (∂L/∂sᵢ)
 ```
 
-So per column the backward pass is just two passes:
+So per column the backward pass is:
 
 1. Compute the scalar `dot = sᵀ · dS` for that column.
 2. For each entry: `dZ[i,j] = S[i,j] · (dS[i,j] − dot)`.
 
-Look at the code in `src/Softmax.h` and you'll see exactly these two
-passes inside the column loop.
+The column loop in `src/Softmax.h` contains these two passes.
 
 ### 3d. The Softmax + cross-entropy shortcut (preview)
 
 In classification networks, Softmax is almost always paired with
 **cross-entropy loss** `L = -Σᵢ tᵢ · log(sᵢ)` where `t` is the one-hot
-target. If you compute the *combined* gradient — pushing
-`∂L/∂z = ∂L/∂s · ∂s/∂z` all the way through — almost everything cancels,
-and you're left with:
+target. If you compute the combined gradient,
+`∂L/∂z = ∂L/∂s · ∂s/∂z`, almost everything cancels, and what remains
+is:
 
 ```
 ∂L/∂z = S − target
 ```
 
-That is dramatically simpler than (and numerically better-behaved than)
-chaining the standalone Softmax backward with a standalone cross-entropy
-backward. The next chapter covers this and the Loss class will use the
-shortcut.
+That is much simpler and numerically better-behaved than chaining the
+standalone Softmax backward with a standalone cross-entropy backward.
+[Chapter 7](07_cross_entropy.md) derives it. In weft the two stay
+separate classes, and a test checks that their composition equals
+`(S − T)/N`.
 
-The standalone Softmax backward we just implemented is still correct on
-its own — verified by the numerical gradient check in `test_softmax.cpp`
-— and we keep it because Softmax may also be used outside the standard
+The standalone Softmax backward we implemented is still correct on its
+own (verified by the numerical gradient check in `test_softmax.cpp`),
+and we keep it because Softmax may also be used outside the standard
 classification setup (e.g. attention layers, custom losses).
 
 ---
@@ -217,18 +219,19 @@ classification setup (e.g. attention layers, custom losses).
 - **GELU**, **Swish**: smoother variants of ReLU used in modern
   transformers.
 
-We will add what we need when we need it. For IRIS, ReLU is more than
-enough.
+We add these when we need them. For IRIS, ReLU is enough.
 
 ---
 
-## 5. What's next
+## 5. The following chapters
 
-We have everything for the forward pass of a real classifier: `Dense →
-ReLU → Dense → Softmax`. To train it, we need a loss function. The next
-chapter covers **cross-entropy** and the Softmax+CE combined gradient
-shortcut, after which we have all the pieces for the first end-to-end
-network on IRIS.
+We have everything for the forward pass of a classifier: `Dense →
+ReLU → Dense → Softmax`. To train it, we need a loss function.
+[Chapter 6](06_jacobian.md) first describes what we have done in terms
+of the Jacobian. [Chapter 7](07_cross_entropy.md) covers
+**cross-entropy** and the combined Softmax+CE gradient, and
+[chapter 8](08_network.md) connects the pieces for the first
+end-to-end network on IRIS.
 
 
 ## Further reading

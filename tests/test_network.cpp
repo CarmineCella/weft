@@ -9,6 +9,8 @@
 //   1. Forward composition matches a manual chain.
 //   2. Full pipeline: numerical dW vs analytical dW on the first Dense.
 //   3. Training run: SGD reduces a 3-class synthetic classification loss.
+//   4. summary() / describe() print the architecture.
+//   5. save / load round-trip, and load rejects a different architecture.
 //
 #include "Network.h"
 #include "Dense.h"

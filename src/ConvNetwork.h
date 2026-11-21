@@ -2,7 +2,7 @@
 //
 // ConvNetwork.h  --  container for ConvLayer instances.
 //
-// Parallel to Network<T>, with exactly the same interface so the user
+// Parallel to Network<T>, with the same core interface so the user
 // can build a conv stack the same way they build a dense one:
 //
 //      ConvNetwork<float> conv;
@@ -104,6 +104,7 @@ public:
         f.write(reinterpret_cast<const char*>(&version), sizeof(version));
         f.write(reinterpret_cast<const char*>(&count),   sizeof(count));
         for (const auto& l : layers_) l->save_params(f);
+        if (!f) throw std::runtime_error("ConvNetwork::save: write failed: " + path);
     }
 
     void load(const std::string& path) {
@@ -119,6 +120,7 @@ public:
         if (count != layers_.size())
             throw std::runtime_error("ConvNetwork::load: layer count mismatch");
         for (auto& l : layers_) l->load_params(f);
+        if (!f) throw std::runtime_error("ConvNetwork::load: read failed: " + path);
     }
 
 private:

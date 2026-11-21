@@ -7,7 +7,7 @@
 // A 2-D convolution slides a small kernel (say 3x3) across the H-W
 // plane of each input channel, multiplying element-wise and summing,
 // producing one value per (output_channel, output_position).  The
-// naive nested-loop implementation is six loops deep and slow.
+// naive nested-loop implementation is seven loops deep and slow.
 //
 // im2col rearranges the input so the whole convolution becomes a
 // single matrix multiply:

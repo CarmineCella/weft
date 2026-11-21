@@ -29,7 +29,7 @@
 //     ConvNetwork  Conv2D(1->16) -> ReLU4D -> MaxPool(2)    (1,64,16) -> (16,32,8)
 //                  Conv2D(16->32) -> ReLU4D -> MaxPool(2)              -> (32,16,4)
 //                  Conv2D(32->64) -> ReLU4D -> MaxPool(2)              -> (64, 8,2)
-//                  -- flatten --                                      -> 2048
+//                  -- flatten --                                      -> 1024
 //     Network      Dense(1024, 256) -> ReLU -> Dense(256, 2*LATENT)
 //   Reparam:
 //     z = mu + sigma * eps,  eps ~ N(0, I)
@@ -82,7 +82,7 @@ using namespace weft;
 
 // ---- patch shape ---------------------------------------------------------
 constexpr std::size_t FREQ_BINS_IN  = 2049;   // from FRAME_SIZE=4096 in extract_features
-constexpr std::size_t FREQ_BINS     = 64;     // after block-averaging
+constexpr std::size_t FREQ_BINS     = 64;     // mel bins
 constexpr std::size_t TIME_FRAMES   = 16;     // 16 frames * ~46ms hop = ~0.8s patches.
                                               // Small enough that most TinySOL notes
                                               // produce >=1 patch; larger windows
@@ -149,16 +149,16 @@ patches_from_cache(const CachedFeatures& cache, const MelTransform<float>& mel,
     // Third pass: allocate and fill.
     Tensor4D<float> P(n_patches, 1, FREQ_BINS, TIME_FRAMES);
     std::size_t out_idx = 0;
-    std::vector<float> col_lores(FREQ_BINS);   // scratch buffer for one downsampled column
+    std::vector<float> col_lores(FREQ_BINS);   // scratch buffer for one mel column
     for (auto [s, e] : runs) {
         const std::size_t len = e - s;
         if (len < TIME_FRAMES) continue;
         for (std::size_t t0 = 0; t0 + TIME_FRAMES <= len; t0 += window_hop) {
             for (std::size_t t = 0; t < TIME_FRAMES; ++t) {
-                // Read column s + t0 + t into the downsampled buffer.
+                // Read column s + t0 + t and convert it to mel bins.
                 // Matrix is (FREQ_BINS_IN x N) row-major; column access via
                 // operator() is element-wise.  One temp buffer copy keeps
-                // the inner block-average loop cache-friendly.
+                // the mel filterbank loop cache-friendly.
                 std::vector<float> col_hi(FREQ_BINS_IN);
                 for (std::size_t f = 0; f < FREQ_BINS_IN; ++f)
                     col_hi[f] = cache.X(f, s + t0 + t);
@@ -194,8 +194,8 @@ int main(int argc, char** argv) {
                      "  feature file must be per_frame logmag, produced by:\n"
                      "    extract_features <wav_dir> <out.feat> logmag per_frame\n"
                      "  window_hop: frames between consecutive patches from\n"
-                     "              one file.  Default 16 (50%% overlap of\n"
-                     "              the 32-frame window).\n";
+                     "              one file.  Default 8 (50% overlap of\n"
+                     "              the 16-frame window).\n";
         return 1;
     }
     const std::string feature_path = argv[1];

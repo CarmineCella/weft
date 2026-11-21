@@ -2,8 +2,9 @@
 //
 // AudioFeatures.h -- feature extraction for audio classification.
 //
-// Two feature types, both producing a single fixed-length vector per
-// input signal (energy-weighted across frames):
+// Two feature types.  Each comes in two forms: one fixed-length vector
+// per input signal (energy-weighted across frames), described first, and
+// one vector per frame (the *_frames functions further down):
 //
 //   logmag_spectrum  -- log-magnitude FFT spectrum, length frame_size/2+1.
 //                       Full bin-by-bin envelope; lots of detail, large
@@ -177,7 +178,8 @@ std::vector<T> energy_weighted_features(const std::vector<T>& samples,
 
 // Per-frame log-magnitude spectra.  Returns one vector per non-silent
 // frame; vector length is frame_size/2 + 1.  Used by the classifier (with
-// per-file aggregation at eval time) and by future autoencoder work.
+// per-file aggregation at eval time) and by the audio VAE
+// (examples/train_audio_vae.cpp).
 //
 // Silent frames are skipped so we don't waste training capacity on noise
 // in leading/trailing silence.

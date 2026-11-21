@@ -13,8 +13,8 @@
 // Algorithm:  bit-reversal permutation, then log2(N) "butterfly" stages.
 // Each butterfly combines a pair of complex values with a "twiddle"
 // factor w = exp(-2*pi*i / len) at stage size `len`.  Total work is
-// (N/2) * log2(N) complex multiplies -- O(N log N) instead of the naive
-// O(N^2) sum.
+// (N/2) * log2(N) butterflies (one data multiply and one twiddle update
+// each) -- O(N log N) instead of the naive O(N^2) sum.
 //
 // For real input (e.g. audio samples) lift to complex by copying samples
 // into the real part and zeroing the imaginary part.  The output is then
@@ -35,8 +35,7 @@ template <typename T>
 inline constexpr T pi_v = T(3.14159265358979323846L);
 
 // A power of two has exactly one bit set, so (n & (n - 1)) == 0.
-// (Exception: zero also satisfies this, hence the separate n == 0 guard
-// at the call site.)
+// (Exception: zero also satisfies this, hence the n != 0 test below.)
 inline bool is_power_of_two(std::size_t n) {
     return n != 0 && (n & (n - 1)) == 0;
 }

@@ -1,4 +1,4 @@
-// iris_classifier / main.cpp
+// iris_classifier / iris_classifier.cpp
 //
 // First end-to-end classifier in weft.  Trains a tiny MLP on Fisher's
 // 1936 IRIS dataset and reports per-epoch loss and accuracy.

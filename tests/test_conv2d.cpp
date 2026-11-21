@@ -135,8 +135,8 @@ int main() {
     // and we can verify each entry separately with central differences:
     //     dL/dp[i]  ~=  ( L(p + eps) - L(p - eps) ) / (2 eps)
     //
-    // Central differences are O(eps^2) accurate, so with eps = 1e-3
-    // we can expect agreement to a few parts in 10^-4 for float32.
+    // Central differences are O(eps^2) accurate, so in double precision
+    // with eps = 1e-5 we can expect agreement to better than 10^-6.
     // Any indexing bug in im2col or col2im is overwhelmingly likely
     // to show up here.
     // ----------------------------------------------------------------
@@ -160,7 +160,7 @@ int main() {
         Matrix<double> db_an = conv.db();
 
         const double eps     = 1e-5;
-        const double tol_rel = 1e-6;   // 1% relative -- realistic for fp32 central diff
+        const double tol_rel = 1e-6;   // relative tolerance, double precision
         const double tol_abs = 1e-8;   // absolute floor for tiny-magnitude gradients
 
         auto ok = [&](double num, double an) {
@@ -235,8 +235,8 @@ int main() {
 
     // ----------------------------------------------------------------
     // 6.  Same gradient check at stride=2 (different code path through
-    //     im2col / col2im -- input pixels are no longer covered by
-    //     overlapping receptive fields).
+    //     im2col / col2im -- the receptive fields overlap by one column
+    //     instead of two).
     // ----------------------------------------------------------------
     {
         const std::size_t N = 1, in_C = 2, out_C = 2;

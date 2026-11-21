@@ -1,12 +1,13 @@
 # 6 — The Jacobian (the unifying object behind every backward pass)
 
-`03_backprop.md` derived `Dense::backward` from a perturbation argument on a
-single weight. `05_activations.md` built ReLU and Softmax and derived their
-backward formulas. This chapter steps back and shows that *every* backward pass
-we've written — and every one we'll write — is the same operation:
+[Chapter 3](03_backprop.md) derived `Dense::backward` from a perturbation
+argument on a single weight. [Chapter 5](05_activations.md) built ReLU and
+Softmax and derived their backward formulas. This chapter shows that
+every backward pass we have written, and every one we will write, is
+the same operation:
 
-> **Backward = multiply the upstream gradient by the transposed Jacobian of
-> the layer's forward function.**
+> Backward = multiply the upstream gradient by the transposed Jacobian of
+> the layer's forward function.
 
 Layers differ only in what their Jacobian looks like and how cheaply we can
 multiply by it.
@@ -15,27 +16,27 @@ multiply by it.
 
 ## 1. What a Jacobian is
 
-Build up from what's familiar.
+We build up from the scalar case.
 
 ### Scalar function of a scalar
-For `f: ℝ → ℝ`, the derivative `f'(x)` is one number — the slope of `f` at
-`x`. It says: if I nudge `x` by `ε`, `f` changes by approximately
+For `f: ℝ → ℝ`, the derivative `f'(x)` is one number, the slope of `f`
+at `x`. If `x` changes by `ε`, `f` changes by approximately
 `f'(x) · ε`.
 
 ### Scalar function of a vector
-For `f: ℝⁿ → ℝ`, we need one partial per input, packaged as a vector — the
-**gradient**:
+For `f: ℝⁿ → ℝ`, we need one partial derivative per input, collected in
+a vector, the **gradient**:
 
 ```
 ∇f = [ ∂f/∂x₁,  ∂f/∂x₂,  …,  ∂f/∂xₙ ]
 ```
 
-Same content as the slope, but vector-valued because there are multiple
-directions you can nudge.
+It has the same content as the slope, but is vector-valued because
+there are several directions in which the input can change.
 
 ### Vector function of a vector
-For `f: ℝⁿ → ℝᵐ` — `m` outputs, `n` inputs — each output has its own
-gradient. Stack them as rows and you get a matrix: the **Jacobian**.
+For `f: ℝⁿ → ℝᵐ`, with `m` outputs and `n` inputs, each output has its
+own gradient. Stacked as rows they form a matrix, the **Jacobian**.
 
 ```
        ┌                              ┐
@@ -46,10 +47,11 @@ gradient. Stack them as rows and you get a matrix: the **Jacobian**.
        └                              ┘
 ```
 
-`J[i,j] = ∂fᵢ/∂xⱼ` — "how does output `i` respond to a nudge in input `j`?"
+`J[i,j] = ∂fᵢ/∂xⱼ` says how output `i` responds to a small change in
+input `j`.
 
-Row `i` is "the gradient of output `i`." Column `j` is "the effect of input
-`j` on every output."
+Row `i` is the gradient of output `i`. Column `j` is the effect of
+input `j` on every output.
 
 ### The geometric picture
 
@@ -61,10 +63,9 @@ f(x + ε)  ≈  f(x)  +  J · ε
 ```
 
 This is the multi-variable generalisation of `f(x + ε) ≈ f(x) + f'(x)·ε`.
-It's exactly the perturbation intuition we used to derive Dense's backward
-pass in `04_one_weight.md` — but stated for vectors. The Jacobian answers
-"how does the output respond when an input is nudged?" all at once, for
-every (input, output) pair.
+It is the perturbation argument we used to derive Dense's backward pass
+in [chapter 3](03_backprop.md), stated for vectors. The Jacobian gives
+the response of every output to a small change in every input.
 
 ---
 
@@ -77,41 +78,41 @@ The chain rule for a layer `f: x → y` reads:
         =  Σᵢ (dL/dyᵢ) · J[i,j]
 ```
 
-That sum is exactly the `j`-th entry of `Jᵀ · dL/dy`. So in matrix form:
+That sum is the `j`-th entry of `Jᵀ · dL/dy`. In matrix form:
 
 ```
 dL/dx = Jᵀ · dL/dy
 ```
 
-That single formula is the entire content of "backward" for any layer.
-Backprop is the chain rule; the chain rule for vector functions is matrix
-multiplication by the transposed Jacobian. *Every* `backward()` we will ever
-write — Dense, ReLU, Softmax, Conv, BatchNorm, attention — is a
-specialisation of this one expression.
+This formula is the content of "backward" for any layer. Backprop is
+the chain rule, and the chain rule for vector functions is matrix
+multiplication by the transposed Jacobian. Every `backward()` we write
+(Dense, ReLU, Softmax, Conv, LayerNorm, attention) is a special case of
+this expression.
 
 What changes from layer to layer is (1) what the Jacobian looks like and
-(2) how cheaply we can multiply by it *without* materialising it.
+(2) how cheaply we can multiply by it without materialising it.
 
 ---
 
 ## 3. The Jacobians of weft's three layers
 
-This view lets you re-read everything we've built as variations on
+With this view, everything we have built is a variation on
 `Jᵀ · dL/dy`.
 
-### Dense: J *is* W
+### Dense: J is W
 
-`y = Wx + b`, so `∂yᵢ/∂xⱼ = W[i,j]`. **The Jacobian is `W` itself.** No
-materialisation needed — `W` is already sitting in memory as a layer
-parameter. The chain rule gives:
+`y = Wx + b`, so `∂yᵢ/∂xⱼ = W[i,j]`. The Jacobian is `W` itself.
+Nothing needs to be materialised, because `W` is already in memory as a
+layer parameter. The chain rule gives:
 
 ```
 dX = Wᵀ · dY     i.e.    dX = Jᵀ · dY
 ```
 
-The `Wᵀ` that appears in `Dense::backward` is just `Jᵀ` for this particular
-Jacobian. The "transpose symmetry" of `03_backprop.md` is the general `Jᵀ`
-rule, specialised to the linear case.
+The `Wᵀ` that appears in `Dense::backward` is `Jᵀ` for this particular
+Jacobian. The "transpose symmetry" of [chapter 3](03_backprop.md) is the
+general `Jᵀ` rule, specialised to the linear case.
 
 ### ReLU: J is diagonal
 
@@ -122,9 +123,10 @@ Jacobian is **diagonal**, with:
 J[i,i] = 1 if zᵢ > 0 else 0
 ```
 
-Multiplying by a diagonal matrix is the same as element-wise multiplying by
-its diagonal — a Hadamard product. That is why `dZ = dA ⊙ mask` is correct,
-and why we store only the `K`-element mask, never the `K × K` matrix.
+Multiplying by a diagonal matrix is the same as multiplying
+element-wise by its diagonal, a Hadamard product. That is why
+`dZ = dA ⊙ mask` is correct, and why we store only the `K`-element
+mask, never the `K × K` matrix.
 
 ### Softmax: J is dense, but structured
 
@@ -134,21 +136,22 @@ and why we store only the `K`-element mask, never the `K × K` matrix.
 J[i,j] = ∂sᵢ/∂zⱼ = sᵢ · (δᵢⱼ - sⱼ)
 ```
 
-This is the first non-diagonal Jacobian in the library. Two structural
-properties worth noticing:
+This is the first non-diagonal Jacobian in the library. It has
+structure:
 
-- **It's symmetric** (`J = Jᵀ`): the off-diagonal `-sᵢ · sⱼ` is symmetric in
-  `i` and `j`, and the diagonal entries `sᵢ(1 - sᵢ)` are well-defined. So
-  `Jᵀ · dS = J · dS` — convenient.
-- **Each row sums to zero**: because the outputs `sᵢ` always sum to 1,
-  nudging any `zⱼ` rearranges the `sᵢ` without changing their total. So
-  `Σᵢ ∂sᵢ/∂zⱼ = 0` for any `j`. Useful sanity check when debugging.
+- **It is symmetric** (`J = Jᵀ`): the off-diagonal `-sᵢ · sⱼ` is
+  symmetric in `i` and `j`, and the diagonal entries `sᵢ(1 - sᵢ)` are
+  well-defined. So `Jᵀ · dS = J · dS`.
+- **Each column sums to zero**: because the outputs `sᵢ` always sum to 1,
+  changing any `zⱼ` rearranges the `sᵢ` without changing their total. So
+  `Σᵢ ∂sᵢ/∂zⱼ = 0` for any `j`. Since `J` is symmetric, each row sums to
+  zero too. This is a useful check when debugging.
 
 ---
 
-## 4. A concrete worked example
+## 4. A worked example
 
-Pick `z = (1, 0, -1)`. After the stability shift (subtract `max = 1`):
+Take `z = (1, 0, -1)`. After the stability shift (subtract `max = 1`):
 
 ```
 e_z'   = (e⁰, e⁻¹, e⁻²)  ≈  (1, 0.368, 0.135)
@@ -166,12 +169,12 @@ Build `J` from `J[i,j] = sᵢ(δᵢⱼ - sⱼ)`:
        └                          ┘
 ```
 
-(Symmetric ✓, every row sums to ~0 ✓.)
+(The matrix is symmetric and every row sums to approximately 0.)
 
-Pick an arbitrary upstream gradient `dS = (0.5, -0.3, 0.1)` and compute the
-downstream `dZ = J · dS` two ways.
+Take an arbitrary upstream gradient `dS = (0.5, -0.3, 0.1)` and compute
+the downstream `dZ = J · dS` in two ways.
 
-**Method 1 — materialise `J` and matmul:**
+**Method 1: materialise `J` and matmul.**
 
 ```
 dZ[0] =  0.223·0.5 + (-0.163)·(-0.3) + (-0.060)·0.1  ≈  0.154
@@ -179,7 +182,7 @@ dZ[1] = -0.163·0.5 +   0.185·(-0.3)  + (-0.022)·0.1  ≈ -0.139
 dZ[2] = -0.060·0.5 + (-0.022)·(-0.3) +   0.082·0.1   ≈ -0.015
 ```
 
-**Method 2 — the algebraic shortcut implemented in `Softmax::backward`:**
+**Method 2: the algebraic shortcut implemented in `Softmax::backward`.**
 
 ```
 dot = s · dS  =  0.665·0.5 + 0.245·(-0.3) + 0.090·0.1  ≈  0.268
@@ -189,56 +192,56 @@ dZ[1] = s₁(dS₁ - dot) = 0.245·(-0.3 - 0.268)  ≈ -0.139
 dZ[2] = s₂(dS₂ - dot) = 0.090·(0.1 - 0.268)   ≈ -0.015
 ```
 
-Identical results. The shortcut is precisely the algebra of `J · dS` with
-the structure of `J` factored out — so we never have to build `J`.
+The results are identical. The shortcut is the algebra of `J · dS` with
+the structure of `J` factored out, so we never have to build `J`.
 
 ---
 
 ## 5. Never materialise a Jacobian you can avoid
 
-For `K` classes, Softmax's explicit Jacobian is a `K × K` matrix *per
-example*. With `K = 1000` and a batch of 32, that's 32 million floats just
-to hold the Jacobians — plus a 1000×1000 matrix-vector product per
+For `K` classes, Softmax's explicit Jacobian is a `K × K` matrix per
+example. With `K = 1000` and a batch of 32, that is 32 million floats
+to hold the Jacobians, plus a 1000×1000 matrix-vector product per
 example.
 
 The shortcut formula avoids both: one dot product (`O(K)`) plus one
-element-wise pass (`O(K)`) per column. **`O(K)` instead of `O(K²)`, with
-zero extra allocation.**
+element-wise pass (`O(K)`) per column. The cost is `O(K)` instead of
+`O(K²)`, with no extra allocation.
 
 This is the general principle of efficient backprop:
 
-> **If your Jacobian has structure, exploit it. Never build a Jacobian you
-> can avoid building.**
+> If your Jacobian has structure, exploit it. Never build a Jacobian you
+> can avoid building.
 
 Every layer in this library follows the rule:
 
-- **Dense**: Jacobian *is* `W` — a parameter we already have.
-- **ReLU**: Jacobian is diagonal — we store only the diagonal, as a mask.
-- **Softmax**: Jacobian has rank-1 correction structure — one dot product
-  per column captures the action.
-- **Convolution** (later): the Jacobian is enormous but extremely sparse and
-  shift-invariant — the action becomes another (transposed) convolution.
+- **Dense**: the Jacobian is `W`, a parameter we already have.
+- **ReLU**: the Jacobian is diagonal, and we store only the diagonal,
+  as a mask.
+- **Softmax**: the Jacobian has rank-1 correction structure, and one
+  dot product per column captures its action.
+- **Convolution** (later): the Jacobian is enormous but extremely
+  sparse and shift-invariant, and its action becomes another
+  (transposed) convolution.
 
-The skill of writing efficient layers is recognising the structure of `J`
-and reducing `Jᵀ · dY` to the cheapest equivalent operation.
+Writing an efficient layer means recognising the structure of `J` and
+reducing `Jᵀ · dY` to the cheapest equivalent operation.
 
 ---
 
 ## 6. Summary
 
-The Jacobian is the single object underneath every backward pass — the
-matrix of all first-order responses of a layer's outputs to its inputs. The
-chain rule for vector functions is matrix multiplication by the transposed
-Jacobian:
+The Jacobian is the matrix of all first-order responses of a layer's
+outputs to its inputs. The chain rule for vector functions is matrix
+multiplication by the transposed Jacobian:
 
 ```
 dL/dx = Jᵀ · dL/dy
 ```
 
-That formula, plus the principle "exploit structure, never materialise an
-expensive Jacobian", is the whole story of backward in a neural-network
-library. Everything else is recognising what `J` looks like for your
-particular layer and rewriting `Jᵀ · dY` in the cheapest possible form.
+Every backward pass in the library is this formula, with `Jᵀ · dY`
+rewritten in the cheapest form that the structure of `J` allows, so
+that an expensive Jacobian is never materialised.
 
 
 ## Further reading

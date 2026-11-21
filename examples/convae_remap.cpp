@@ -5,7 +5,7 @@
 // 16-frame log-magnitude tiles are slid across the input with 50%
 // overlap, each tile is encoded to a latent (mu only, no sampling) and
 // decoded back to a tile of magnitudes.  Overlap-add the decoded tiles
-// in the spectrogram domain, upsample frequency back to 2049 bins, pair
+// in the mel-spectrogram domain, invert the mel filterbank back to 2049 bins, pair
 // with the INPUT's own phase, iSTFT, and write.
 //
 // What this is: an autoencoder-style projection through the learned
@@ -209,7 +209,7 @@ int main(int argc, char** argv) {
     Tensor4D<float> dec_feat  = unflatten(dec_flat, P, 64, 8, 2);
     Tensor4D<float> Ypatches  = dec_conv.forward(dec_feat);          // (P,1,FREQ,TIME)
 
-    // ---- overlap-add patches into output low-res spectrogram --------
+    // ---- overlap-add patches into the output mel spectrogram --------
     // Rectangular window (uniform weight 1) keeps this simple: each
     // overlapped frame is the mean of the patches that cover it.
     std::vector<std::vector<float>> out_lo(n, std::vector<float>(FREQ_BINS, 0.0f));

@@ -19,8 +19,8 @@
 // attention weights over the keys sum to 1).
 //
 // No learnable parameters live here; the Q/K/V projections sit one level
-// up in MultiHeadAttention, which lets a single MHA layer share this
-// operator across its heads.  We keep it as a plain struct (not a
+// up in MultiHeadAttention, which gives each of its heads its own
+// instance of this operator.  We keep it as a plain class (not a
 // Layer<T>) because Layer's forward(X) -> Y interface only carries one
 // input, while attention has three.  MultiHeadAttention drives the
 // caching and the gradient routing.

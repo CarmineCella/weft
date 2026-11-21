@@ -11,8 +11,8 @@
 //   3. Each pixel row is padded with zero bytes up to a multiple of 4.
 //
 // We always write 24-bit colour (3 bytes/pixel).  Greyscale is just
-// R = G = B, which keeps the format uniform and leaves the door open
-// for colour later (e.g. a colormap for spectrogram images).
+// R = G = B, which keeps the format uniform; the weight and filter
+// visualisations (mnist_weights, cifar_filters) use real colour.
 //
 // Usage:
 //     Bitmap bmp(width, height);              // black canvas

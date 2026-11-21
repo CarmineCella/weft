@@ -5,9 +5,9 @@
 //      param  <-  param  -  lr * grad
 //
 // No state, no momentum. Useful as a baseline and as a foil to understand
-// what Adam buys.  If you need momentum, use Adam with beta2 set very
-// high (effectively disabling the adaptive part); we don't ship a
-// separate "SGD with momentum" because Adam subsumes it.
+// what Adam buys.  weft does not ship SGD with momentum.  Adam (Adam.h)
+// contains a momentum term, but it also rescales every parameter by its
+// own gradient history, so it is not a drop-in equivalent.
 //
 #include "Optimizer.h"
 #include "Matrix.h"

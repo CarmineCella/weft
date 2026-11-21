@@ -1,55 +1,55 @@
 # weft
 
-**Companion library for the book *Designing Neural Networks for Music Applications*.**
+Companion library for the book *Designing Neural Networks for Music
+Applications*.
 
-**W**eights **E**stimated **F**rom **T**raining — a small, dependency-free
-neural-network library written from scratch in C++, with every architecture
-demonstrated on audio and music applications.
+weft (**W**eights **E**stimated **F**rom **T**raining) is a small
+neural-network library written from scratch in C++. It has no
+dependencies beyond the C++ standard library. Every architecture in it
+is used on an audio or music task.
 
 ## What this is
 
-A library and a book, written together. The book teaches the major neural
-network architectures — multilayer perceptrons, autoencoders, convolutional
-networks, attention — through applications that audio and music people care
-about: instrument classification, timbre morphing, generative sound texture,
-and a capstone that combines matching pursuit with a transformer for
-generative audio. The library is the running code: every chapter of the book
-points at the same source files; every line in the source files exists
-because some chapter of the book explains why.
+A library and a book, written together. The book covers multilayer
+perceptrons, autoencoders, convolutional networks and attention. Each
+is applied to a task from audio or music: instrument classification,
+timbre morphing, a network that plays a synthesiser, a transformer that
+writes four-voice chorales, and a system that combines matching pursuit
+with a transformer to generate sound.
 
-There are no external dependencies beyond the C++ standard library. No
-PyTorch, no NumPy, no BLAS by default. Matrix multiply, backpropagation, the
-FFT, convolution, attention — every algorithm is implemented from first
-principles and explained in the book.
+Each chapter of the book explains part of the library, and each part of
+the library is explained by a chapter.
 
-For why this is written in C++ rather than Python with PyTorch, see
-[chapter 1](notes/01_why_cpp.md).
+The matrix product, backpropagation, the FFT, convolution and attention
+are implemented in the library and explained in the book. PyTorch,
+NumPy and BLAS are not used by the default build.
+
+[Chapter 1](notes/01_why_cpp.md) explains why the library is in C++ and
+not in Python.
 
 ## Principles
 
-- **Header-only and templated.** Each class lives in its own capitalized
-  `.h` file (`Matrix.h`, `Layer.h`, `Tensor4D.h`, …), templated on the
-  scalar type (`float` or `double`).
-- **Standard library only by default.** The default build uses only the
-  C++ standard library. An optional `make BLAS=1` opt-in routes matmul
-  through Apple Accelerate / OpenBLAS, but every algorithm has a portable
-  std-lib path.
-- **Readable like the math.** Operator overloading lets a layer's forward
-  pass be written literally as `Z = W * X + b`.
-- **One namespace.** Everything lives in `namespace weft`.
+- **Header-only and templated.** Each class is in its own `.h` file
+  (`Matrix.h`, `Layer.h`, `Tensor4D.h`, ...), templated on the scalar
+  type (`float` or `double`).
+- **Standard library only by default.** `make BLAS=1` optionally sends
+  the matrix product to Apple Accelerate or OpenBLAS. Every algorithm
+  also has a portable version.
+- **Code that reads like the mathematics.** Operator overloading lets a
+  layer's forward pass be written as `Z = W * X + b`.
+- **One namespace.** Everything is in `namespace weft`.
 
 ## Conventions
 
-- A batch of examples is stored **one example per column**: an input batch
-  has shape `(features × batch_size)`, a weight matrix has shape
-  `(out × in)`, and the forward pass reads `Z = W * X + b`.
-- Matrix data is stored in a flat **row-major** buffer for cache
-  friendliness.
-- 4-D tensors for convolutional layers use **NCHW** layout
-  (batch × channels × height × width), matching PyTorch and cuDNN.
-  Conversion between 2-D and 4-D is via an explicit `flatten` free
-  function — the design choice is discussed in
-  [chapter 21](notes/21_from_matrices_to_tensors.md).
+- A batch stores one example per column. An input batch has shape
+  `(features × batch_size)`, a weight matrix has shape `(out × in)`, and
+  the forward pass is `Z = W * X + b`.
+- Matrix data is stored in one flat buffer in row-major order.
+- 4-D tensors for convolutional layers use the NCHW layout
+  (batch × channels × height × width). The free function `flatten`
+  converts a 4-D tensor to a matrix;
+  [chapter 21](notes/21_from_matrices_to_tensors.md) discusses this
+  choice.
 
 ## Build and run
 
@@ -58,69 +58,69 @@ cd build
 make             # build all tests and examples
 make test        # build and run all tests
 make examples    # build the example programs
+make book        # build the book (needs LaTeX and pandoc)
 make clean       # remove build artefacts
 
-make BLAS=1      # opt-in: BLAS-accelerated matmul
-                 #   macOS: Apple Accelerate (ships with the OS)
+make BLAS=1      # optional: BLAS matrix product
+                 #   macOS: Apple Accelerate (part of the system)
                  #   Linux: OpenBLAS (apt: libopenblas-dev)
 ```
 
-Tests and examples are both auto-discovered from their folders: drop a
-`.cpp` into `tests/` or `examples/` and `make` finds it.
+Tests and examples are found automatically: a `.cpp` file placed in
+`tests/` or `examples/` is built by `make`.
+
+## Data
+
+The data sets are not in the repository. Each has a script in `data/`:
+
+| Script | Data | Used in chapters |
+| --- | --- | --- |
+| `download_mnist.sh` | MNIST handwritten digits | 12, 16–18 |
+| `download_TinySOL_2020.sh` | TinySOL instrument samples | 15, 19, 23, 24 |
+| `download_cifar10.sh` | CIFAR-10 images | 22 |
+| `make_chorales.py` | Bach chorales as MIDI, from the music21 corpus | 27 |
+
+`make_chorales.py` is the only place the project uses Python
+(`pip install music21`). Three short recordings in `data/` are used as
+test sounds in chapters 19, 23, 28 and 29.
 
 ## Project layout
 
-    root/
-      src/        *.h        the header-only library
-      tests/      *.cpp      one executable per .cpp file
-      examples/   *.cpp      one executable per .cpp file
-      notes/      *.md       the book's chapters live here
-      book/                  LaTeX build of the chapters into one PDF
-      build/      Makefile   (you run make from here)
-                  tests/     test binaries land here
-                  examples/  example binaries land here
+    src/        *.h        the library
+    tests/      *.cpp      one test program per file
+    examples/   *.cpp      one example program per file
+    notes/      *.md       the chapters of the book, one file each
+    book/                  builds the chapters into one PDF
+    data/                  download scripts and test sounds
+    build/      Makefile   run make here
+                tests/     test programs are built here
+                examples/  example programs are built here
 
-## Curriculum
+## Contents
 
-The library is built in the order the book teaches it. Each milestone
-produces both classification and generative applications; audio and music
-are the binding domain.
+The library is built in the order of the chapters. Each chapter is one
+Markdown file in `notes/`, with the same number as in the book.
 
-| Stage | Material | Chapters |
-|---|---|---|
-| Why C++ | The language choice, up front and honestly. | 1 |
-| Foundations | Matrix algebra, backpropagation, one weight by hand, activations, the Jacobian, cross-entropy, the network class. | 2–8 |
-| First classifiers | Iris; optimizers; dropout; MNIST. | 9–12 |
-| Audio | The FFT, audio features, an orchestral-instrument classifier. | 13–15 |
-| Autoencoders | MNIST autoencoder, variational autoencoder, weight visualization, the audio VAE. | 16–19 |
-| Performance | `std::thread`-parallelised matmul and the optional BLAS path. | 20 |
-| Convolution | Tensors, Conv2D via im2col, max-pooling, the CIFAR-10 classifier, a convolutional VAE for audio. | 21–23 |
-| Differentiable synthesis | A harmonic-plus-noise synthesiser with hand-written gradients, a spectral loss, and a network that plays it: timbre transfer, instrument morphing, notes that were never recorded. | 24 |
-| Attention | Multi-head self-attention with a causal mask, positional encoding, layer norm, the transformer block. | 25, 26 |
-| Transformer chorales | An autoregressive transformer trained on four-voice Bach chorales, measured against a Markov baseline. | 27 |
+| Part | Material | Chapters |
+| --- | --- | --- |
+| Foundations | Why C++; matrices; backpropagation; one weight by hand; activations; the Jacobian; cross-entropy; the network class. | 1–8 |
+| Training and first classifiers | Iris; optimisers; dropout; MNIST. | 9–12 |
+| Sound and autoencoders | The FFT; audio features; an instrument classifier; autoencoder; variational autoencoder; weight visualisation; the audio VAE. | 13–19 |
+| Convolution | A threaded matrix product and the optional BLAS path; tensors; Conv2D by im2col, max-pooling and a CIFAR-10 classifier; a convolutional VAE for audio. | 20–23 |
+| Synthesis and sequence models | A network that controls a harmonic-plus-noise synthesiser; attention; the transformer block; a transformer trained on Bach chorales; matching pursuit; a transformer trained on matching-pursuit atoms. | 24–29 |
 
-Each chapter is one Markdown file in `notes/`, numbered as in the book.
-
-## Status
-
-- **Done:** chapters 1 – 27 and the corresponding code. These are the
-  chapters of the book (`book/`, built with `make book`).
-- **Not written:** the matching-pursuit capstone and the closing chapter on
-  architectures we don't cover (RNNs, GANs, diffusion, reinforcement
-  learning).
+Recurrent networks, GANs, diffusion models and reinforcement learning
+are not covered.
 
 ## Performance
 
-Two performance levers are built in:
+- **Threaded matrix product.** `Matrix::operator*` splits the rows of
+  the result across threads with `std::thread`. It uses no OpenMP and
+  no processor-specific instructions.
+- **Optional BLAS.** With `make BLAS=1` the same product calls
+  `cblas_sgemm` or `cblas_dgemm` from Apple Accelerate (macOS) or
+  OpenBLAS (elsewhere). It is off by default so that the default build
+  needs nothing beyond the standard library.
 
-- **Threaded matmul** by default — `Matrix::operator*` parallelises across
-  rows with `std::thread`. No OpenMP, no architecture-specific intrinsics,
-  no external dependency.
-- **Optional tuned BLAS** via `make BLAS=1` — the same matmul dispatches to
-  `cblas_sgemm` / `cblas_dgemm` through Apple Accelerate (macOS) or
-  OpenBLAS (elsewhere). Off by default so the std-lib-only promise holds
-  for anyone who doesn't ask for it.
-
-See [chapter 20](notes/20_performance.md) for the full story, including how
-profiling led to each choice and why GPU support is deliberately not on
-the roadmap.
+[Chapter 20](notes/20_performance.md) describes the profiling behind
+each choice and why there is no GPU support.

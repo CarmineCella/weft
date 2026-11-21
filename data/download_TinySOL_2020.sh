@@ -67,5 +67,5 @@ echo "  $N_WAV wav files across $N_INST directories"
 echo
 echo "To use with the audio classification examples:"
 echo "  cd build"
-echo "  ./examples/extract_features ../data/$TARGET_DIR  features.bin"
-echo "  ./examples/sound_classifier features.bin"
+echo "  ./examples/extract_features ../data/$TARGET_DIR  sol_mfcc.feat  mfcc  averaged"
+echo "  ./examples/sound_classifier sol_mfcc.feat"

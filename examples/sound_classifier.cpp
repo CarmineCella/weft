@@ -141,8 +141,9 @@ evaluate(Network<float>& net, CrossEntropy<float>& ce,
 
 // Build a (K x K) confusion matrix over the test set.  Rows = true class,
 // columns = predicted class.  Returns:
-//   confusion[true][pred] = count of test examples (frames if per_frame
-//                          is false, files if per_frame is true)
+//   confusion[true][pred] = count of test FILES (one row per file in
+//                          averaged mode; frames aggregated per file in
+//                          per_frame mode)
 static std::vector<std::vector<int>>
 build_confusion(Network<float>& net,
                 const Matrix<float>& X, const Matrix<float>& Y,
