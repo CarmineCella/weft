@@ -64,7 +64,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             pandoc latexmk biber poppler-utils texlive-latex-extra \
-            texlive-fonts-recommended texlive-fonts-extra texlive-science texlive-publishers
+            texlive-fonts-recommended texlive-fonts-extra texlive-science texlive-publishers \
+            texlive-plain-generic texlive-bibtex-extra
       - name: Validate chapter sources
         run: python3 book/check_sources.py
       - name: Build book
