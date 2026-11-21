@@ -140,7 +140,7 @@ Softmax                            -> (vocab x L)
 ```
 
 Our defaults are `d_model = 128`, `n_heads = 4`, `n_layers = 2`,
-`d_ff = 4 * d_model`. That's about 440k parameters — small enough to
+`d_ff = 4 * d_model`. That's about 430k parameters — small enough to
 train on a CPU, large enough to learn non-trivial voice leading.
 Block size for training is 128 tokens (32 time steps = 8 bars at
 4/4). At inference we step one token at a time.
@@ -148,8 +148,9 @@ Block size for training is 128 tokens (32 time steps = 8 bars at
 Per training step:
 
 1. Pick a random chorale token sequence from the corpus.
-2. Pick a random offset inside it; take a 128-token window as
-   `input` and the same window shifted by one as `target`.
+2. Pick an offset inside it that is a multiple of 4; take a 128-token
+   window as `input` and the same window shifted by one as `target`.
+   One window in ten starts at the very beginning of its chorale.
 3. Forward through the model with the causal mask on. The output is
    a probability over 134 tokens at every one of the 128 positions
    in the chunk.
@@ -162,6 +163,17 @@ the last), one chunk gives us 128 supervised gradients for the cost
 of one forward. That's the central efficiency win of training
 transformers parallel-in-time. (At inference, we have to go back to
 one token at a time — there's no avoiding that for sampling.)
+
+**Why the offset is a multiple of 4.** Token 0 is `BOS` and tokens
+1 to 4 are the four voices of the first time step, so a window that
+starts at a multiple of 4 always has S, A, T, B at positions 1, 2, 3,
+0 (mod 4). The positional encoding then tells the model which voice
+it is writing. We did not do this at first. With arbitrary offsets
+the model has to work out from the notes themselves which voice comes
+next, and section 5 shows what that cost. The one-in-ten rule is
+there for a similar reason: a uniformly random offset shows the model
+the opening of a chorale about once in two hundred windows, and a
+generator that has hardly seen an opening starts badly.
 
 
 ## 4. Sampling
@@ -184,74 +196,131 @@ temperatures (1.0-1.5) flatten the distribution, producing more
 varied output that occasionally goes off the rails. Temperature 1.0
 samples directly from the model's distribution.
 
-A small adversarial detail: after sampling enough tokens to fill
-`MAX_SEQ`, the positional encoding runs out, so we have to *slide*
-the context window forward, dropping the oldest tokens. The
-generated music's coherence then falls to whatever the model's
-practical attention range turned out to be in training. With 2-layer
-attention and `block=128` training chunks, the practical range is on
-the order of the training block size — beyond that, the model is
-generalising past what it saw.
+**The context must look like training.** The model was trained on
+windows of 128 tokens that begin at position 0 of the positional
+encoding. At generation time it must be shown the same thing: the
+*last* 128 tokens (rounded so that the window still starts at a
+multiple of 4), not the whole sequence so far. Coherence beyond 32
+time steps therefore comes only from what the window still contains.
+
+This is worth stating because our first sampler got it wrong, and
+nothing in training said so. It passed the whole sequence, up to the
+1024 positions the encoding table holds. Positions beyond 127 had
+never occurred in training, so after the first two bars the model was
+working from encodings it had never seen. The loss curve looked
+excellent throughout, because the loss is measured on training-sized
+windows.
 
 
-## 5. Honest expectations
+## 5. Results
 
-For the book's purposes we run this against whatever Bach chorale
-corpus you have on disk. Sources commonly cited in the ML music
-literature: the `music21` corpus, the JSB Chorales dataset
-(Boulanger-Lewandowski et al. 2012, ~400 chorales), or hand-picked
-MIDI files from sites like musedata.org. Each chorale needs to be a
-4-track MIDI with the four voices as separate tracks in S, A, T, B
-order. The example reads any directory of such files.
+The corpus is the set of four-part Bach chorales that ships with
+music21 [@cuthbert2010music21]; `data/make_chorales.py` writes 365 of
+them as four-track MIDI files, each transposed to C major or A minor
+so that a small model does not have to learn every key separately.
+One chorale in ten is held out.
 
-With a real chorale corpus, what to expect:
+**Prediction.** The program fits two baselines on the training
+chorales and scores them, like the transformer, by the average
+cross-entropy of the held-out chorales, in nats per token:
 
-- **Loss curve**: starts around `log(134) ≈ 4.9` (uniform-over-vocab
-  baseline), drops to about 1.0-1.5 within a few epochs, slowly
-  approaches ~0.7 with longer training. Perplexity around 2 means
-  the model is effectively choosing among 2 plausible next tokens at
-  each step — which lines up with the fact that within a chorale,
-  most positions have a small number of musically plausible
-  continuations.
+| Model | Held-out loss |
+|---|---|
+| Uniform over the 134 tokens | 4.90 |
+| Unigram | 1.36 |
+| First-order Markov chain per voice | 1.28 |
+| Transformer, 1 epoch (10 s) | 0.99 |
+| Transformer, 10 epochs | 0.60 |
+| Transformer, 40 epochs (8 min) | 0.49 |
 
-- **Generated output (early)**: stays in the right pitch ranges per
-  voice, voicings sit in approximately the right vertical alignment,
-  but voice leading is loose — parallel fifths, sustained
-  dissonances, abrupt range jumps.
+A loss of 0.49 is a perplexity of 1.6: at each step the model is, on
+average, undecided between fewer than two tokens. The transformer
+passes the Markov chain during its first epoch.
 
-- **Generated output (well-trained)**: phrases that hold together,
-  cadences that approximately resolve, mostly-correct voice ranges.
-  Not Bach, but more musically coherent than what an n-gram on the
-  same data would produce. The honest claim is "qualitatively better
-  than first-order Markov, not equal to a careful human."
+**Generation.** A low loss says the model predicts Bach well. It does
+not say that what it *writes* is any good, and the two can come apart
+badly, so we measure the generated music directly. For each chorale
+we compute how often the upper voices form a consonance with the bass
+(a unison, third, fifth, sixth or octave), how often two voices
+cross, how many of the moves between two voices are parallel fifths
+or octaves, and the average length of a note. Ten chorales of 256
+time steps from each generator, against the 365 originals:
 
-- **What this won't fix on its own**: rhythm beyond 16th-note
-  quantisation, dynamics, articulation, lyric setting, large-scale
-  form. All of these need either richer tokenisation (REMI-style
-  event tokens, encoded velocity), explicit conditioning (give the
-  model a key signature, a chorale text, a chord sequence to harmonise),
-  or training data with the relevant variation.
+| | Consonant with bass | Voices crossed | Parallel 5ths/8ves | Quarter notes per attack |
+|---|---|---|---|---|
+| Bach | 85% | 2% | 0.2% | 0.95 |
+| Markov chain per voice | 55% | 45% | 3.7% | 1.08 |
+| Transformer | 78% | 13% | 5.1% | 1.03 |
 
-These are all the honest places future iterations can go. The library
-infrastructure now supports them in principle — embed the right
-token type, train longer, use a deeper model.
+The Markov chain produces four plausible lines that ignore one
+another: its voices cross almost half the time and its harmony is
+not far from what chance would give. The transformer keeps the voices
+in order most of the time and is much closer to Bach in its harmony,
+with the right rhythmic density. That is the difference attention was
+supposed to make, and it is measurable.
+
+It is also not Bach. Voices still cross six times as often as in the
+originals, and parallel fifths and octaves, which the chorale style
+avoids almost completely, are *more* frequent than in the Markov
+output: the model has learned that voices move together, but not the
+rule about how they may not.
+
+**Two bugs that the loss did not show.** The table above is the third
+version. The first, with the sampler that passed the whole sequence
+(section 4), produced chorales whose voices crossed 82% of the time,
+worse than the Markov chain. Fixing the sampler brought the harmony
+up but left the crossing at 80%. Aligning the training windows to
+time steps (section 3) is what brought it to 13%, and it also lowered
+the held-out loss from 0.52 to 0.49. In both cases the training loss
+had looked fine. Had we judged the model by its loss alone, we would
+have reported a success and shipped a generator worse than the
+baseline.
+
+**What this won't fix on its own**: rhythm beyond 16th-note
+quantisation, dynamics, articulation, lyric setting, large-scale
+form. All of these need either richer tokenisation, explicit
+conditioning (a key, a chorale text, a chord sequence to harmonise),
+or training data with the relevant variation.
+
+```
+python3 data/make_chorales.py
+transformer_chorales train    data/chorales  chorale_model  40
+transformer_chorales generate chorale_model  out.mid  256  1.0  1
+transformer_chorales markov   data/chorales  markov.mid  256  1
+```
 
 
-## 6. What this proves
+## 6. What this shows
 
-The point isn't that the model is good. It's that *this kind of model
-is possible* — that everything we've built across all the previous
-notes composes into a generative system that produces structurally
-coherent, joint, multi-voice musical output from a corpus, in a way
-that classical methods on the same input couldn't. The dense MLP
-classifier, the convnet, the audio VAE, the ConvVAE — none of those
-demonstrated something a phase vocoder or Markov chain doesn't
-already do. This one does. That's the threshold neural networks
-needed to cross for the book's pedagogical argument to work, and
-crossing it is what the attention layer actually buys us.
+The dense classifier, the convnet, the audio VAEs and the
+differentiable synthesiser each did something that classical signal
+processing or classical statistics already does, sometimes better.
+This is the first example in the book where the classical baseline is
+measured on the same data and loses clearly, and where the reason is
+the architecture: a per-voice Markov chain cannot represent an
+agreement between voices, and a model that attends across the whole
+texture can.
 
-The closing capstone (note 25) brings attention together with
-matching pursuit from note 3: a generative orchestration system that
-chooses atoms from a learned dictionary, conditioned by attention on
-the previous selections. That's where the Part II machinery finally
-points at music itself rather than at a benchmark.
+The model is small, the corpus is small, and the output is a student
+exercise in the style, not a chorale anyone would mistake for the
+real thing. The claim is narrower and, we think, more useful: with
+nothing but the layers built in this book, running on a laptop CPU
+for eight minutes, a network learns a joint, structured property of
+four-voice music from examples alone.
+
+The next note takes the same model from symbols to sound. Its tokens
+are no longer notes but the atoms of a matching-pursuit decomposition
+[@mallat1993mp] of recorded audio, so that what the transformer
+writes can be heard directly.
+
+
+## Further reading
+
+Generating Bach chorales with neural networks has a long record;
+[@boulanger2012modeling] established the chorales as a benchmark for
+polyphonic sequence models, and DeepBach [@hadjeres2017deepbach] and
+Coconet [@huang2017coconet] are the best-known systems built for
+them. The decoder-only transformer trained to predict the next token
+is the design of [@radford2018gpt], and its application to music with
+long-range structure is [@huang2019musictransformer]. The corpus
+comes from music21 [@cuthbert2010music21].
