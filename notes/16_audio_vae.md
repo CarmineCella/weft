@@ -183,3 +183,12 @@ same way -- toward a convolutional VAE that sees the 2D time-frequency
 structure of a spectrogram, and a sequence model on top of its latents.
 Those are the next milestones.
 
+A caution about what to expect when listening. The remap, the
+interpolation and the sampling all run, and they show what a latent
+space is good for, but the audio quality is low: a small network
+trained with squared error produces blurred spectra, and the phase is
+borrowed from another sound. Note 20 improves the model; it does not
+change that. [Note 21](21_differentiable_synthesis.md) gets clean
+audio by a different route, with a network that controls a
+synthesiser instead of producing spectra.
+

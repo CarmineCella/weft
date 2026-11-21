@@ -1,6 +1,6 @@
-# 22 — Positional encoding, LayerNorm, and the transformer block
+# 23 — Positional encoding, LayerNorm, and the transformer block
 
-[Note 21](21_attention.md) built attention as a pure operator on
+[Note 22](22_attention.md) built attention as a pure operator on
 `(Q, K, V)` and wrapped it in `MultiHeadAttention` with learnable
 projections. By itself attention can't quite stand alone yet: it has
 no notion of *where* a token sits in the sequence, no normalisation
@@ -206,7 +206,7 @@ difference's own truncation error, not of a wrong gradient, so the
 block's test uses a step of `1e-6`.
 
 **A causal block.** `set_causal(true)` on the block switches its
-attention sub-layer to the causal mask of note 21. Nothing else has to
+attention sub-layer to the causal mask of note 22. Nothing else has to
 change, because LayerNorm, the feed-forward sub-stack and the
 residuals all act on one token at a time and cannot carry information
 from a later position to an earlier one. A stack of causal blocks is
@@ -254,7 +254,7 @@ don't build it: it is the same operator with `Q` taken from one
 source and `K, V` from another, and the generative models in the next
 notes are decoder-only, which need only the causal block above.
 
-Note 23 puts the pieces to work. It adds a token embedding, stacks
+Note 24 puts the pieces to work. It adds a token embedding, stacks
 causal blocks into an autoregressive model, and trains it on four-voice
 chorales, so that sampling from it one token at a time writes new
 ones.

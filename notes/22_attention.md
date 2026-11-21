@@ -1,4 +1,4 @@
-# 21 — Attention
+# 22 — Attention
 
 The library so far has two ways to mix information across positions in
 an input. A *dense* layer mixes them all-to-all with a fixed weight
@@ -19,7 +19,7 @@ for language and a growing share of music and audio.
 This note builds the attention operator from the ground up:
 scaled-dot-product attention as a pure function of `(Q, K, V)`, then
 multi-head attention as a `Layer<T>` that learns the projections.
-Note 22 will add the surrounding pieces (positional encoding,
+Note 23 will add the surrounding pieces (positional encoding,
 LayerNorm, a transformer encoder block).
 
 
@@ -287,6 +287,6 @@ Two other variants are common and are not implemented:
   We've already separated `Q` from `K, V` in the operator, so this is
   a usage pattern, not new code.
 
-Note 22 builds the surrounding pieces — sinusoidal positional
+Note 23 builds the surrounding pieces — sinusoidal positional
 encoding, LayerNorm, residual connections — and assembles a complete
 transformer block.

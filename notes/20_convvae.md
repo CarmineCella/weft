@@ -175,13 +175,13 @@ consumes), then for each contiguous run of frames belonging to one
 source WAV, slide a 16-frame window with a hop of 8 frames and extract
 patches. Each patch's 16 columns get mel-transformed from 2049 to 64
 bins inside the loop, and the resulting `(1, 64, 16)` tile becomes one
-training example. On TinySOL we typically get 50–80k patches, which
+training example. On TinySOL this gives about 24,000 patches, which
 fits comfortably in memory.
 
 Healthy training shows reconstruction loss monotonically decreasing,
 KL holding stable in single digits, no oscillation. A representative
-TinySOL run hits recon ≈ 13 at epoch 1 and recon ≈ 6 by epoch 10, with
-KL hovering around 2–3 throughout. If KL spikes by factors of 100 or
+TinySOL run hits recon ≈ 13 at epoch 1 and recon ≈ 7 by epoch 10, with
+KL hovering around 2 throughout. If KL spikes by factors of 100 or
 recon bounces, the mel scale factor is wrong and the encoder is
 producing pathological `log σ²` at init.
 
@@ -256,6 +256,11 @@ machinery applies to any 2-D data with local spatial correlations —
 spectrogram patches today, image tiles tomorrow, raw waveforms in 1-D
 the day after.
 
-The next note picks up the other major architectural family we haven't
-touched: **attention**. After that, the matching-pursuit + attention
-generative audio system that ties Part II together.
+One thing has to be said plainly before moving on. Judged by ear, the
+audio from this model and from the dense VAE of note 16 is poor, and
+the three limitations above are structural: training longer does not
+remove them. They all come from the same decision, which is to make
+the network produce a spectrum and then turn that spectrum back into a
+waveform. [Note 21](21_differentiable_synthesis.md) keeps the goal and
+changes the decision: the network there outputs the controls of a
+synthesiser, and the synthesiser makes the sound.

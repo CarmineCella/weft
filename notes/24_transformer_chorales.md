@@ -1,4 +1,4 @@
-# 23 — A transformer that writes chorales
+# 24 — A transformer that writes chorales
 
 The examples in this book so far have done things classical signal
 processing already does. Phase vocoders cross-synthesised timbres in
@@ -31,7 +31,7 @@ core demonstration is the same.
 
 ## 1. Three small library additions
 
-The pieces we have from notes 21-22 (`ScaledDotProductAttention`,
+The pieces we have from notes 22-23 (`ScaledDotProductAttention`,
 `MultiHeadAttention`, `SinusoidalPositionalEncoding`, `LayerNorm`,
 `TransformerEncoderBlock`) are an *encoder*. To make them generative
 we need three more things.
@@ -49,7 +49,7 @@ toggle it per training run without rebuilding the architecture. The
 finite-difference test passes at `~1e-12` in double precision with
 the mask active, confirming the masked backward is correct.
 
-**Embedding.** Until now every layer took continuous-valued matrices.
+**Embedding.** Almost every layer so far took continuous-valued matrices.
 A language model takes integer token IDs, so we need a learnable
 lookup table. `Embedding<T>` holds a `(d_model × vocab_size)`
 parameter matrix `W`; forward returns the column-by-column gather
@@ -250,7 +250,7 @@ already do. This one does. That's the threshold neural networks
 needed to cross for the book's pedagogical argument to work, and
 crossing it is what the attention layer actually buys us.
 
-The closing capstone (note 24) brings attention together with
+The closing capstone (note 25) brings attention together with
 matching pursuit from note 3: a generative orchestration system that
 chooses atoms from a learned dictionary, conditioned by attention on
 the previous selections. That's where the Part II machinery finally

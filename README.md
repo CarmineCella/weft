@@ -96,16 +96,17 @@ are the binding domain.
 | Performance | `std::thread`-parallelised matmul and the optional BLAS path. | 17 |
 | Convolutional networks | Tensors, Conv2D via im2col, max-pooling, the CIFAR-10 conv classifier. | 18, 19 |
 | Convolutional VAE | Conv-based VAE for audio spectrograms; sharper morphs and interpolations than the dense one. | 20 |
-| Attention | Multi-head self-attention, positional encoding, layer norm, the transformer block. | 21, 22 |
-| Transformer chorales | An autoregressive transformer trained on four-voice MIDI chorales. | 23 |
+| Differentiable synthesis | A harmonic-plus-noise synthesiser with hand-written gradients, a spectral loss, and a network that plays it: timbre transfer, instrument morphing, notes that were never recorded. | 21 |
+| Attention | Multi-head self-attention with a causal mask, positional encoding, layer norm, the transformer block. | 22, 23 |
+| Transformer chorales | An autoregressive transformer trained on four-voice MIDI chorales. | 24 |
 
 ## Status
 
-- **Done:** notes 0b – 22 and the corresponding code. These are the
+- **Done:** notes 0b – 23 and the corresponding code. These are the
   chapters of the book (`book/`, built with `make book`).
-- **Written, code incomplete:** note 23 (transformer chorales). The
-  causal mask, the `Embedding` layer and their tests are not in `src/`
-  yet, so the note is not included in the book.
+- **Written, not yet run:** note 24 (transformer chorales). Its program
+  compiles, but it has no chorale corpus, and `Embedding` and MIDI have
+  no tests yet, so the note is not included in the book.
 - **Not written:** the matching-pursuit capstone and the closing note on
   architectures we don't cover (RNNs, GANs, diffusion, reinforcement
   learning).
