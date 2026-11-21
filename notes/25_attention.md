@@ -270,6 +270,8 @@ same change does reach them. The gradients still agree with finite
 differences, to a few `1e-11` for both the operator and
 `MultiHeadAttention`.
 
+![Attention weights for a sequence of 8 positions with random scores. Each row sums to 1. With the causal mask a position gives no weight to the positions after it.](figures/25_causal_mask.png)
+
 
 ## 8. What is not implemented
 

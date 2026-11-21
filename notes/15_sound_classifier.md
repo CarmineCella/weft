@@ -138,6 +138,8 @@ instruments it can show, for example:
 For SOL the dominant confusions are within instrument families. A
 human listener would have the same difficulty with isolated notes.
 
+![The confusion matrix of one run with averaged MFCC features (test accuracy 92.8%). Rows are the true instrument and columns the predicted one. Empty cells are zero. Most of the errors are between horn and trombone and between viola and violin.](figures/15_confusion.png)
+
 ---
 
 ## 6. The cache format (v2)
@@ -219,4 +221,5 @@ serialisation format) into a complete classifier.
 
 The instrument samples come from the Studio On Line recordings;
 the dataset and its role in computer-assisted orchestration are
-described in [@cella2020orchidea].
+described in [@cella2020orchidea]. Orchidea, the orchestration system
+the samples were collected for, is described in [@cella2022orchidea].

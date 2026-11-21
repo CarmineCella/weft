@@ -26,6 +26,8 @@ frequencies. Bins 2049..4095 are the mirror image (negative
 frequencies), which carry no extra information for real input. For
 this reason we keep only `N/2 + 1` bins downstream.
 
+![A signal made of three sinusoids at 250, 750 and 1500 Hz with amplitudes 1, 0.5 and 0.25 (left, the first 20 ms), and the magnitude of its FFT (right). Each sinusoid gives one peak. The three frequencies were chosen to fall exactly on FFT bins.](figures/13_signal_spectrum.png)
+
 ## 2. Why we don't compute the DFT directly
 
 The formula above is an `O(N^2)` algorithm: N output bins, each a sum

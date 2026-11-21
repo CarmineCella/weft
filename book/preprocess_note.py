@@ -23,6 +23,7 @@ them:
 Reads markdown on stdin, writes markdown on stdout.
 """
 
+import os
 import re
 import sys
 
@@ -173,6 +174,23 @@ def chapter_links(text):
     return _CHAPTER_LINK.sub(fix, text)
 
 
+# A figure: ![caption](figures/name.png).  The Markdown chapters show the
+# PNG.  When make_figures.py also wrote a PDF of the same figure, the book
+# uses that, because a PDF is a line drawing and prints sharply.
+_FIGURE = re.compile(r"\]\(figures/([A-Za-z0-9_]+)\.png\)")
+_FIGURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "..", "notes", "figures")
+
+
+def figure_files(text):
+    def fix(m):
+        name = m.group(1)
+        if os.path.exists(os.path.join(_FIGURE_DIR, name + ".pdf")):
+            return "](figures/" + name + ".pdf)"
+        return m.group(0)
+    return _FIGURE.sub(fix, text)
+
+
 def main():
     src = sys.stdin.read()
     # Optional argument: this chapter's file stem, used as its label so
@@ -195,6 +213,7 @@ def main():
                         break
             part = "".join(lines)
             part = chapter_links(part)
+            part = figure_files(part)
             part = replace_prose(part)
         else:
             part = replace_code(part)

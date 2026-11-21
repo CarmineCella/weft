@@ -30,6 +30,8 @@ pipeline.)
 `load_labels` returns a `vector<int>` of digit indices. `one_hot<float>`
 turns that into a `(10, 60000)` matrix with a single 1 per column.
 
+![The first 30 images of the MNIST training set.](figures/12_mnist_digits.png)
+
 ---
 
 ## 2. The architecture
@@ -144,6 +146,8 @@ Later in training, as the network starts to overfit, train accuracy
 exceeds it. When it crosses over and the gap starts to grow, consider
 stopping training or strengthening regularisation. The gap between the
 two is a basic diagnostic.
+
+![Loss and accuracy of the MNIST classifier over ten epochs. The training values are measured with dropout active.](figures/12_mnist_training.png)
 
 ---
 

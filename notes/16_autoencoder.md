@@ -168,6 +168,8 @@ side effect is that the noise in any single pixel, being unpredictable
 from the rest of the image, can't pass the bottleneck either, so
 reconstructions come out denoised relative to their inputs.
 
+![Test digits (top row) and their reconstructions by the autoencoder (bottom row).](figures/16_reconstructions.png)
+
 ---
 
 ## 6. Demo 2 — latent interpolation
@@ -194,6 +196,8 @@ latent space yields plausible outputs, then we can *sample* new points
 and get new outputs: new digits, or in the audio version, new timbres.
 The plain autoencoder comes close to this, with one limitation
 described in the next section.
+
+![A 3 changed into an 8 by interpolating between their latent codes.](figures/16_interpolation.png)
 
 ---
 

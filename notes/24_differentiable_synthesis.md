@@ -190,6 +190,8 @@ semitone around a known pitch, so there is no octave ambiguity.
 Octave ambiguity is the hard part of general pitch tracking, and its
 absence is the reason we do not need a full pitch tracker.
 
+![The synthesiser and its loss. The controls are on the left. In section 5 they are fitted directly to one recording. From section 7 a network produces them.](figures/24_synthesiser.png)
+
 
 ## 5. First experiment: no network
 
@@ -232,6 +234,10 @@ nothing here goes beyond what classical methods already do.
 the fitted controls of two notes, are the classical cross-synthesis
 of two sets of partials. What the network adds is described in
 section 8.
+
+![A flute note and the two parts of the synthesiser fitted to it, on the same grey scale. The harmonic part contains the partials. The noise part is a broad band with no partials.](figures/24_resynthesis.png)
+
+![The fitted amplitudes of the first 20 harmonics of a flute and a clarinet playing A4. Each bar is the median over the middle half of the note, relative to the first harmonic.](figures/24_harmonics.png)
 
 
 ## 6. The pitch period sets the time scale

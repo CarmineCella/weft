@@ -51,6 +51,8 @@ scale is shared across all ten templates. This is why `Bmp.h` writes 24-bit
 RGB and not greyscale: the colour carries the sign, which is half the
 information.
 
+![The weights of the linear classifier, one image for each digit from 0 to 9. Red is positive, blue is negative and white is zero.](figures/18_weights.png)
+
 ## 4. Reaching the weights
 
 The library already provides what is needed:

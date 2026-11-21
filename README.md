@@ -1,7 +1,7 @@
 # weft
 
-Companion library for the book *Designing Neural Networks for Music
-Applications*.
+Companion library for the book *Designing Musical Networks: neural
+networks for sound and music, built from scratch in C++*.
 
 weft (**W**eights **E**stimated **F**rom **T**raining) is a small
 neural-network library written from scratch in C++. It has no
@@ -80,8 +80,11 @@ The data sets are not in the repository. Each has a script in `data/`:
 | `download_cifar10.sh` | CIFAR-10 images | 22 |
 | `make_chorales.py` | Bach chorales as MIDI, from the music21 corpus | 27 |
 
-`make_chorales.py` is the only place the project uses Python
-(`pip install music21`). Three short recordings in `data/` are used as
+`make_chorales.py` needs Python (`pip install music21`). The library,
+the tests and the examples do not. Python is used in one other place:
+`book/make_figures.py` draws the figures of the book from the files the
+examples write. The figures are in `notes/figures/`, so the book builds
+without running that script. Three short recordings in `data/` are used as
 test sounds in chapters 19, 23, 28 and 29.
 
 ## Project layout
@@ -90,6 +93,7 @@ test sounds in chapters 19, 23, 28 and 29.
     tests/      *.cpp      one test program per file
     examples/   *.cpp      one example program per file
     notes/      *.md       the chapters of the book, one file each
+                figures/   the figures of the book
     book/                  builds the chapters into one PDF
     data/                  download scripts and test sounds
     build/      Makefile   run make here

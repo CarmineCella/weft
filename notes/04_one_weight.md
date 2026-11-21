@@ -155,6 +155,8 @@ next forward pass gives `z = 0.64`, `L = 0.065`, which is closer still.
 This is the training algorithm. Run on many (input, target) pairs with
 many weights, it trains a network.
 
+![The loss as a function of `w₁`, with the other weight and the bias held fixed. The dashed line has the slope −1.8 computed in step 4. The update moves `w₁` from 0.5 to 0.68 and the loss from 0.405 to 0.1458.](figures/04_one_step.png)
+
 ---
 
 ## Where the loss enters the SGD update

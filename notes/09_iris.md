@@ -196,6 +196,8 @@ In this output:
   weights. This is deliberate, and the next section discusses the
   consequences.
 
+![Loss and accuracy of the IRIS classifier during training, as printed by the program every ten epochs.](figures/09_iris_training.png)
+
 ---
 
 ## 7. The seed-variance warning

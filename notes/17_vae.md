@@ -202,6 +202,10 @@ encoder never produced from any real input, so they are generated and
 not reconstructed. Most are readable digits; a few are blends from
 samples landing between clusters.
 
+![Digits decoded from a regular grid of points in the two-dimensional latent space, from −2.5 to 2.5 on each axis.](figures/17_latent_grid.png)
+
+![Digits decoded from latent points drawn at random from `N(0, I)`.](figures/17_samples.png)
+
 ---
 
 ## 7. Application to audio

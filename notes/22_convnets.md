@@ -351,6 +351,8 @@ minutes and produces a model that reaches 72% test accuracy.
 The training prints loss, train accuracy, and test accuracy each epoch,
 and saves a checkpoint after each one, so Ctrl-C is safe.
 
+![Training loss and accuracy of the CIFAR-10 classifier over 15 epochs. Training accuracy is measured with dropout active.](figures/22_cifar_training.png)
+
 
 ## 9. Visualising what the first layer learned
 
@@ -400,6 +402,8 @@ directly an image. Techniques for visualising deeper layers
 of scope here. The first layer learns features, and those features
 look like edges and colour patches because that is what is locally
 informative in natural images.
+
+![The 32 kernels of the first convolutional layer after training. Each is 5 × 5 pixels with three colour channels.](figures/22_filters.png)
 
 
 ## 10. Later chapters

@@ -140,6 +140,8 @@ dominant one. Other windows (Hamming, Blackman, Kaiser) have different
 tradeoffs between main-lobe width and side-lobe height. Hann is the
 standard default and is adequate here.
 
+![The spectrum of a 440 Hz sine in one frame of 4096 samples, without a window and with a Hann window. Without the window the sine leaves energy at every frequency, between 50 and 60 dB below the peak. With the Hann window the level falls quickly away from 440 Hz.](figures/14_window.png)
+
 ### Why energy-weighted averaging?
 
 A note's character is in its loud parts. The release of a piano note,
@@ -228,6 +230,8 @@ The output is a 40-dimensional summary of the power spectrum, biased
 toward lower frequencies (where the filters are narrower and more
 numerous). Human hearing has the same bias.
 
+![The 40 triangular filters of the mel filterbank at a sample rate of 44.1 kHz. The filters are narrow and close together at low frequencies and wide at high frequencies. Alternate filters are drawn in two colours.](figures/14_mel_filterbank.png)
+
 ### Why the DCT at the end?
 
 The 40 log-mel-energies are strongly correlated: adjacent filters
@@ -290,6 +294,8 @@ The per-frame functions skip silent frames (energy below a small
 threshold) so we don't train on noise from leading/trailing silence.
 The averaged version effectively does the same thing through energy
 weighting.
+
+![A flute note (A4, from TinySOL) as a waveform, as the log-magnitude spectrum of each frame, and as the log energy in the 40 mel bands of each frame. The frames are 4096 samples long with a hop of 2048 samples.](figures/14_features.png)
 
 ---
 

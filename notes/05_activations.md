@@ -221,6 +221,8 @@ classification setup (e.g. attention layers, custom losses).
 
 We add these when we need them. For IRIS, ReLU is enough.
 
+![ReLU, sigmoid and tanh (left) and their derivatives (right). The derivative of ReLU is 1 for every positive input. The derivatives of sigmoid and tanh approach 0 when the input is far from 0.](figures/05_activations.png)
+
 ---
 
 ## 5. The following chapters

@@ -207,6 +207,8 @@ small enough that SGD is sufficient, which is why that example keeps
 SGD. Adam's advantage appears on larger, less well-behaved problems, and
 every example from MNIST onwards uses it.
 
+![SGD and Adam on the quadratic of this section, 100 steps from (5, 5). Left: the path of each optimiser; the cross marks the minimum. Right: the loss at each step, on a logarithmic scale. SGD brings `y` to 0 in its first step and then moves slowly along `x`. Adam moves both coordinates at the same rate.](figures/10_sgd_adam.png)
+
 ---
 
 ## 7. Practical recommendations

@@ -269,6 +269,8 @@ spectrum back into a waveform.
 changes the decision: the network there outputs the controls of a
 synthesiser, and the synthesiser makes the sound.
 
+![Spectrograms of the first 8 seconds of `cage.wav` and of its remap by the convolutional VAE, each scaled to its own maximum. The output has energy at all frequencies, and the harmonics of the input are no longer separate lines.](figures/23_remap.png)
+
 
 ## Further reading
 

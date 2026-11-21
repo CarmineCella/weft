@@ -137,6 +137,8 @@ of time), so sustained tones fare better than sharp transients. The
 orchestral colour comes from the decoder being unable to represent
 anything but TinySOL spectra.
 
+![Spectrograms of the first 8 seconds of `cage.wav` and of its remap by the dense VAE. Each panel is scaled to its own maximum. The output follows the timing of the input. Its spectrum is denser than the input's, and the pauses are not silent.](figures/19_remap.png)
+
 ## 6. Generating (`vae_generate`): interpolation and sampling
 
 The remap could reuse the input's phase. The two generative

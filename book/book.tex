@@ -1,5 +1,5 @@
 %-------------------------------------------------------------------------------
-% book.tex  --  Designing Neural Networks for Music Applications
+% book.tex  --  Designing Musical Networks
 % Master file.  The introduction lives in chapters/ (hand-written); every
 % other chapter lives in generated/ (produced by pandoc from ../notes/*.md).
 % See book/Makefile.
@@ -60,7 +60,23 @@
 \addbibresource{bibliography/refs.bib}
 
 % --- Graphics paths ------------------------------------------------------------
-\graphicspath{{images/}{./}}
+% The figures are in notes/figures/, next to the Markdown chapters that
+% show them.  book/make_figures.py draws them.
+\graphicspath{{../notes/}{images/}{./}}
+% pandoc wraps every image in \pandocbounded, which must shrink an image
+% that is wider than the text and leave a smaller one at its own size.
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{%
+  \sbox\pandoc@box{#1}%
+  \ifdim\wd\pandoc@box>\linewidth
+    \resizebox{\linewidth}{!}{\usebox\pandoc@box}%
+  \else
+    \usebox\pandoc@box
+  \fi}
+% Place a figure where it appears in the text when there is room.
+\def\fps@figure{htbp}
+\makeatother
 
 % --- Custom math commands -----------------------------------------------------
 \newcommand{\R}{\mathbb{R}}
@@ -98,8 +114,8 @@
 
 \titlehead{}
 \subject{}
-\title[Designing Neural Networks for Music Applications]{Designing Neural Networks\\for Music Applications}
-\subtitle{Built from scratch in C++ with the weft library}
+\title[Designing Musical Networks]{Designing Musical Networks}
+\subtitle{Neural networks for sound and music,\\built from scratch in C++ with the weft library}
 \author[C.-E. Cella]{Carmine-Emanuele Cella}
 \date{\today}
 \publishers{draft}
@@ -110,8 +126,7 @@
 \uppertitleback{\@titlehead}
 \lowertitleback{%
     \textbf{Draft.}\\
-    This is a working draft of \emph{Designing Neural Networks for Music
-    Applications}.  Comments are welcome.
+    This is a working draft of \emph{Designing Musical Networks}.  Comments are welcome.
 
     \medskip
 

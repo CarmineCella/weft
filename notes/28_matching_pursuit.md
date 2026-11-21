@@ -69,6 +69,8 @@ the same decomposition. The test suite checks this: given a
 12-sample click, the first atom chosen is the shortest, and given a
 steady sine it is the longest, at the sine's frequency.
 
+![One atom of each of the four window lengths at 1000 Hz, on the same time axis.](figures/28_atoms.png)
+
 
 ## 3. The algorithm
 
@@ -171,6 +173,10 @@ atoms use the shortest. It is a sustained tone and the dictionary
 represents it as one. In `cage.wav` 61% is in the longest window and
 the rest is spread across the shorter ones.
 
+![The signal-to-residual ratio against the number of atoms for four sounds. The horizontal axis is logarithmic.](figures/28_how_many.png)
+
+![The first 6 seconds of `cage.wav` as a spectrogram and as its 2,000 strongest atoms. Each atom is drawn as a box, half its window length wide and one frequency bin high. Darker atoms are stronger.](figures/28_atom_list.png)
+
 
 ## 6. Editing a sound by editing its list
 
@@ -235,3 +241,10 @@ spectral modelling synthesis [@serra1990sms] are the related
 tradition that tracks partials over time instead of selecting
 independent atoms. The time-stretching of section 6 is the oldest
 application of the phase vocoder [@flanagan1966phase].
+
+Matching pursuit is also used in computer-assisted orchestration. The
+target is a sound to be imitated by an orchestra, and the dictionary
+is a collection of recorded instrument notes in place of windowed
+sinusoids. Orchidea [@cella2022orchidea; @cella2021orchideapractice]
+combines a stochastic matching pursuit with other optimisation
+methods to find the notes.

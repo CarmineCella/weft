@@ -62,6 +62,8 @@ infinite.
 > one-hot targets. The information-theoretic and the probabilistic
 > arguments give the same loss.
 
+![The loss on one example as a function of the probability the network gives to the correct class. Cross-entropy grows without limit as that probability approaches 0. The squared error never exceeds 1.](figures/07_cross_entropy.png)
+
 ---
 
 ## 3. The batch form

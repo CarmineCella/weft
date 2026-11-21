@@ -70,6 +70,8 @@ parameters and is defined for any position. Whether a trained model
 can use positions it never saw in training is a separate question,
 examined in [chapter 27](27_transformer_chorales.md).
 
+![The positional encoding for 100 positions with `d_model = 64`. Each column is the vector added to the token at one position. The low-numbered features change quickly with the position and the high-numbered features change slowly.](figures/26_positional_encoding.png)
+
 
 ## 3. LayerNorm
 
@@ -217,6 +219,8 @@ LayerNorm removes a constant added to a whole column, so a uniform
 shift would have no effect on the block's output and the test would
 prove nothing. We made that mistake in the first version of the
 test.)
+
+![The transformer block. The input passes through a LayerNorm and the attention, and the result is added to the input. The same is done with the two dense layers.](figures/26_block.png)
 
 
 ## 5. Parameter count

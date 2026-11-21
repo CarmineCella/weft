@@ -41,6 +41,11 @@ GENERATED := $(patsubst $(NOTES_DIR)/%.md,generated/%.tex,$(NOTES))
 # "chapters/*.tex" and fail.
 CHAPTERS  := $(wildcard chapters/*.tex)
 
+# The figures, drawn by make_figures.py and kept in the repository.  A
+# chapter shows a figure with ![caption](figures/name.png); the
+# preprocessor switches to name.pdf when that file exists.
+FIGURES   := $(wildcard $(NOTES_DIR)/figures/*)
+
 BUILD_DIR := build
 
 PANDOC    := pandoc
@@ -74,7 +79,7 @@ all: $(BUILD_DIR)/book.pdf
 # regenerates that one chapter.
 notes: $(GENERATED)
 
-generated/%.tex: $(NOTES_DIR)/%.md pandoc-template.latex preprocess_note.py
+generated/%.tex: $(NOTES_DIR)/%.md pandoc-template.latex preprocess_note.py $(FIGURES)
 	@mkdir -p generated
 	python3 preprocess_note.py $* < $< | $(PANDOC) $(PANDOC_FLAGS) -o $@
 
@@ -88,7 +93,7 @@ generated/%.tex: $(NOTES_DIR)/%.md pandoc-template.latex preprocess_note.py
 # error, including for undefined cross-references -- but the PDF is produced anyway in those
 # cases.  We check for the actual PDF after the run; if it's there, the
 # build succeeded; if not, fail.
-$(BUILD_DIR)/book.pdf: book.tex $(GENERATED) $(CHAPTERS)
+$(BUILD_DIR)/book.pdf: book.tex $(GENERATED) $(CHAPTERS) $(FIGURES)
 	@mkdir -p $(BUILD_DIR)
 	@# An editor building book.tex in place leaves book.bbl / book.bcf here.
 	@# LaTeX finds those before the ones in $(BUILD_DIR), and latexmk then
