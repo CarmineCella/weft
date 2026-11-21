@@ -75,6 +75,7 @@ Tests and examples are both auto-discovered from their folders: drop a
       tests/      *.cpp      one executable per .cpp file
       examples/   *.cpp      one executable per .cpp file
       notes/      *.md       the book's chapters live here
+      book/                  LaTeX build of the notes into one PDF
       build/      Makefile   (you run make from here)
                   tests/     test binaries land here
                   examples/  example binaries land here
@@ -93,19 +94,21 @@ are the binding domain.
 | Autoencoders | MNIST autoencoder, weight visualization, dense variational autoencoder. | 13, 14, 15 |
 | Audio VAE | Spectrogram VAE for timbre interpolation, generation, and remap on real instrument samples. | 16 |
 | Performance | `std::thread`-parallelised matmul and the optional BLAS path. | 17 |
-| Convolutional networks | Tensors, Conv2D via im2col, max-pooling, the MNIST conv classifier. | 18, 19 |
+| Convolutional networks | Tensors, Conv2D via im2col, max-pooling, the CIFAR-10 conv classifier. | 18, 19 |
 | Convolutional VAE | Conv-based VAE for audio spectrograms; sharper morphs and interpolations than the dense one. | 20 |
-| Attention | Multi-head self-attention, positional encoding, layer norm, the transformer block. | 21 |
-| Capstone | Matching pursuit as an interpretable codec, plus a transformer learning the temporal structure of atom sequences — a generative audio system. | 22 |
-| Architectures we don't cover | RNNs, GANs, diffusion, reinforcement learning — what they are, why we skipped them, where to read more. | 23 |
+| Attention | Multi-head self-attention, positional encoding, layer norm, the transformer block. | 21, 22 |
+| Transformer chorales | An autoregressive transformer trained on four-voice MIDI chorales. | 23 |
 
 ## Status
 
-- **Done:** notes 01 – 18 and the corresponding code (foundations, MLP
-  applications, dense AE/VAE, audio VAE, performance, tensors).
-- **In progress:** note 19 (Conv2D, MaxPool2D, MNIST conv classifier).
-- **Planned:** notes 20 – 23 (ConvVAE, attention, MP + attention capstone,
-  architectures we don't cover).
+- **Done:** notes 0b – 22 and the corresponding code. These are the
+  chapters of the book (`book/`, built with `make book`).
+- **Written, code incomplete:** note 23 (transformer chorales). The
+  causal mask, the `Embedding` layer and their tests are not in `src/`
+  yet, so the note is not included in the book.
+- **Not written:** the matching-pursuit capstone and the closing note on
+  architectures we don't cover (RNNs, GANs, diffusion, reinforcement
+  learning).
 
 ## Performance
 

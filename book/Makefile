@@ -6,21 +6,21 @@
 #
 #      cd book
 #      make             # build build/book.pdf
-#      make notes       # just regenerate the Part II tex from notes/*.md
+#      make notes       # just regenerate the chapter tex from notes/*.md
 #      make clean       # remove generated/ (the per-note tex)
 #      make distclean   # remove generated/ AND build/
 #
 #  Two-stage build:
 #    1. preprocess_note.py + pandoc convert ../notes/*.md to generated/*.tex
 #       (one chapter per note, with Unicode normalised and heading prefixes
-#       stripped).  These are the Part II chapters of the book.
-#    2. latexmk runs lualatex on book.tex, which \input{}s
-#         chapters/*.tex   (hand-written: preface + Parts I and III)
-#         generated/*.tex  (auto-generated: Part II)
+#       stripped).  These are the chapters of the book.
+#    2. latexmk runs pdflatex on book.tex, which \input{}s
+#         chapters/*.tex   (hand-written: the introduction)
+#         generated/*.tex  (auto-generated: one chapter per note)
 #       and produces build/book.pdf.
 #
 #  Tool requirements:
-#    - texlive with lualatex, latexmk, biber, and the packages
+#    - texlive with pdflatex, latexmk, biber, and the packages
 #      texlive-fonts-extra, texlive-publishers, texlive-science,
 #      texlive-plain-generic, texlive-bibtex-extra
 #      (MacTeX has all of these by default; BasicTeX needs them added.)
@@ -35,7 +35,7 @@ NOTES     := $(wildcard $(NOTES_DIR)/*.md)
 # Map ../notes/19_convnets.md -> generated/19_convnets.tex
 GENERATED := $(patsubst $(NOTES_DIR)/%.md,generated/%.tex,$(NOTES))
 
-# Hand-written chapter sources (Part I + preface; later, Part III + appendices).
+# Hand-written chapter sources (the introduction).
 # Wrapped in $(wildcard ...) because make does NOT glob bare patterns in
 # prerequisite lists -- it would otherwise look for a literal file named
 # "chapters/*.tex" and fail.
@@ -67,7 +67,7 @@ LATEXMK_FLAGS := -pdf -interaction=nonstopmode -outdir=$(BUILD_DIR)
 
 all: $(BUILD_DIR)/book.pdf
 
-# Stage 1: regenerate Part II tex from markdown notes.
+# Stage 1: regenerate the chapter tex from markdown notes.
 # The preprocessor handles Unicode math chars and strips heading prefixes
 # before pandoc runs.  Pattern rule is per-note so editing one note only
 # regenerates that one chapter.
@@ -84,8 +84,7 @@ generated/%.tex: $(NOTES_DIR)/%.md pandoc-template.latex preprocess_note.py
 #
 # The leading `-` on the latexmk line tells make to ignore latexmk's
 # exit code.  latexmk will return nonzero whenever pdflatex emits any
-# error, including for undefined cross-references to chapters or
-# appendices not yet written -- but the PDF is produced anyway in those
+# error, including for undefined cross-references -- but the PDF is produced anyway in those
 # cases.  We check for the actual PDF after the run; if it's there, the
 # build succeeded; if not, fail.
 $(BUILD_DIR)/book.pdf: book.tex $(GENERATED) $(CHAPTERS)
@@ -94,8 +93,7 @@ $(BUILD_DIR)/book.pdf: book.tex $(GENERATED) $(CHAPTERS)
 	@if [ -f $(BUILD_DIR)/book.pdf ]; then \
 	    echo ""; \
 	    echo "Built $(BUILD_DIR)/book.pdf"; \
-	    echo "(Any 'Undefined refs' messages above are warnings, not errors --"; \
-	    echo " they refer to chapters/appendices not yet written.)"; \
+	    echo "(Any 'Undefined refs' messages above are warnings, not errors.)"; \
 	else \
 	    echo "BUILD FAILED: no PDF produced.  See $(BUILD_DIR)/book.log."; \
 	    exit 1; \

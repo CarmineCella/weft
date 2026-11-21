@@ -1,0 +1,50 @@
+% Introduction -- hand-written.  Everything after this is generated from
+% ../notes/*.md.
+
+This book builds a neural-network library from nothing, one piece at a
+time, and uses each piece on sound and music as soon as it exists.  The
+library is called \texttt{weft} (\emph{Weights Estimated From Training}).
+It is written in C++, it is header-only, and it depends on nothing beyond
+the C++ standard library: the matrix product, backpropagation, the
+optimisers, the Fourier transform, convolution and attention are all
+implemented here and explained here.
+
+The book and the library were written together.  Each chapter introduces
+one part of \texttt{weft}: it states the mathematics, derives the
+gradients, shows the code that implements them, and points to a test that
+checks the result numerically.  Nothing in the library is there without a
+chapter that explains it, and no chapter describes code that you cannot
+open and run.
+
+\section*{What the chapters cover}
+
+The first chapters build the core: matrices, backpropagation and the dense
+layer, activations, the cross-entropy loss, the network container,
+optimisers and dropout.  Two small classifiers, on the Iris flowers and on
+handwritten digits, show the core working end to end.
+
+Audio enters with the fast Fourier transform and spectral features, which
+lead to a classifier of orchestral instrument samples.  Autoencoders and
+variational autoencoders follow, first on digits and then on spectrograms,
+where they are used to generate sounds and to interpolate between timbres.
+
+A chapter on performance makes training practical with a threaded matrix
+product and an optional BLAS backend.  Four-dimensional tensors then open
+the way to convolutional networks and to a convolutional autoencoder for
+audio.  The last chapters build attention, positional encoding and layer
+normalisation, and assemble them into a transformer block.
+
+\section*{What you need}
+
+You need to be comfortable reading C++ and to remember some linear algebra
+and calculus: matrix products, partial derivatives and the chain rule.  No
+earlier experience with machine learning is assumed.  The first chapter
+explains why the library is in C++ and not in Python.
+
+\section*{How to read it}
+
+Read with the source open.  The headers are in \texttt{src/}, the tests in
+\texttt{tests/} and the complete programs in \texttt{examples/}.  From the
+\texttt{build/} directory, \texttt{make} compiles everything and
+\texttt{make test} runs the tests.  The chapters are meant to be read in
+order, because each one uses the code written in the chapters before it.
