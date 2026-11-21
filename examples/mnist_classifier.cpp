@@ -5,8 +5,8 @@
 // at once:
 //
 //   - MNIST.h loader for the IDX file format
-//   - Network composed of Dense + ReLU + Dropout + Softmax
-//   - Cross-entropy loss
+//   - Network composed of Dense + ReLU + Dropout, returning logits
+//   - Stable logits-based cross-entropy loss
 //   - Adam optimiser (per-parameter adaptive learning rates)
 //   - train() / eval() mode switching so Dropout is only active on the
 //     training pass, never on the test pass.
@@ -14,30 +14,30 @@
 // Architecture:
 //     Dense(784, 256) -> ReLU -> Dropout(0.3)
 //     Dense(256, 128) -> ReLU -> Dropout(0.3)
-//     Dense(128, 10)  -> Softmax
+//     Dense(128, 10)  -> logits (SoftmaxCrossEntropy lives outside net)
 //
 // Usage:
-//     mnist_classifier [data_dir]
+//     mnist_classifier [data_dir] [seed] [checkpoint]
 //
 // data_dir defaults to ../data/mnist (relative to build/, the standard
 // place Make invokes binaries from).  The directory must contain the
 // four uncompressed IDX files; use data/download_mnist.sh to fetch them.
 //
 #include "Adam.h"
-#include "CrossEntropy.h"
+#include "SoftmaxCrossEntropy.h"
 #include "Data.h"
 #include "Dense.h"
 #include "Dropout.h"
 #include "MNIST.h"
 #include "Network.h"
 #include "ReLU.h"
-#include "Softmax.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -50,7 +50,7 @@ using namespace weft;
 // in eval mode when this is called -- the function does not touch it.
 static std::pair<float, float>
 evaluate(Network<float>& net,
-         CrossEntropy<float>& ce,
+         SoftmaxCrossEntropy<float>& ce,
          const Matrix<float>& X,
          const Matrix<float>& Y,
          std::size_t batch_size)
@@ -81,6 +81,9 @@ int main(int argc, char** argv) {
     using clock = std::chrono::steady_clock;
 
     const std::string data_dir = (argc > 1) ? argv[1] : "../data/mnist";
+    const unsigned seed = (argc > 2) ? static_cast<unsigned>(std::stoul(argv[2])) : 1u;
+    const std::string checkpoint = (argc > 3) ? argv[3] : "mnist_classifier.wnet";
+    set_seed(seed);
 
     std::cout << "weft :: MNIST classifier\n";
     std::cout << "data directory: " << data_dir << "\n\n";
@@ -105,6 +108,19 @@ int main(int argc, char** argv) {
     Matrix<float> Y_train = one_hot<float>(y_train, 10);
     Matrix<float> Y_test  = one_hot<float>(y_test,  10);
 
+    // The official test split is untouched until the selected model is fixed.
+    auto development = train_test_split(X_train, Y_train, 0.1, seed);
+    X_train = std::move(development.X_train);
+    Y_train = std::move(development.Y_train);
+    Matrix<float> X_validation = std::move(development.X_test);
+    Matrix<float> Y_validation = std::move(development.Y_test);
+    if (X_train.cols() == 0 || X_validation.cols() == 0 || X_test.cols() == 0) {
+        std::cerr << "training, validation, and test sets must be nonempty\n";
+        return 1;
+    }
+    std::cout << "seed: " << seed << ", validation images: " << X_validation.cols()
+              << ", checkpoint: " << checkpoint << "\n";
+
     std::cout << "loaded "
               << X_train.cols() << " training and "
               << X_test.cols()  << " test images "
@@ -118,14 +134,14 @@ int main(int argc, char** argv) {
     Network<float> net;
     net.add<Dense>  (784, 256);
     net.add<ReLU>   ();
-    net.add<Dropout>(0.3f, /*seed=*/1);
+    net.add<Dropout>(0.3f);
     net.add<Dense>  (256, 128);
     net.add<ReLU>   ();
-    net.add<Dropout>(0.3f, /*seed=*/2);
+    net.add<Dropout>(0.3f);
     net.add<Dense>  (128, 10);
-    net.add<Softmax>();
 
-    CrossEntropy<float> ce;
+
+    SoftmaxCrossEntropy<float> ce;
     Adam<float>         opt(1e-3f);
 
     const std::size_t batch_size = 128;
@@ -144,30 +160,31 @@ int main(int argc, char** argv) {
     // ----------------------------------------------------------------
     net.eval();
     {
-        auto [init_loss, init_acc] = evaluate(net, ce, X_test, Y_test, batch_size);
+        auto [init_loss, init_acc] = evaluate(net, ce, X_validation, Y_validation, batch_size);
         std::cout << std::fixed << std::setprecision(4);
-        std::cout << "before training:   test loss = " << init_loss
-                  << ",   test acc = " << init_acc << "\n\n";
+        std::cout << "before training:   validation loss = " << init_loss
+                  << ",   validation acc = " << init_acc << "\n\n";
     }
 
     // ----------------------------------------------------------------
     // 4. Training loop.
     //    Train metrics are accumulated DURING the training pass, so
     //    they reflect dropout being active (which slightly hurts the
-    //    metric, especially early in training).  Test metrics are
+    //    metric, especially early in training).  Validation metrics are
     //    measured in eval mode after each epoch.
     // ----------------------------------------------------------------
-    std::cout << "epoch  train loss  train acc   test loss   test acc    time\n";
+    std::cout << "epoch  train loss  train acc   val loss    val acc     time\n";
     std::cout << "-----  ----------  ---------   ---------   --------   -----\n";
 
     auto t_total_start = clock::now();
+    float best_validation_loss = std::numeric_limits<float>::infinity();
 
     for (int epoch = 1; epoch <= epochs; ++epoch) {
         auto t_epoch_start = clock::now();
 
         // ---- training pass ----
         net.train();
-        auto idx = shuffled_indices(X_train.cols(), /*seed=*/epoch);
+        auto idx = shuffled_indices(X_train.cols(), random_seed());
 
         double      epoch_loss    = 0;
         std::size_t epoch_correct = 0;
@@ -194,9 +211,14 @@ int main(int argc, char** argv) {
         const float train_loss = static_cast<float>(epoch_loss / n_seen);
         const float train_acc  = static_cast<float>(epoch_correct) / n_seen;
 
-        // ---- test pass ----
+        // ---- validation pass ----
         net.eval();
-        auto [test_loss, test_acc] = evaluate(net, ce, X_test, Y_test, batch_size);
+        auto [validation_loss, validation_acc] =
+            evaluate(net, ce, X_validation, Y_validation, batch_size);
+        if (validation_loss < best_validation_loss) {
+            best_validation_loss = validation_loss;
+            net.save(checkpoint);
+        }
 
         auto t_epoch_end = clock::now();
         double secs = std::chrono::duration<double>(t_epoch_end - t_epoch_start).count();
@@ -204,8 +226,8 @@ int main(int argc, char** argv) {
         std::cout << std::setw(5)  << epoch        << "  "
                   << std::setw(10) << train_loss   << "  "
                   << std::setw(9)  << train_acc    << "   "
-                  << std::setw(9)  << test_loss    << "   "
-                  << std::setw(8)  << test_acc     << "   "
+                  << std::setw(9)  << validation_loss << "   "
+                  << std::setw(8)  << validation_acc  << "   "
                   << std::setprecision(1) << std::setw(4) << secs << "s"
                   << std::setprecision(4)
                   << "\n" << std::flush;
@@ -217,6 +239,7 @@ int main(int argc, char** argv) {
     // ----------------------------------------------------------------
     // 5. Final report.
     // ----------------------------------------------------------------
+    net.load(checkpoint);
     net.eval();
     auto [final_loss, final_acc] = evaluate(net, ce, X_test, Y_test, batch_size);
 

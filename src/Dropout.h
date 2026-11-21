@@ -32,11 +32,15 @@
 //
 #include "Layer.h"
 #include "Matrix.h"
+#include "Random.h"
 
+#include <cmath>
 #include <iomanip>
+#include <limits>
 #include <random>
 #include <sstream>
 #include <string>
+#include <stdexcept>
 
 namespace weft {
 
@@ -45,8 +49,11 @@ class Dropout : public Layer<T> {
 public:
     // rate is the probability of dropping each activation; 0 disables
     // dropout entirely (forward is then identity in both modes).
-    explicit Dropout(T rate, unsigned seed = std::random_device{}())
-        : rate_(rate), gen_(seed) {}
+    explicit Dropout(T rate, unsigned seed = random_seed())
+        : rate_(rate), gen_(seed) {
+        if (!std::isfinite(rate) || rate < T(0) || rate >= T(1))
+            throw std::invalid_argument("Dropout: rate must be in [0, 1)");
+    }
 
     Matrix<T> forward(const Matrix<T>& X) override {
         if (!this->training() || rate_ == T(0))
@@ -74,6 +81,13 @@ public:
     std::string describe() const override {
         std::ostringstream os;
         os << "Dropout(" << std::fixed << std::setprecision(2) << rate_ << ")";
+        return os.str();
+    }
+
+    std::string configuration() const override {
+        std::ostringstream os;
+        os << "Dropout(" << std::setprecision(std::numeric_limits<T>::max_digits10)
+           << rate_ << ")";
         return os.str();
     }
 

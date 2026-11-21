@@ -45,7 +45,7 @@
 
 #include "Adam.h"
 #include "AtomFile.h"
-#include "CrossEntropy.h"
+#include "SoftmaxCrossEntropy.h"
 #include "MatchingPursuit.h"
 #include "Matrix.h"
 #include "TokenTransformer.h"
@@ -342,7 +342,7 @@ int cmd_train(int argc, char** argv) {
     const int epochs = std::atoi(argv[3]);
     const std::size_t n_atoms = std::size_t(std::atoi(argv[4]));
 
-    // Each file gives one token sequence; its last tenth (in time) is held out.
+    // Each file gives one token sequence; its last tenth of time-ordered atoms (by count) is held out.
     std::vector<std::vector<int>> train, held;
     std::vector<std::size_t> sizes;
     std::uint32_t sample_rate = 44100;
@@ -395,7 +395,7 @@ int cmd_train(int argc, char** argv) {
     }
 
     Model model;
-    CrossEntropy<float> ce;
+    SoftmaxCrossEntropy<float> ce;
     Adam<float> opt(3e-4f);
     std::mt19937 rng(7);
     std::size_t total = 0;
@@ -414,7 +414,7 @@ int cmd_train(int argc, char** argv) {
             for (std::size_t off = 0; off + BLOCK + 1 <= seq.size(); off += BLOCK) {
                 std::vector<int> in (seq.begin() + long(off), seq.begin() + long(off + BLOCK));
                 std::vector<int> tgt(seq.begin() + long(off + 1), seq.begin() + long(off + BLOCK + 1));
-                sum += ce.forward(model.forward(in), one_hot_seq(tgt));
+                sum += ce.forward(model.forward_logits(in), one_hot_seq(tgt));
                 ++count;
             }
         return count ? sum / double(count) : 0.0;
@@ -435,8 +435,8 @@ int cmd_train(int argc, char** argv) {
                 off = PER_ATOM * std::uniform_int_distribution<std::size_t>(0, max_k)(rng);
             std::vector<int> in (seq.begin() + long(off), seq.begin() + long(off + BLOCK));
             std::vector<int> tgt(seq.begin() + long(off + 1), seq.begin() + long(off + BLOCK + 1));
-            sum += ce.forward(model.forward(in), one_hot_seq(tgt));
-            model.backward(ce.backward());
+            sum += ce.forward(model.forward_logits(in), one_hot_seq(tgt));
+            model.backward_logits(ce.backward());
             model.update(opt);
         }
         const double h = held_loss();
@@ -696,6 +696,7 @@ int cmd_stats(int argc, char** argv) {
 } // namespace
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     const std::string cmd = (argc > 1) ? argv[1] : "";
     try {
         if (cmd == "roundtrip") return cmd_roundtrip(argc, argv);

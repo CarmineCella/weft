@@ -16,6 +16,7 @@
 //
 #include "Layer.h"
 #include "Matrix.h"
+#include "Random.h"
 
 #include <cmath>
 #include <cstddef>
@@ -30,15 +31,18 @@ namespace weft {
 template <typename T = float>
 class Dense : public Layer<T> {
 public:
-    Dense(std::size_t in_features, std::size_t out_features)
+    Dense(std::size_t in_features, std::size_t out_features,
+          unsigned seed = random_seed())
         : W_(out_features, in_features),
           b_(out_features, 1, T(0))
     {
+        if (in_features == 0 || out_features == 0)
+            throw std::invalid_argument("Dense: feature counts must be positive");
         // He initialisation: stddev = sqrt(2 / fan_in).
         // Keeps activation variances roughly constant across layers when
         // paired with ReLU (He et al., 2015).
         const T stddev = std::sqrt(T(2) / static_cast<T>(in_features));
-        W_.randomizeNormal(T(0), stddev);
+        W_.randomizeNormal(T(0), stddev, seed);
     }
 
     // ------------------------------------------------------------------
@@ -57,6 +61,9 @@ public:
     //   dX = W^T * dZ             (passed down to the layer below)
     // ------------------------------------------------------------------
     Matrix<T> backward(const Matrix<T>& dZ) override {
+        if (X_cache_.rows() != W_.cols() ||
+            dZ.rows() != W_.rows() || dZ.cols() != X_cache_.cols())
+            throw std::invalid_argument("Dense::backward: no matching forward input");
         dW_ = dZ * X_cache_.transpose();
         db_ = dZ.sumColumns();
         return W_.transpose() * dZ;
@@ -112,6 +119,7 @@ private:
         std::uint32_t r = 0, c = 0;
         in.read(reinterpret_cast<char*>(&r), sizeof(r));
         in.read(reinterpret_cast<char*>(&c), sizeof(c));
+        if (!in) throw std::runtime_error("Dense::load_params: truncated shape");
         if (r != M.rows() || c != M.cols())
             throw std::runtime_error(
                 "Dense::load_params: shape mismatch (build the same architecture "
@@ -120,6 +128,7 @@ private:
             for (std::size_t j = 0; j < M.cols(); ++j) {
                 T v = T(0);
                 in.read(reinterpret_cast<char*>(&v), sizeof(T));
+                if (!in) throw std::runtime_error("Dense::load_params: truncated parameters");
                 M(i, j) = v;
             }
     }

@@ -73,6 +73,7 @@ static std::size_t find_digit(const std::vector<int>& labels, int digit) {
 }
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     using clock = std::chrono::steady_clock;
     const std::string data_dir = (argc > 1) ? argv[1] : "../data/mnist";
 

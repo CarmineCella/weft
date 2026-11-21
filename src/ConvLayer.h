@@ -44,6 +44,7 @@ public:
 
     // For ConvNetwork::summary() / debugging.
     virtual std::string describe() const = 0;
+    virtual std::string configuration() const { return describe(); }
 
     // For ConvNetwork::save() / load().  Default no-op suits parameter-
     // free layers (ReLU4D, MaxPool2D); Conv2D overrides them.

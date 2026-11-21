@@ -13,7 +13,7 @@
 // end of training to show which class pairs get confused most.
 //
 #include "Adam.h"
-#include "CrossEntropy.h"
+#include "SoftmaxCrossEntropy.h"
 #include "Data.h"
 #include "Dense.h"
 #include "Dropout.h"
@@ -94,7 +94,7 @@ static void aggregate_per_file(const Matrix<float>& frame_preds,
 // Evaluate (loss, accuracy) on the test set.  For per_frame mode, aggregate
 // predictions by file so accuracy is reported per-file, not per-frame.
 static std::pair<float, float>
-evaluate(Network<float>& net, CrossEntropy<float>& ce,
+evaluate(Network<float>& net, SoftmaxCrossEntropy<float>& ce,
          const Matrix<float>& X, const Matrix<float>& Y,
          const std::vector<int>& file_ids,
          bool per_frame,
@@ -115,9 +115,10 @@ evaluate(Network<float>& net, CrossEntropy<float>& ce,
         Matrix<float> Yb = Y.selectColumns(idx);
         Matrix<float> S  = net.forward(Xb);
         sum_loss += static_cast<double>(ce.forward(S, Yb)) * bs;
+        const auto& probabilities = ce.probabilities();
         for (std::size_t i = 0; i < bs; ++i)
             for (std::size_t k = 0; k < S.rows(); ++k)
-                all_preds(k, start + i) = S(k, i);
+                all_preds(k, start + i) = probabilities(k, i);
     }
     const float loss = static_cast<float>(sum_loss / N);
 
@@ -154,6 +155,7 @@ build_confusion(Network<float>& net,
 
     // Get all frame predictions.
     Matrix<float> preds(K, X.cols());
+    Softmax<float> softmax;
     const std::size_t batch_size = 128;
     for (std::size_t start = 0; start < X.cols(); start += batch_size) {
         const std::size_t end = std::min(start + batch_size, X.cols());
@@ -161,7 +163,7 @@ build_confusion(Network<float>& net,
         std::vector<std::size_t> idx(bs);
         for (std::size_t i = 0; i < bs; ++i) idx[i] = start + i;
         Matrix<float> Xb = X.selectColumns(idx);
-        Matrix<float> S  = net.forward(Xb);
+        Matrix<float> S  = softmax.forward(net.forward(Xb));
         for (std::size_t i = 0; i < bs; ++i)
             for (std::size_t k = 0; k < K; ++k)
                 preds(k, start + i) = S(k, i);
@@ -218,6 +220,7 @@ static void print_confusion(const std::vector<std::vector<int>>& conf,
 }
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     using clock = std::chrono::steady_clock;
 
     if (argc < 2) {
@@ -266,6 +269,14 @@ int main(int argc, char** argv) {
     //      column split when each file has exactly one row) ----
     Matrix<float>    Y = one_hot<float>(cache.labels, K);
     auto split = group_train_test_split(cache.X, Y, cache.file_ids, 0.2, /*seed=*/1);
+    auto development = group_train_test_split(
+        split.X_train, split.Y_train, split.file_ids_train, 0.125, /*seed=*/2);
+    split.X_train = std::move(development.X_train);
+    split.Y_train = std::move(development.Y_train);
+    if (split.X_train.cols() == 0 || development.X_test.cols() == 0 || split.X_test.cols() == 0) {
+        std::cerr << "need enough source files for nonempty train/validation/test splits\n";
+        return 1;
+    }
 
     std::cout << "split: " << split.X_train.cols() << " train, "
               << split.X_test.cols()  << " test "
@@ -275,6 +286,7 @@ int main(int argc, char** argv) {
     Standardizer<float> scaler;
     Matrix<float> X_tr = scaler.fit_transform(split.X_train);
     Matrix<float> X_te = scaler.transform   (split.X_test);
+    Matrix<float> X_validation = scaler.transform(development.X_test);
     std::cout << "features standardised (fit on train only)\n\n";
 
     // ---- Architecture: size-appropriate to the feature type ----
@@ -287,20 +299,20 @@ int main(int argc, char** argv) {
         net.add<ReLU>   ();
         net.add<Dropout>(0.3f, /*seed=*/2);
         net.add<Dense>  (128, K);
-        net.add<Softmax>();
+
     } else if (cache.feature_type == "mfcc") {
         net.add<Dense>  (FEAT_DIM, 64);
         net.add<ReLU>   ();
         net.add<Dropout>(0.2f, /*seed=*/1);
         net.add<Dense>  (64, K);
-        net.add<Softmax>();
+
     } else {
         std::cerr << "unknown feature type in cache: " << cache.feature_type << "\n";
         return 1;
     }
     std::cout << "architecture:\n" << net.summary() << "\n";
 
-    CrossEntropy<float> ce;
+    SoftmaxCrossEntropy<float> ce;
     Adam<float>         opt(1e-3f);
 
     const std::size_t batch_size = 32;
@@ -312,8 +324,8 @@ int main(int argc, char** argv) {
               << "epochs:     " << epochs << "\n\n";
 
     // ---- Training loop ----
-    const std::string acc_label = cache.per_frame ? "test acc (per file)" : "test acc";
-    std::cout << "epoch  train loss  train acc   test loss   " << acc_label << "   time\n";
+    const std::string acc_label = cache.per_frame ? "val acc (per file)" : "val acc";
+    std::cout << "epoch  train loss  train acc   val loss    " << acc_label << "   time\n";
     std::cout << "-----  ----------  ---------   ---------   "
               << std::string(acc_label.size(), '-') << "   -----\n";
 
@@ -351,8 +363,8 @@ int main(int argc, char** argv) {
         const float train_acc  = static_cast<float>(epoch_correct) / n_seen;
 
         net.eval();
-        auto [test_loss, test_acc] = evaluate(net, ce, X_te, split.Y_test,
-                                               split.file_ids_test,
+        auto [test_loss, test_acc] = evaluate(net, ce, X_validation, development.Y_test,
+                                               development.file_ids_test,
                                                cache.per_frame, batch_size);
 
         double secs = std::chrono::duration<double>(clock::now() - t_epoch).count();

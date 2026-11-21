@@ -41,6 +41,7 @@
 
 #include "Conv2D.h"
 #include "ConvNetwork.h"
+#include "AudioModelConfig.h"
 #include "Dense.h"
 #include "Flatten.h"
 #include "Matrix.h"
@@ -67,12 +68,12 @@
 using namespace weft;
 
 // ---- spectrogram + patch constants (must match train_conv_audio_vae) -----
-constexpr std::size_t FRAME_SIZE   = 4096;
-constexpr std::size_t HOP_SIZE     = 2048;
+constexpr std::size_t FRAME_SIZE   = AudioModelConfig::frame_size;
+constexpr std::size_t HOP_SIZE     = AudioModelConfig::hop_size;
 constexpr std::size_t FREQ_BINS_IN = 2049;
-constexpr std::size_t FREQ_BINS    = 64;
-constexpr std::size_t TIME_FRAMES  = 16;
-constexpr std::size_t LATENT       = 32;
+constexpr std::size_t FREQ_BINS    = AudioModelConfig::mel_bins;
+constexpr std::size_t TIME_FRAMES  = AudioModelConfig::time_frames;
+constexpr std::size_t LATENT       = AudioModelConfig::latent;
 constexpr std::size_t FLAT         = 64 * 8 * 2;   // bottleneck shape (64, 8, 2)
 
 // --------------------------------------------------------------------------
@@ -113,10 +114,10 @@ static void load_models(const std::string& prefix,
     dec_conv.add<Upsample2D>(2);
     dec_conv.add<Conv2D>    (16,  1, 3, 1, 1);
 
-    enc_conv .load(prefix + ".enc_conv");
-    enc_dense.load(prefix + ".enc_dense");
-    dec_dense.load(prefix + ".dec_dense");
-    dec_conv .load(prefix + ".dec_conv");
+    enc_conv .load(prefix + ".enc_conv", AudioModelConfig::metadata(true));
+    enc_dense.load(prefix + ".enc_dense", AudioModelConfig::metadata(true));
+    dec_dense.load(prefix + ".dec_dense", AudioModelConfig::metadata(true));
+    dec_conv .load(prefix + ".dec_conv", AudioModelConfig::metadata(true));
     enc_conv.eval(); enc_dense.eval();
     dec_dense.eval(); dec_conv.eval();
 }
@@ -271,6 +272,8 @@ static int do_interp(ConvNetwork<float>& enc_conv,
                      const std::string& out_path,
                      std::size_t N_patches) {
     WavData A = load_wav(a_path), B = load_wav(b_path);
+    AudioModelConfig::require_sample_rate(A.sample_rate);
+    AudioModelConfig::require_sample_rate(B.sample_rate);
     std::cout << "A: " << a_path << "\nB: " << b_path << "\n";
 
     std::vector<std::vector<float>> lmA, lmB, phA, phB;
@@ -327,6 +330,7 @@ static int do_sample(Network<float>&     dec_dense,
                      std::size_t N_patches,
                      unsigned    seed) {
     WavData donor = load_wav(donor_path);
+    AudioModelConfig::require_sample_rate(donor.sample_rate);
     std::vector<std::vector<float>> lmD, phD;
     stft_decomp(donor.samples, lmD, phD);
     if (phD.empty()) { std::cerr << "donor too short\n"; return 1; }
@@ -368,6 +372,7 @@ static int do_sample(Network<float>&     dec_dense,
 
 // --------------------------------------------------------------------------
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     if (argc < 3) {
         std::cerr << "usage:\n"
                   << "  convae_generate <prefix> interp <A.wav> <B.wav> "
@@ -394,7 +399,7 @@ int main(int argc, char** argv) {
     // Build the mel filterbank used at training time.  Must match
     // train_conv_audio_vae exactly (same n_mels, n_bins, sample_rate,
     // and scale).
-    const MelTransform<float> mel(FREQ_BINS, FREQ_BINS_IN, 44100.0f);
+    const MelTransform<float> mel(FREQ_BINS, FREQ_BINS_IN, static_cast<float>(AudioModelConfig::sample_rate), AudioModelConfig::mel_scale);
 
     try {
         if (mode == "interp") {

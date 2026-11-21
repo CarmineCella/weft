@@ -38,12 +38,17 @@ the wrong shape throws (the layer count and each matrix's dimensions are
 checked). For this reason the application tools rebuild the identical
 encoder/decoder before calling `load`.
 
-These files contain parameters, not a complete model description or a
-resumable training state. The current `Network::load` reads the version
-field without rejecting unsupported versions, and same-shaped
-architectures with different activations are not distinguished. Keep the
-matching model definition and preprocessing settings with the weights.
-Adam's running moments and random-generator state are not saved here.
+New weight files include version, scalar width, and layer configuration
+checks. Same-shaped activation substitutions are rejected. The audio
+applications also supply a shared `AudioModelConfig` description, which
+records the sample rate, FFT/hop, window, latent size, and, for the
+convolutional model, mel settings. Loading requires the same metadata.
+
+Legacy version-one network files can still be read through the low-level
+API without a metadata requirement. Their format cannot verify these
+settings. Known-compatible old audio weights can be re-saved with
+verified metadata; the application does not guess it. These are still
+weight files: Adam's moments and random-generator state are not saved.
 
 The scheme needs no `dynamic_cast` and no central registry of layer
 types. The convolutional layers of chapter 22 use the same two-method
@@ -69,9 +74,10 @@ the same `logmag` feature the classifier used, so the existing
 `extract_features ... logmag per_frame` produces the training set, and
 the remap computes the same feature formula from its own STFT. This
 requires matching the sample rate, Hann window, FFT size, hop, and
-channel handling. The current cache does not record all those settings,
-so the applications must be configured consistently. Matching a formula
-alone does not establish matching preprocessing.
+channel handling. Version-three caches record the framing settings and
+the audio applications validate them against `AudioModelConfig`. They
+require 44.1 kHz input. Matching a formula alone does not establish
+matching preprocessing.
 
 The VAE is the MNIST one with bigger layers and a 32-D latent. We
 don't need a 2-D latent here, because there is no manifold picture to

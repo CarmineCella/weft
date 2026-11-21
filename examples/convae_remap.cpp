@@ -26,6 +26,7 @@
 
 #include "Conv2D.h"
 #include "ConvNetwork.h"
+#include "AudioModelConfig.h"
 #include "Dense.h"
 #include "Flatten.h"
 #include "Matrix.h"
@@ -51,12 +52,12 @@
 using namespace weft;
 
 // ---- must match train_conv_audio_vae -----------------------------------
-constexpr std::size_t FRAME_SIZE   = 4096;
-constexpr std::size_t HOP_SIZE     = 2048;
+constexpr std::size_t FRAME_SIZE   = AudioModelConfig::frame_size;
+constexpr std::size_t HOP_SIZE     = AudioModelConfig::hop_size;
 constexpr std::size_t FREQ_BINS_IN = 2049;
-constexpr std::size_t FREQ_BINS    = 64;
-constexpr std::size_t TIME_FRAMES  = 16;
-constexpr std::size_t LATENT       = 32;
+constexpr std::size_t FREQ_BINS    = AudioModelConfig::mel_bins;
+constexpr std::size_t TIME_FRAMES  = AudioModelConfig::time_frames;
+constexpr std::size_t LATENT       = AudioModelConfig::latent;
 constexpr std::size_t FLAT         = 64 * 8 * 2;
 
 // Stride between consecutive patch starts.  TIME_FRAMES/2 = 50% overlap,
@@ -102,16 +103,17 @@ static void load_models(const std::string& prefix,
     dec_conv.add<Upsample2D>(2);
     dec_conv.add<Conv2D>    (16,  1, 3, 1, 1);
 
-    enc_conv .load(prefix + ".enc_conv");
-    enc_dense.load(prefix + ".enc_dense");
-    dec_dense.load(prefix + ".dec_dense");
-    dec_conv .load(prefix + ".dec_conv");
+    enc_conv .load(prefix + ".enc_conv", AudioModelConfig::metadata(true));
+    enc_dense.load(prefix + ".enc_dense", AudioModelConfig::metadata(true));
+    dec_dense.load(prefix + ".dec_dense", AudioModelConfig::metadata(true));
+    dec_conv .load(prefix + ".dec_conv", AudioModelConfig::metadata(true));
     enc_conv.eval(); enc_dense.eval();
     dec_dense.eval(); dec_conv.eval();
 }
 
 // --------------------------------------------------------------------------
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     if (argc < 4) {
         std::cerr << "usage: convae_remap <model_prefix> "
                      "<input.wav> <output.wav>\n";
@@ -136,20 +138,19 @@ int main(int argc, char** argv) {
 
     // Build the mel filterbank used at training time.  Must match
     // train_conv_audio_vae exactly.
-    const MelTransform<float> mel(FREQ_BINS, FREQ_BINS_IN, 44100.0f);
+    const MelTransform<float> mel(FREQ_BINS, FREQ_BINS_IN, static_cast<float>(AudioModelConfig::sample_rate), AudioModelConfig::mel_scale);
 
     // ---- load + STFT ------------------------------------------------
     WavData wav;
-    try { wav = load_wav(in_path); }
+    try {
+        wav = load_wav(in_path);
+        AudioModelConfig::require_sample_rate(wav.sample_rate);
+    }
     catch (const std::exception& e) {
         std::cerr << "error loading audio: " << e.what() << "\n"; return 1;
     }
     std::cout << "input: " << in_path << "  (" << wav.samples.size()
               << " samples @ " << wav.sample_rate << " Hz)\n";
-    if (wav.sample_rate != 44100)
-        std::cout << "note: model trained at 44100 Hz; other rates shift the "
-                     "frequency-to-bin mapping and may sound off-pitch\n";
-
     auto frames = stft(wav.samples, FRAME_SIZE, HOP_SIZE);
     const std::size_t n = frames.size();
     if (n < TIME_FRAMES) {

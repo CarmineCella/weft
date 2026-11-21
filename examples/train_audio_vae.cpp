@@ -27,6 +27,7 @@
 //
 #include "Adam.h"
 #include "Data.h"
+#include "AudioModelConfig.h"
 #include "Dense.h"
 #include "FeatureCache.h"
 #include "MSE.h"
@@ -44,10 +45,11 @@
 
 using namespace weft;
 
-constexpr std::size_t LATENT = 32;
+constexpr std::size_t LATENT = AudioModelConfig::latent;
 constexpr float       BETA   = 1.0f;
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     using clock = std::chrono::steady_clock;
 
     if (argc < 3) {
@@ -71,6 +73,7 @@ int main(int argc, char** argv) {
     CachedFeatures cache;
     try {
         cache = load_features(feature_path);
+        AudioModelConfig::require_cache(cache);
     } catch (const std::exception& e) {
         std::cerr << "error: " << e.what() << "\n";
         return 1;
@@ -139,8 +142,8 @@ int main(int argc, char** argv) {
     // Helper: write the current encoder/decoder to <prefix>.enc/.dec.
     auto save_models = [&](const std::string& tag) {
         try {
-            enc.save(prefix + ".enc");
-            dec.save(prefix + ".dec");
+            enc.save(prefix + ".enc", AudioModelConfig::metadata(false));
+            dec.save(prefix + ".dec", AudioModelConfig::metadata(false));
             std::cout << "  [" << tag << " saved -> " << prefix
                       << ".enc/.dec]\n" << std::flush;
         } catch (const std::exception& e) {

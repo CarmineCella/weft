@@ -38,7 +38,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <istream>
+#include <iomanip>
+#include <limits>
 #include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -56,9 +59,14 @@ public:
           beta_ (d_model, 1, T(0)),
           dgamma_(d_model, 1, T(0)),
           dbeta_ (d_model, 1, T(0))
-    {}
+    {
+        if (d_model == 0 || !std::isfinite(eps) || eps <= T(0))
+            throw std::invalid_argument("LayerNorm: positive feature count and epsilon required");
+    }
 
     Matrix<T> forward(const Matrix<T>& X) override {
+        if (X.rows() != d_model_ || X.cols() == 0)
+            throw std::invalid_argument("LayerNorm::forward: input shape mismatch");
         if (X.rows() != d_model_)
             throw std::invalid_argument(
                 "LayerNorm::forward: input rows must equal d_model");
@@ -95,6 +103,8 @@ public:
     }
 
     Matrix<T> backward(const Matrix<T>& dY) override {
+        if (x_hat_.rows() == 0 || dY.rows() != x_hat_.rows() || dY.cols() != x_hat_.cols())
+            throw std::invalid_argument("LayerNorm::backward: no matching forward input");
         const std::size_t D = dY.rows();
         const std::size_t N = dY.cols();
 
@@ -136,6 +146,13 @@ public:
         return "LayerNorm(d_model=" + std::to_string(d_model_) + ")";
     }
 
+    std::string configuration() const override {
+        std::ostringstream text;
+        text << describe() << ";epsilon="
+             << std::setprecision(std::numeric_limits<T>::max_digits10) << eps_;
+        return text.str();
+    }
+
     void save_params(std::ostream& out) const override {
         write_vec(out, gamma_);
         write_vec(out, beta_);
@@ -166,6 +183,7 @@ private:
     static void read_vec(std::istream& in, Matrix<T>& V) {
         std::uint32_t r = 0;
         in.read(reinterpret_cast<char*>(&r), sizeof(r));
+        if (!in) throw std::runtime_error("LayerNorm::load_params: truncated shape");
         if (r != V.rows())
             throw std::runtime_error(
                 "LayerNorm::load_params: shape mismatch (build the same "
@@ -173,6 +191,7 @@ private:
         for (std::size_t i = 0; i < V.rows(); ++i) {
             T v = T(0);
             in.read(reinterpret_cast<char*>(&v), sizeof(T));
+            if (!in) throw std::runtime_error("LayerNorm::load_params: truncated parameters");
             V(i, 0) = v;
         }
     }

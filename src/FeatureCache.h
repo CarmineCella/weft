@@ -19,7 +19,7 @@
 // File layout:
 //
 //     "WFED"                              -- 4-byte magic (weft feature dataset)
-//     uint32  version = 2
+//     uint32  version = 3 (version 2 remains readable, without timing metadata)
 //     uint32  feature_dim
 //     uint32  n_samples
 //     uint32  n_classes
@@ -30,6 +30,9 @@
 //     float[feature_dim * n_samples]      -- column-major, native byte order
 //     int32[n_samples]                    -- labels, native byte order
 //     int32[n_samples]                    -- file_ids, native byte order
+//     uint32 sample_rate, frame_size, hop_size
+//     string window; uint32 has_offsets
+//     uint64[n_samples] if has_offsets     -- original frame starts, native order
 //
 // Header integers are little-endian (byte-by-byte) so the metadata can
 // be inspected on any host.  The bulk float/int32 payload is in the
@@ -46,6 +49,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace weft {
 
@@ -61,6 +65,9 @@ struct CachedFeatures {
     // the classifier split by file (not by frame) and aggregate
     // predictions across frames of the same file at eval time.
     std::vector<int>         file_ids;
+    std::uint32_t sample_rate = 0, frame_size = 0, hop_size = 0;
+    std::string window = "hann";
+    std::vector<std::uint64_t> frame_offsets; // original sample offsets, before silence removal
 };
 
 namespace detail {
@@ -78,7 +85,7 @@ inline std::string read_string(std::ifstream& in) {
     return s;
 }
 
-constexpr std::uint32_t VERSION = 2;
+constexpr std::uint32_t VERSION = 3;
 
 } // namespace detail
 
@@ -90,6 +97,9 @@ inline void save_features(const std::string& path, const CachedFeatures& data) {
         throw std::runtime_error("FeatureCache: matrix columns != labels");
     if (data.X.cols() != data.file_ids.size())
         throw std::runtime_error("FeatureCache: matrix columns != file_ids");
+    if (!data.frame_offsets.empty() &&
+        (!data.per_frame || data.frame_offsets.size() != data.X.cols()))
+        throw std::runtime_error("FeatureCache: invalid frame_offsets");
 
     out.write("WFED", 4);                                  // magic
     detail::write_le_u32(out, detail::VERSION);
@@ -127,6 +137,14 @@ inline void save_features(const std::string& path, const CachedFeatures& data) {
     out.write(reinterpret_cast<const char*>(file_id_buf.data()),
               static_cast<std::streamsize>(file_id_buf.size() * sizeof(std::int32_t)));
 
+    detail::write_le_u32(out, data.sample_rate);
+    detail::write_le_u32(out, data.frame_size);
+    detail::write_le_u32(out, data.hop_size);
+    detail::write_string(out, data.window);
+    detail::write_le_u32(out, data.frame_offsets.empty() ? 0u : 1u);
+    if (!data.frame_offsets.empty())
+        out.write(reinterpret_cast<const char*>(data.frame_offsets.data()),
+                  static_cast<std::streamsize>(data.frame_offsets.size() * sizeof(std::uint64_t)));
     if (!out) throw std::runtime_error("FeatureCache: write failed: " + path);
 }
 
@@ -140,7 +158,7 @@ inline CachedFeatures load_features(const std::string& path) {
         throw std::runtime_error("FeatureCache: bad magic in: " + path);
 
     std::uint32_t version = detail::read_le_u32(in);
-    if (version != detail::VERSION)
+    if (version != 2 && version != detail::VERSION)
         throw std::runtime_error("FeatureCache: unsupported version " +
                                  std::to_string(version) + " in " + path +
                                  " (expected " + std::to_string(detail::VERSION) +
@@ -182,7 +200,45 @@ inline CachedFeatures load_features(const std::string& path) {
     if (!in) throw std::runtime_error("FeatureCache: short read in file_ids");
     out.file_ids.assign(file_id_buf.begin(), file_id_buf.end());
 
+    if (version >= 3) {
+        out.sample_rate = detail::read_le_u32(in);
+        out.frame_size = detail::read_le_u32(in);
+        out.hop_size = detail::read_le_u32(in);
+        out.window = detail::read_string(in);
+        const auto has_offsets = detail::read_le_u32(in);
+        if (has_offsets > 1 || (has_offsets && !out.per_frame))
+            throw std::runtime_error("FeatureCache: invalid offsets flag");
+        if (has_offsets) {
+            out.frame_offsets.resize(n_samples);
+            in.read(reinterpret_cast<char*>(out.frame_offsets.data()),
+                    static_cast<std::streamsize>(n_samples) * sizeof(std::uint64_t));
+            if (!in) throw std::runtime_error("FeatureCache: short read in frame offsets");
+        }
+    }
     return out;
+}
+
+// Split at both source-file boundaries and gaps left by silence removal.
+// A temporal model must never infer adjacency from retained column order.
+inline std::vector<std::pair<std::size_t, std::size_t>>
+contiguous_frame_runs(const CachedFeatures& cache) {
+    const std::size_t n = cache.X.cols();
+    if (!cache.per_frame || cache.file_ids.size() != n ||
+        cache.frame_offsets.size() != n || cache.hop_size == 0)
+        throw std::runtime_error("FeatureCache: timing metadata required; re-run extract_features");
+    std::vector<std::pair<std::size_t, std::size_t>> runs;
+    if (n == 0) return runs;
+    std::size_t start = 0;
+    for (std::size_t j = 1; j < n; ++j) {
+        const bool adjacent = cache.frame_offsets[j] > cache.frame_offsets[j - 1] &&
+            cache.frame_offsets[j] - cache.frame_offsets[j - 1] == cache.hop_size;
+        if (cache.file_ids[j] != cache.file_ids[j - 1] || !adjacent) {
+            runs.emplace_back(start, j);
+            start = j;
+        }
+    }
+    runs.emplace_back(start, n);
+    return runs;
 }
 
 } // namespace weft

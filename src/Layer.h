@@ -58,6 +58,9 @@ public:
     // can never silently drift out of sync with the real network).
     virtual std::string describe() const = 0;
 
+    // Exact non-parameter settings used to validate new checkpoints.
+    virtual std::string configuration() const { return describe(); }
+
     // Serialise / deserialise this layer's trainable parameters to a binary
     // stream.  Default is a no-op (activations have no parameters); Dense
     // overrides to read/write its weights and bias.  The network's

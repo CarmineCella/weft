@@ -37,7 +37,7 @@ namespace weft {
 template <typename T = float>
 class Embedding {
 public:
-    Embedding(std::size_t vocab_size, std::size_t d_model, unsigned seed = 1)
+    Embedding(std::size_t vocab_size, std::size_t d_model, unsigned seed = random_seed())
         : vocab_size_(vocab_size), d_model_(d_model),
           W_(d_model, vocab_size), dW_(d_model, vocab_size, T(0))
     {
@@ -106,6 +106,7 @@ public:
         std::uint32_t r = 0, c = 0;
         in.read(reinterpret_cast<char*>(&r), sizeof(r));
         in.read(reinterpret_cast<char*>(&c), sizeof(c));
+        if (!in) throw std::runtime_error("Embedding::load_params: truncated shape");
         if (r != W_.rows() || c != W_.cols())
             throw std::runtime_error(
                 "Embedding::load_params: shape mismatch (build the same "
@@ -114,6 +115,7 @@ public:
             for (std::size_t j = 0; j < W_.cols(); ++j) {
                 T v = T(0);
                 in.read(reinterpret_cast<char*>(&v), sizeof(T));
+                if (!in) throw std::runtime_error("Embedding::load_params: truncated parameters");
                 W_(i, j) = v;
             }
     }

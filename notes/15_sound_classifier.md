@@ -142,14 +142,14 @@ human listener would have the same difficulty with isolated notes.
 
 ---
 
-## 6. The cache format (v2)
+## 6. The cache format
 
 `FeatureCache.h` provides `save_features` and `load_features`. The
 file format:
 
 ```
 "WFED"  magic                          (weft feature dataset)
-uint32  version = 2
+uint32  version = 3
 uint32  feature_dim
 uint32  n_samples (or n_frames in per_frame mode)
 uint32  n_classes
@@ -159,6 +159,10 @@ length-prefixed strings  class_names[] (n_classes of them)
 float[feature_dim * n_samples]         column-major
 int32[n_samples]                       labels
 int32[n_samples]                       file_ids
+uint32                                sample_rate, frame_size, hop_size
+length-prefixed string                window
+uint32                                has_offsets (0 or 1)
+uint64[n_samples] if has_offsets       original sample offsets
 ```
 
 Header integers are little-endian, assembled byte by byte, so they
@@ -167,13 +171,24 @@ byte order. A cache extracted on one machine and loaded on a machine
 with the other byte order has scrambled floats, so this must be
 avoided.
 
-The version changed from 1 to 2 to add `per_frame` and `file_ids`.
-A v1 cache cannot be loaded and must be regenerated with
-`extract_features`.
+Version 2 added `per_frame` and `file_ids`. Version 3 retains that
+payload and appends sample rate, frame size, hop, window, and optional
+original frame offsets. The extractor now writes version 3. Version 2
+remains readable for classification, but must be regenerated for the
+audio VAE tools that require preprocessing and timing metadata.
+A version-one cache must also be regenerated.
 
 ---
 
 ## 7. Results for each combination
+
+These measurements predate the current validation split and deterministic
+initialization. The current classifier reserves 20% of source files for
+the final test and another part of the remaining files for validation.
+Standardization is fitted only on the final training portion. Epoch
+reports use validation data; the final confusion matrix uses the test
+files. The network ends in logits, and frame probabilities from
+`SoftmaxCrossEntropy` are averaged for per-file decisions.
 
 | feature | mode      | test accuracy | training time |
 |---------|-----------|---------------|---------------|

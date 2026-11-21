@@ -23,6 +23,7 @@
 #include <iomanip>
 
 int main() {
+    weft::set_seed(1);
     using std::cout;
     cout << std::fixed << std::setprecision(4);
 

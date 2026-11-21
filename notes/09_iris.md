@@ -9,7 +9,7 @@ tools:
 - `Matrix::selectColumns(indices)`: slices a matrix by column indices.
 - `Standardizer`: fits per-feature mean/std on training data and applies
   them to both train and test.
-- `one_hot`, `train_test_split`, `shuffled_indices`, `accuracy`: free
+- `one_hot`, `train_validation_test_split`, `shuffled_indices`, `accuracy`: free
   functions in `Data.h`.
 
 ---
@@ -23,11 +23,12 @@ and the autoencoder follow the same structure.
 1. **Load** the raw data into matrices (features × examples).
 2. **One-hot encode** the class labels into a `(num_classes × N)` target
    matrix.
-3. **Split** into train/test (random, with a fixed seed).
+3. **Split** into training, validation, and test data with a fixed seed.
 4. **Standardise** features: fit the scaler on the training split only,
-   then apply it to both splits.
+   then apply it to validation and test data.
 5. **Train** with mini-batch SGD, shuffling each epoch.
-6. **Evaluate** with accuracy on the held-out test set.
+6. **Monitor** validation performance, then evaluate the fixed model on
+   the test set once.
 
 Once the data is loaded, the last four steps are mechanical. The
 library's `Data.h` and `Standardizer.h` cover them.
@@ -89,6 +90,11 @@ mapped into the same space as the training inputs.
 
 Mini-batch SGD with per-epoch shuffling:
 
+The current example sets `weft::set_seed(1)` before constructing the
+network, uses a 90/30/30 train/validation/test split, and trains with
+`SoftmaxCrossEntropy` on raw logits. The loop below uses `S` for that
+logits matrix; probabilities are available from the loss when needed.
+
 ```cpp
 SGD<float> opt(learning_rate);
 for (int epoch = 0; epoch < epochs; ++epoch) {
@@ -125,8 +131,9 @@ The important choices are:
 - **Use the same `shuffled_indices` seed strategy across runs** so
   the batch order is reproducible. The example uses the epoch number as
   the seed, which gives different orders per epoch but the same orders
-  on every run. (The weight initialisation is not seeded, so final
-  numbers still vary from run to run; see section 7.)
+  on every run. The model initialization is now seeded too. Change the
+  master seed deliberately when studying variation between trained
+  models; section 7 records the earlier unseeded experiment.
 
 ---
 
@@ -185,16 +192,20 @@ training for 100 epochs
 final test accuracy: 1.0000  (30/30 correct)
 ```
 
-In this output:
+This output and the figure record the earlier 120/30 training/test
+configuration, before the validation split and fixed initialization.
+They are not expected output for the revised 90/30/30 example.
+
+In that recorded output:
 
 - The untrained network is at 23% accuracy, below the 33% that random
   guessing among three classes would give. This has no significance: it
   is the result of the random initial weights. Ten epochs later it is
   at 100%.
-- Your numbers will differ. The split and the batch order are seeded,
-  but the initial weights are not, so every run starts from different
-  weights. The next section discusses the consequences of that current
-  initialization behaviour.
+- The split and batch order were seeded, but the initial weights were
+  not. The next section records the resulting variation. The current
+  program instead repeats its initialization under the same seed and
+  toolchain.
 
 ![Loss and accuracy of the IRIS classifier during training, as printed by the program every ten epochs.](figures/09_iris_training.png)
 
@@ -202,7 +213,7 @@ In this output:
 
 ## 7. The seed-variance warning
 
-Over twenty runs of the example, the final test accuracy takes several
+Over twenty runs of that earlier configuration, the final test accuracy took several
 values:
 
 | test accuracy | runs out of 20 |

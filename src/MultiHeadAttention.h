@@ -131,6 +131,10 @@ public:
              + ", n_heads=" + std::to_string(n_heads_) + ")";
     }
 
+    std::string configuration() const override {
+        return describe() + (causal_ ? ";causal=1" : ";causal=0");
+    }
+
     void save_params(std::ostream& out) const override {
         Wq_.save_params(out);
         Wk_.save_params(out);

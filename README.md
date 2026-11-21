@@ -1,5 +1,7 @@
 # weft
 
+[![CI](https://github.com/CarmineCella/weft/actions/workflows/ci.yml/badge.svg)](https://github.com/CarmineCella/weft/actions/workflows/ci.yml)
+
 Companion library for the book *Designing Musical Networks: neural
 networks for sound and music, built from scratch in C++*.
 
@@ -57,6 +59,7 @@ not in Python.
 cd build
 make             # build all tests and examples
 make test        # build and run all tests
+make headers     # compile each public header independently
 make examples    # build the example programs
 make book        # build the book (needs LaTeX and pandoc)
 make clean       # remove build artefacts
@@ -68,6 +71,62 @@ make BLAS=1      # optional: BLAS matrix product
 
 Tests and examples are found automatically: a `.cpp` file placed in
 `tests/` or `examples/` is built by `make`.
+
+## Classification and reproducibility
+
+Classification examples return **logits** from their final Dense layer
+and train with `SoftmaxCrossEntropy`. It evaluates log-sum-exp directly
+and returns the logits gradient, including batch averaging. Do not add
+a Softmax layer before this loss. Its `probabilities()` accessor provides
+the corresponding normalized predictions after `forward`. The standalone
+Softmax and probability-space CrossEntropy remain available for study.
+
+Call `weft::set_seed(42)` before constructing a model to reproduce its
+initialization and dropout streams. Explicit per-layer seeds remain
+available. Reproducibility is within a given toolchain/backend; standard
+random distributions and floating-point reductions can differ between
+platforms.
+
+The classifier examples monitor validation data and reserve test data
+for the final evaluation. MNIST saves the checkpoint with the lowest
+validation loss:
+
+```sh
+./examples/mnist_classifier ../data/mnist 42 mnist.wnet
+```
+
+## Saved models and audio features
+
+New Network, ConvNetwork, and TokenTransformer checkpoints validate
+their version, scalar width, and architecture/configuration. Parameter
+files contain weights, not optimizer moments or a resumable RNG state.
+Existing version-one dense/conv files and headerless transformer files
+can still be loaded through their legacy paths with the same architecture.
+
+Feature-cache version 3 records sample rate, FFT/hop settings, window,
+and original frame offsets. Temporal patches split at file boundaries
+and at gaps left by silence removal. Version-two caches remain readable
+for classification; re-run extraction for the audio VAE examples.
+Those examples share `AudioModelConfig` and check the preprocessing
+metadata stored with each model. They require 44.1 kHz input.
+Old audio weights need verified metadata before reuse; see
+[the release notes](CHANGELOG.md).
+
+## Continuous integration
+
+GitHub Actions builds all examples and runs the test programs on Linux
+(GCC and Clang) and macOS (Clang), including OpenBLAS/Accelerate builds.
+It also checks independent header compilation, runs synthetic-data
+example pipelines, validates the Markdown chapters, and compiles the
+book PDF as a downloadable workflow artifact.
+
+The end-to-end smoke checks need Python 3 and no downloaded datasets:
+
+```sh
+make -C build test headers
+python3 tests/smoke_examples.py
+python3 book/check_sources.py
+```
 
 ## Data
 

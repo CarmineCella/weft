@@ -116,6 +116,10 @@ public:
              + ", d_ff=" + std::to_string(d_ff_) + ")";
     }
 
+    std::string configuration() const override {
+        return describe() + ";" + mha_.configuration();
+    }
+
     // save/load in a fixed order so the architecture rebuild can
     // reproduce the state exactly.  Each sub-layer handles its own
     // bytes.

@@ -11,12 +11,10 @@
 //   backward (returned as dL/dS):
 //      dL/dS[i,n]  =  -(1/N) * T[i,n] / S[i,n]
 //
-// Pair this with Softmax: when CE.backward()'s output is fed through
-// Softmax::backward(), the chain simplifies algebraically to
-//      dL/dZ  =  (S - T) / N
-// (the standalone formulas individually contain things that can blow up
-// when S has tiny entries; the composition has those terms cancel out).
-// That identity is verified in tests/test_crossentropy.cpp.
+// This probability-space implementation adds epsilon to log(S) and its
+// denominator. It approximates the ideal objective only away from zero.
+// Use SoftmaxCrossEntropy with raw logits for classifier training; its
+// gradient remains useful for very confident wrong predictions.
 //
 #include "Loss.h"
 #include "Matrix.h"
@@ -31,7 +29,8 @@ template <typename T = float>
 class CrossEntropy : public Loss<T> {
 public:
     T forward(const Matrix<T>& predicted, const Matrix<T>& target) override {
-        if (predicted.rows() != target.rows() ||
+        if (predicted.rows() == 0 || predicted.cols() == 0 ||
+            predicted.rows() != target.rows() ||
             predicted.cols() != target.cols())
             throw std::invalid_argument(
                 "CrossEntropy::forward: shape mismatch between predicted and target");
@@ -49,6 +48,8 @@ public:
     }
 
     Matrix<T> backward() override {
+        if (predicted_cache_.rows() == 0 || predicted_cache_.cols() == 0)
+            throw std::logic_error("CrossEntropy::backward: call forward first");
         const std::size_t R = predicted_cache_.rows();
         const std::size_t N = predicted_cache_.cols();
         const T eps   = T(1e-12);

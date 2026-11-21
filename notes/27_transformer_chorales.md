@@ -48,10 +48,10 @@ interface and call it from `TokenTransformer<T>`
 layers in section 3.
 
 Its saved weights require the same model configuration on loading.
-The current `TokenTransformer::load` also lacks a final stream-state
-check, so a truncated parameter file can escape detection. The
-serialization is a limited weight-storage mechanism, not a validated
-complete-model format.
+New transformer headers check scalar width, vocabulary, dimensions,
+head/block counts, and context capacity. Reads and writes also check
+stream state, including when reading a legacy headerless file.
+Optimizer and RNG state are still outside this weight format.
 
 **MIDI in and out.** MIDI is a binary format with big-endian
 multi-byte values and delta times stored as variable-length
@@ -152,8 +152,9 @@ One training step:
 3. Forward through the model with the causal mask on. The output is
    a probability over 134 tokens at every one of the 128 positions
    in the chunk.
-4. Loss = cross-entropy between predicted probabilities and
-   one-hot targets, averaged across positions.
+4. `SoftmaxCrossEntropy` evaluates logits against one-hot targets,
+   averaged across positions, using `forward_logits` and
+   `backward_logits`. Sampling still calls `forward` for probabilities.
 5. Backward, Adam step.
 
 Every position in the chunk produces a prediction, not only the last,

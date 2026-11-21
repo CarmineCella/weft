@@ -678,6 +678,7 @@ int cmd_phrase(int argc, char** argv) {
 } // namespace
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     const std::string cmd = (argc > 1) ? argv[1] : "";
     try {
         if (cmd == "train")   return cmd_train(argc, argv);

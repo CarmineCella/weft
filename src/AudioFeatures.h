@@ -30,6 +30,7 @@
 #include "FFT.h"
 
 #include <cmath>
+#include <cstdint>
 #include <complex>
 #include <cstddef>
 #include <stdexcept>
@@ -143,6 +144,8 @@ std::vector<T> energy_weighted_features(const std::vector<T>& samples,
                                          std::size_t feature_size,
                                          FrameFn fn)
 {
+    if (frame_size < 2 || hop_size == 0)
+        throw std::invalid_argument("AudioFeatures: frame_size >= 2 and hop_size > 0 required");
     if (samples.size() < frame_size)
         throw std::runtime_error("AudioFeatures: input shorter than frame_size");
 
@@ -187,8 +190,12 @@ template <typename T>
 std::vector<std::vector<T>>
 logmag_spectrum_frames(const std::vector<T>& samples,
                        std::size_t frame_size = 4096,
-                       std::size_t hop_size = 2048)
+                       std::size_t hop_size = 2048,
+                       std::vector<std::uint64_t>* frame_offsets = nullptr)
 {
+    if (frame_size < 2 || hop_size == 0)
+        throw std::invalid_argument("AudioFeatures: frame_size >= 2 and hop_size > 0 required");
+    if (frame_offsets) frame_offsets->clear();
     if (samples.size() < frame_size)
         throw std::runtime_error("AudioFeatures: input shorter than frame_size");
 
@@ -213,6 +220,7 @@ logmag_spectrum_frames(const std::vector<T>& samples,
         for (std::size_t i = 0; i < n_bins; ++i)
             log_mag[i] = std::log(T(1) + mag[i]);
         out.push_back(std::move(log_mag));
+        if (frame_offsets) frame_offsets->push_back(static_cast<std::uint64_t>(start));
     }
     return out;
 }
@@ -226,8 +234,12 @@ mfcc_frames(const std::vector<T>& samples,
             std::size_t frame_size = 4096,
             std::size_t hop_size = 2048,
             std::size_t num_mel_bins = 40,
-            std::size_t num_mfcc = 13)
+            std::size_t num_mfcc = 13,
+            std::vector<std::uint64_t>* frame_offsets = nullptr)
 {
+    if (frame_size < 2 || hop_size == 0)
+        throw std::invalid_argument("AudioFeatures: frame_size >= 2 and hop_size > 0 required");
+    if (frame_offsets) frame_offsets->clear();
     if (samples.size() < frame_size)
         throw std::runtime_error("AudioFeatures: input shorter than frame_size");
 
@@ -261,6 +273,7 @@ mfcc_frames(const std::vector<T>& samples,
             log_mel[m] = std::log(sum + T(1e-12));
         }
         out.push_back(detail::dct2(log_mel, num_mfcc));
+        if (frame_offsets) frame_offsets->push_back(static_cast<std::uint64_t>(start));
     }
     return out;
 }

@@ -196,10 +196,11 @@ is:
 That is much simpler and numerically better-behaved than chaining the
 standalone Softmax backward with a standalone cross-entropy backward.
 [Chapter 7](07_cross_entropy.md) derives it. In weft the two stay
-separate classes. A test compares their composition with `(S − T)/N`
+separate classes for inspecting the chain rule. A test compares their composition with `(S − T)/N`
 at moderate logits. The current cross-entropy adds epsilon, so this
 agreement is approximate and can fail badly for extreme wrong
-predictions; chapter 7 explains the distinction.
+predictions; chapter 7 explains the distinction. The training examples
+use `SoftmaxCrossEntropy` directly on logits to avoid this failure.
 
 The standalone Softmax backward we implemented is still correct on its
 own (verified by the numerical gradient check in `test_softmax.cpp`),

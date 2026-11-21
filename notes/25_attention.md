@@ -256,8 +256,10 @@ forward computation and the existing formulas remove them from the
 gradient.
 
 `MultiHeadAttention` exposes the flag as `set_causal(bool)` and passes
-it to every head. It is a switch, not a parameter: it is not saved
-with the weights, and the same layer can be run both ways.
+it to every head. It is a switch, not a trainable parameter. The bare
+parameter stream omits it; new network checkpoint headers record its
+setting for compatibility checks. Rebuild the intended causal setting
+before loading.
 
 The tests check the following. The attention map has exact zeros below
 the diagonal and its columns still sum to 1. Changing token `t` leaves

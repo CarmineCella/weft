@@ -38,8 +38,11 @@ turns that into a `(10, 60000)` matrix with a single 1 per column.
 ```
 Dense(784, 256) -> ReLU -> Dropout(0.3)
 Dense(256, 128) -> ReLU -> Dropout(0.3)
-Dense(128, 10)  -> Softmax
+Dense(128, 10)  -> logits
 ```
+
+`SoftmaxCrossEntropy` consumes those logits directly. Softmax remains
+part of the objective, but is not a separate final layer in this model.
 
 The network has about 235,000 parameters. That is large enough relative
 to 60,000 training examples that overfitting is a risk, which is the
@@ -71,19 +74,21 @@ a validation criterion, and repeated runs.
 ## 4. The training loop in detail
 
 ```cpp
+SoftmaxCrossEntropy<float> ce;
 for (int epoch = 1; epoch <= epochs; ++epoch) {
     net.train();                                  // (a)
     auto idx = shuffled_indices(X.cols(), epoch);
 
     for (mini-batches) {
-        Matrix S = net.forward(X_batch);
-        float  L = ce.forward(S, Y_batch);
+        Matrix logits = net.forward(X_batch);
+        float L = ce.forward(logits, Y_batch);
         net.backward(ce.backward());
         net.update(opt);
     }
 
     net.eval();                                   // (b)
-    auto [test_loss, test_acc] = evaluate(...);
+    auto [validation_loss, validation_acc] = evaluate(...);
+    // Save when validation loss improves.
 }
 ```
 
@@ -97,7 +102,7 @@ test pass then uses the uncorrupted activations.
 `(b)` puts the network into inference mode. Dropout becomes the
 identity. The network we evaluate is the full, un-corrupted one.
 
-Without `(b)`, the reported test accuracy would describe a randomly
+Without `(b)`, the reported validation accuracy would describe a randomly
 masked network and vary with those masks. It would not evaluate the
 inference configuration.
 
@@ -106,16 +111,17 @@ use, matrix shapes, the number of updates per epoch, and gradient
 noise. Timing and validation measurements are needed to choose it for
 another model or machine.
 
-The current program evaluates the official test set after each epoch.
-We retain that behaviour in the displayed loop so the text matches the
-code. For model development, evaluate a held-out validation split here
-and reserve the test set for the final frozen model; see section 7.
+The current program holds out 10% of the official training images for
+validation. It saves the checkpoint with the lowest validation loss,
+loads that checkpoint after training, and evaluates the official test
+set once. The initialization and dropout streams follow the supplied
+seed.
 
 ---
 
 ## 5. Train vs test accuracy: reading the gap
 
-The "train acc" reported in our table is the running accuracy during
+The "train acc" reported in the recorded run is the running accuracy during
 the training pass, measured with dropout still active. The "test acc"
 is measured in eval mode.
 
@@ -130,7 +136,7 @@ eval mode after an epoch. Use validation performance to investigate
 early stopping or regularisation. Repeatedly consulting test accuracy
 for those choices would make it part of model selection.
 
-![Loss and accuracy of the MNIST classifier over ten epochs. The training values are measured with dropout active.](figures/12_mnist_training.png)
+![The earlier MNIST run over ten epochs, with training values measured under dropout. This figure predates the validation split; the current program reports validation metrics during training and final test accuracy once.](figures/12_mnist_training.png)
 
 ---
 
@@ -150,6 +156,7 @@ Then from `build/`:
 make
 ./examples/mnist_classifier              # uses ../data/mnist
 ./examples/mnist_classifier /some/path   # or pass a path
+./examples/mnist_classifier /some/path 42 mnist.wnet  # seed and checkpoint
 ```
 
 The recorded example reaches about 98% test accuracy after ten epochs.
@@ -164,14 +171,9 @@ discusses the performance choices.
 A more complete MNIST classifier would do the following, which we
 deliberately omit:
 
-- **Validation set.** Hold out part of the 60,000 training images for
-  architecture choices, learning-rate choices, and early stopping.
-  The current example has no such split: it monitors test accuracy
-  each epoch. Treat its table as an implementation demonstration,
-  not a test-driven tuning procedure.
-- **Model checkpointing.** Select a checkpoint using validation
-  performance, freeze the choice, then evaluate the test set once.
-  The current program does not implement best-checkpoint selection.
+- **Repeated seeds.** The current program already uses validation
+  checkpoint selection and one final test evaluation. Repeat that
+  procedure across declared seeds when comparing configurations.
 - **Learning-rate schedule and augmentation.** A schedule, small
   translations, and rotations are possible experiments. Measure
   their effect on validation data instead of assuming an accuracy gain.

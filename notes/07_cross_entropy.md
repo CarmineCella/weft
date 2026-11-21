@@ -3,9 +3,9 @@
 Cross-entropy measures the probability a classifier assigns to its
 targets. Pairing it with softmax gives a particularly simple gradient
 with respect to the logits: `(S − T) / N`. We derive that identity,
-then distinguish it from the epsilon-regularised calculation currently
-used by weft. That distinction matters when a prediction is confidently
-wrong.
+then distinguish it from the legacy probability-space calculation.
+The training examples use a fused logits-based loss so that confidently
+wrong predictions still receive a corrective gradient.
 
 ---
 
@@ -142,14 +142,15 @@ The combined form has these advantages:
 
 This identity motivates evaluating the loss directly from logits. It
 avoids forming a tiny probability only to take its logarithm and divide
-by it. Weft currently keeps the two classes separate.
+by it. `SoftmaxCrossEntropy` uses that path in the training examples.
+The separate classes remain useful for inspecting the derivation.
 
 ---
 
-## 6. The current implementation and its numerical limit
+## 6. Probability-space loss and stable training
 
 Separate `Softmax` and `CrossEntropy` classes make the chain rule easy
-to inspect. The current loss guards against `log(0)` by adding
+to inspect. The legacy `CrossEntropy` guards against `log(0)` by adding
 $\epsilon=10^{-12}$:
 
 $$
@@ -178,23 +179,26 @@ for arbitrary logits.
 
 For a single example with double-precision logits `(50, -50)` and the
 second class as target, the ideal loss is approximately 100 and the
-logits gradient is approximately `(1, -1)`. The current implementation
+logits gradient is approximately `(1, -1)`. The legacy probability-space implementation
 instead gives a loss near 27.631 and a gradient near
 `(3.72e-32, -3.72e-32)`. A confidently wrong prediction receives
-almost no correction. This is a limitation of the current code,
+almost no correction. This is a limitation of that probability-space path,
 including for a small classifier if it reaches extreme logits.
+The training examples now avoid this path.
 
-A stable logits-based loss would use log-sum-exp. For one example with
+A stable logits-based loss uses log-sum-exp. For one example with
 target class $c$ and $m=\max_i Z_i$:
 
 $$
 L = m + \log\!\left(\sum_i e^{Z_i-m}\right) - Z_c.
 $$
 
-Its backward pass can return `(S - T) / N` directly. That fused path is
-an implementation improvement; it is not present in the current
-classification examples. Keep the distinction between the ideal
-derivation and the epsilon-regularised code when interpreting a run.
+`SoftmaxCrossEntropy::backward()` returns the logits gradient directly.
+The classifier's last layer therefore emits logits, with no Softmax
+layer in the network itself. After `forward(logits, targets)`, the
+loss's `probabilities()` accessor supplies normalized predictions for
+uses such as averaging frame predictions by file. Generation can still
+call standalone Softmax when probabilities are needed.
 
 ---
 
@@ -225,6 +229,10 @@ convention, the mean-over-batch `1/N` factor is part of the gradient.
 All 35 checks in the five test programs so far (Matrix, Dense, ReLU, Softmax, CrossEntropy)
 pass.
 
+`tests/test_softmax_crossentropy.cpp` additionally checks extreme logits,
+underflow, soft targets, batch averaging, shift invariance, numerical
+gradients, and a training step from a confidently wrong initialization.
+
 ---
 
 ## 8. The classifier so far
@@ -232,7 +240,7 @@ pass.
 We now have every component of a classifier:
 
 ```
-Dense  →  ReLU  →  Dense  →  Softmax  →  CrossEntropy
+Dense  →  ReLU  →  Dense (logits)  →  SoftmaxCrossEntropy
 ```
 
 The next chapter combines these in a small `Network` class that holds an
@@ -242,7 +250,7 @@ training run on real data.
 
 ## 9. Exercise: when does epsilon matter?
 
-For a one-hot target, evaluate the extra gradient factor
+For the legacy probability-space path, evaluate the extra gradient factor
 $S_c/(S_c+\epsilon)$ at target probabilities `1e-2`, `1e-12`, and
 `1e-20`, with `epsilon = 1e-12`. At which point does the current
 implementation stop approximating the ideal logits gradient? Explain

@@ -68,7 +68,7 @@ public:
            std::size_t kernel_size,
            std::size_t stride  = 1,
            std::size_t padding = 0,
-           unsigned    seed    = std::random_device{}())
+           unsigned    seed    = random_seed())
         : in_C_(in_channels), out_C_(out_channels),
           K_(kernel_size), stride_(stride), padding_(padding),
           // Kernel as a (out_C, in_C*K*K) matrix: each row is one

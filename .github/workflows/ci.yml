@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cpp:
+    name: C++ (${{ matrix.os }}, ${{ matrix.compiler }}, ${{ matrix.backend }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, compiler: g++, backend: portable}
+          - {os: ubuntu-24.04, compiler: clang++, backend: portable}
+          - {os: macos-latest, compiler: clang++, backend: portable}
+          - {os: ubuntu-24.04, compiler: g++, backend: blas}
+          - {os: macos-latest, compiler: clang++, backend: blas}
+    env:
+      OPENBLAS_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install OpenBLAS
+        if: runner.os == 'Linux' && matrix.backend == 'blas'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libopenblas-dev
+      - name: Build examples, test, and check independent headers
+        shell: bash
+        run: |
+          if [[ "${{ matrix.backend }}" == blas ]]; then
+            make -C build -j2 test headers CXX="${{ matrix.compiler }}" BLAS=1
+          else
+            make -C build -j2 test headers CXX="${{ matrix.compiler }}"
+          fi
+      - name: Exercise complete examples with synthetic data
+        if: matrix.backend == 'portable'
+        run: python3 tests/smoke_examples.py
+
+  book:
+    name: Book and Markdown sources
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install book tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            pandoc latexmk biber poppler-utils texlive-latex-extra \
+            texlive-fonts-recommended texlive-fonts-extra texlive-science texlive-publishers
+      - name: Validate chapter sources
+        run: python3 book/check_sources.py
+      - name: Build book
+        run: make -C book
+      - name: Check rendered text and LaTeX errors
+        run: python3 book/check_sources.py --pdf book/build/book.pdf
+      - name: Save compiled book
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: designing-musical-networks
+          path: book/build/book.pdf
+          if-no-files-found: error
+          retention-days: 14

@@ -47,7 +47,7 @@
 // default 1.0 (lower = more conservative, higher = more random).
 
 #include "Adam.h"
-#include "CrossEntropy.h"
+#include "SoftmaxCrossEntropy.h"
 #include "Dense.h"
 #include "Embedding.h"
 #include "LayerNorm.h"
@@ -57,7 +57,6 @@
 #include "ReLU.h"
 #include "ScaledDotProductAttention.h"
 #include "SinusoidalPositionalEncoding.h"
-#include "Softmax.h"
 #include "TokenTransformer.h"
 #include "TransformerEncoderBlock.h"
 
@@ -425,7 +424,7 @@ static int cmd_train(int argc, char** argv) {
 
     // ---- model + optimiser ----
     ChoraleLM model;
-    CrossEntropy<float> ce;
+    SoftmaxCrossEntropy<float> ce;
     Adam<float>         opt(3e-4f);     // lower LR; transformers don't like 1e-3
 
     // ---- training loop (one chunk per step) ----
@@ -445,7 +444,7 @@ static int cmd_train(int argc, char** argv) {
                  off += (BLOCK / N_VOICES) * N_VOICES) {
                 std::vector<int> input (seq.begin() + off, seq.begin() + off + BLOCK);
                 std::vector<int> target(seq.begin() + off + 1, seq.begin() + off + BLOCK + 1);
-                sum += ce.forward(model.forward(input), one_hot_seq(target));
+                sum += ce.forward(model.forward_logits(input), one_hot_seq(target));
                 ++count;
             }
         return count ? sum / double(count) : 0.0;
@@ -479,13 +478,13 @@ static int cmd_train(int argc, char** argv) {
             std::vector<int> input (seq.begin() + off, seq.begin() + off + BLOCK);
             std::vector<int> target(seq.begin() + off + 1, seq.begin() + off + BLOCK + 1);
 
-            Matrix<float> probs = model.forward(input);
+            Matrix<float> logits = model.forward_logits(input);
             Matrix<float> Y     = one_hot_seq(target);
-            const float L = ce.forward(probs, Y);
+            const float L = ce.forward(logits, Y);
             sum_loss += static_cast<double>(L);
 
-            Matrix<float> dP = ce.backward();
-            model.backward(dP);
+            Matrix<float> dLogits = ce.backward();
+            model.backward_logits(dLogits);
             model.update(opt);
 
         }
@@ -724,6 +723,7 @@ static int cmd_stats(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     if (argc < 2) {
         std::cerr <<
             "usage:\n"

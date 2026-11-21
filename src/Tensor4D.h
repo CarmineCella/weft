@@ -23,6 +23,8 @@
 // features down, examples across, matching Matrix's existing
 // one-example-per-column convention.
 //
+#include "Random.h"
+
 #include <vector>
 #include <cstddef>
 #include <stdexcept>
@@ -83,14 +85,14 @@ public:
     // Gaussian -- the usual starting point for conv kernels (He init
     // will pick the stddev when we get to Conv2D).
     void randomizeNormal(T mean = T(0), T stddev = T(1),
-                         unsigned seed = std::random_device{}()) {
+                         unsigned seed = random_seed()) {
         std::mt19937 gen(seed);
         std::normal_distribution<T> dist(mean, stddev);
         for (T& x : data_) x = dist(gen);
     }
 
     void randomizeUniform(T lo = T(-1), T hi = T(1),
-                          unsigned seed = std::random_device{}()) {
+                          unsigned seed = random_seed()) {
         std::mt19937 gen(seed);
         std::uniform_real_distribution<T> dist(lo, hi);
         for (T& x : data_) x = dist(gen);

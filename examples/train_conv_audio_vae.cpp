@@ -54,6 +54,7 @@
 #include "Conv2D.h"
 #include "ConvNetwork.h"
 #include "Data.h"
+#include "AudioModelConfig.h"
 #include "Dense.h"
 #include "FeatureCache.h"
 #include "Flatten.h"
@@ -82,14 +83,14 @@ using namespace weft;
 
 // ---- patch shape ---------------------------------------------------------
 constexpr std::size_t FREQ_BINS_IN  = 2049;   // from FRAME_SIZE=4096 in extract_features
-constexpr std::size_t FREQ_BINS     = 64;     // mel bins
-constexpr std::size_t TIME_FRAMES   = 16;     // 16 frames * ~46ms hop = ~0.8s patches.
+constexpr std::size_t FREQ_BINS     = AudioModelConfig::mel_bins;     // mel bins
+constexpr std::size_t TIME_FRAMES   = AudioModelConfig::time_frames;     // 16 frames * ~46ms hop = ~0.8s patches.
                                               // Small enough that most TinySOL notes
                                               // produce >=1 patch; larger windows
                                               // would exclude shorter notes.
 
 // ---- VAE hyperparameters -------------------------------------------------
-constexpr std::size_t LATENT = 32;
+constexpr std::size_t LATENT = AudioModelConfig::latent;
 constexpr float       BETA   = 1.0f;
 constexpr std::size_t FLAT   = 64 * 8 * 2;    // 1024 (= 64 channels x 8 freq x 2 time at bottleneck)
 
@@ -122,17 +123,8 @@ patches_from_cache(const CachedFeatures& cache, const MelTransform<float>& mel,
     if (cache.feature_type != "logmag")
         throw std::runtime_error("expected logmag features");
 
-    const std::size_t N = cache.X.cols();
-    // First pass: find file boundaries.
-    std::vector<std::pair<std::size_t, std::size_t>> runs;   // [start, end)
-    std::size_t run_start = 0;
-    for (std::size_t j = 1; j < N; ++j) {
-        if (cache.file_ids[j] != cache.file_ids[run_start]) {
-            runs.emplace_back(run_start, j);
-            run_start = j;
-        }
-    }
-    runs.emplace_back(run_start, N);
+    // Preserve actual sample spacing, including gaps from discarded silence.
+    const auto runs = contiguous_frame_runs(cache);
 
     // Second pass: count patches.
     std::size_t n_patches = 0;
@@ -187,6 +179,7 @@ select_patches(const Tensor4D<float>& X, const std::vector<std::size_t>& idx) {
 // --------------------------------------------------------------------------
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     using clock = std::chrono::steady_clock;
     if (argc < 3) {
         std::cerr << "usage: train_conv_audio_vae <feature.feat> "
@@ -220,6 +213,7 @@ int main(int argc, char** argv) {
     CachedFeatures cache;
     try {
         cache = load_features(feature_path);
+        AudioModelConfig::require_cache(cache);
     } catch (const std::exception& e) {
         std::cerr << "error loading features: " << e.what() << "\n";
         return 1;
@@ -235,7 +229,7 @@ int main(int argc, char** argv) {
         // Mel filterbank: 64 mel bins from 2049 linear bins at 44100 Hz.
         // Trained model bakes in this choice; convae_generate/convae_remap
         // must build the same filterbank to invert correctly.
-        const MelTransform<float> mel(FREQ_BINS, FREQ_BINS_IN, 44100.0f);
+        const MelTransform<float> mel(FREQ_BINS, FREQ_BINS_IN, static_cast<float>(AudioModelConfig::sample_rate), AudioModelConfig::mel_scale);
         X = patches_from_cache(cache, mel, window_hop);
     } catch (const std::exception& e) {
         std::cerr << "error slicing patches: " << e.what() << "\n";
@@ -296,10 +290,10 @@ int main(int argc, char** argv) {
 
     auto save_models = [&](const std::string& tag) {
         try {
-            enc_conv .save(prefix + ".enc_conv");
-            enc_dense.save(prefix + ".enc_dense");
-            dec_dense.save(prefix + ".dec_dense");
-            dec_conv .save(prefix + ".dec_conv");
+            enc_conv .save(prefix + ".enc_conv", AudioModelConfig::metadata(true));
+            enc_dense.save(prefix + ".enc_dense", AudioModelConfig::metadata(true));
+            dec_dense.save(prefix + ".dec_dense", AudioModelConfig::metadata(true));
+            dec_conv .save(prefix + ".dec_conv", AudioModelConfig::metadata(true));
             std::cout << "  [" << tag << " saved -> " << prefix
                       << ".{enc_conv,enc_dense,dec_dense,dec_conv}]\n"
                       << std::flush;

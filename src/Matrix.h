@@ -19,6 +19,8 @@
 // double when you want to numerically check gradients later).
 //
 
+#include "Random.h"
+
 #include <vector>
 #include <cstddef>
 #include <stdexcept>
@@ -93,14 +95,14 @@ public:
 
     // Gaussian init -- the usual starting point for weights.
     void randomizeNormal(T mean = T(0), T stddev = T(1),
-                         unsigned seed = std::random_device{}()) {
+                         unsigned seed = random_seed()) {
         std::mt19937 gen(seed);
         std::normal_distribution<T> dist(mean, stddev);
         for (T& x : data_) x = dist(gen);
     }
 
     void randomizeUniform(T lo = T(-1), T hi = T(1),
-                          unsigned seed = std::random_device{}()) {
+                          unsigned seed = random_seed()) {
         std::mt19937 gen(seed);
         std::uniform_real_distribution<T> dist(lo, hi);
         for (T& x : data_) x = dist(gen);

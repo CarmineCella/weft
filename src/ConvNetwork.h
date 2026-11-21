@@ -25,6 +25,7 @@
 //
 #include "ConvLayer.h"
 #include "Optimizer.h"
+#include "Checkpoint.h"
 
 #include <memory>
 #include <vector>
@@ -33,6 +34,7 @@
 #include <fstream>
 #include <cstdint>
 #include <stdexcept>
+#include <utility>
 
 namespace weft {
 
@@ -90,40 +92,39 @@ public:
     // Persistence.  Same on-disk format as Network<T> but with a
     // distinct magic so a conv file isn't loaded as a dense file by
     // mistake.  Header:  4-byte magic "WCNV" + u32 version + u32
-    // layer_count, then each layer's save_params payload back-to-back.
+    // layer_count, scalar width, configuration, then parameter payloads.
     // Loading requires the network to already be built with the same
     // architecture (same layer count, same shapes).
     // ---------------------------------------------------------------
-    void save(const std::string& path) const {
+    void save(const std::string& path, const std::string& metadata = "") const {
         std::ofstream f(path, std::ios::binary);
         if (!f) throw std::runtime_error("ConvNetwork::save: cannot open " + path);
-        const char magic[4] = {'W','C','N','V'};
-        const std::uint32_t version = 1;
-        const std::uint32_t count   = static_cast<std::uint32_t>(layers_.size());
-        f.write(magic, 4);
-        f.write(reinterpret_cast<const char*>(&version), sizeof(version));
-        f.write(reinterpret_cast<const char*>(&count),   sizeof(count));
+        detail::write_checkpoint_header<T>(f, "WCNV",
+            static_cast<std::uint32_t>(layers_.size()), configuration(metadata));
         for (const auto& l : layers_) l->save_params(f);
+        f.flush();
         if (!f) throw std::runtime_error("ConvNetwork::save: write failed: " + path);
     }
 
-    void load(const std::string& path) {
+    void load(const std::string& path, const std::string& metadata = "") {
         std::ifstream f(path, std::ios::binary);
         if (!f) throw std::runtime_error("ConvNetwork::load: cannot open " + path);
-        char magic[4];
-        std::uint32_t version, count;
-        f.read(magic, 4);
-        f.read(reinterpret_cast<char*>(&version), sizeof(version));
-        f.read(reinterpret_cast<char*>(&count),   sizeof(count));
-        if (magic[0]!='W'||magic[1]!='C'||magic[2]!='N'||magic[3]!='V')
-            throw std::runtime_error("ConvNetwork::load: bad magic");
-        if (count != layers_.size())
-            throw std::runtime_error("ConvNetwork::load: layer count mismatch");
+        detail::read_checkpoint_header<T>(f, "WCNV",
+            static_cast<std::uint32_t>(layers_.size()), configuration(metadata),
+            metadata.empty());
         for (auto& l : layers_) l->load_params(f);
         if (!f) throw std::runtime_error("ConvNetwork::load: read failed: " + path);
     }
 
 private:
+    std::string configuration(const std::string& metadata) const {
+        std::string config;
+        for (const auto& layer : layers_) {
+            const std::string part = layer->configuration();
+            config += std::to_string(part.size()) + ":" + part;
+        }
+        return config + "\n" + metadata;
+    }
     std::vector<std::unique_ptr<ConvLayer<T>>> layers_;
 };
 

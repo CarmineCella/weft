@@ -19,9 +19,9 @@
 //
 // Note: in classification networks Softmax is normally paired with cross-
 // entropy loss; the *combined* gradient is just (S - target), much simpler
-// than the standalone backward.  weft keeps the two classes separate:
-// CrossEntropy::backward chained through this backward equals (S - T)/N,
-// which tests/test_crossentropy.cpp verifies.
+// than the standalone backward. Use SoftmaxCrossEntropy directly on logits
+// for classifier training. The legacy probability-space CrossEntropy adds
+// epsilon and only approximates that identity at moderate probabilities.
 // This standalone backward is correct on its own and verified by the
 // numerical gradient check in tests/test_softmax.cpp.
 //
@@ -30,6 +30,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <stdexcept>
 
 namespace weft {
 
@@ -37,6 +38,8 @@ template <typename T = float>
 class Softmax : public Layer<T> {
 public:
     Matrix<T> forward(const Matrix<T>& Z) override {
+        if (Z.rows() == 0 || Z.cols() == 0)
+            throw std::invalid_argument("Softmax::forward: empty logits");
         const std::size_t R = Z.rows();
         const std::size_t C = Z.cols();
         Matrix<T> S(R, C);
@@ -64,6 +67,10 @@ public:
     }
 
     Matrix<T> backward(const Matrix<T>& dS) override {
+        if (S_cache_.rows() == 0 || S_cache_.cols() == 0)
+            throw std::logic_error("Softmax::backward: call forward first");
+        if (dS.rows() != S_cache_.rows() || dS.cols() != S_cache_.cols())
+            throw std::invalid_argument("Softmax::backward: gradient shape mismatch");
         const std::size_t R = S_cache_.rows();
         const std::size_t C = S_cache_.cols();
         Matrix<T> dZ(R, C);

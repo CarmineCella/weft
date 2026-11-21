@@ -182,6 +182,11 @@ on).
 
 The library now has every component needed for a classifier:
 
+The composition tests keep the separate Softmax and CrossEntropy
+operations so their chain rule remains visible. The application examples
+instead use `SoftmaxCrossEntropy` on a network ending in logits, as
+described in chapter 7.
+
 - `Matrix` and the operations on it.
 - `Dense` (forward, backward, SGD update).
 - `ReLU`, `Softmax` activations.

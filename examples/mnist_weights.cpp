@@ -74,6 +74,7 @@ static void blit_weights(Bitmap& bmp, const Matrix<float>& W, std::size_t row,
 }
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     const std::string data_dir = (argc > 1) ? argv[1] : "../data/mnist";
 
     std::cout << "weft :: MNIST weight visualisation\n";

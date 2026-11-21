@@ -32,9 +32,9 @@
 #  this Makefile does not need to be touched.
 #
 #  The `book` target delegates to book/Makefile, which runs pandoc on
-#  notes/*.md (producing the Part II chapters) and then lualatex on
+#  notes/*.md (producing the Part II chapters) and then pdflatex on
 #  book/book.tex.  See book/Makefile for tool requirements (pandoc,
-#  texlive with lualatex, biber).
+#  texlive with pdflatex, biber).
 # ============================================================================
 
 # ---- locations (relative to this build/ directory) ------------------------
@@ -81,7 +81,7 @@ EXAMPLE_SRCS := $(wildcard $(EXAMPLE_DIR)/*.cpp)
 EXAMPLE_BINS := $(patsubst $(EXAMPLE_DIR)/%.cpp,examples/%,$(EXAMPLE_SRCS))
 
 # ---- phony targets ---------------------------------------------------------
-.PHONY: all test examples book book-clean clean distclean
+.PHONY: all test headers examples book book-clean clean distclean
 
 all: $(TEST_BINS) $(EXAMPLE_BINS)
 
@@ -96,12 +96,18 @@ test: $(TEST_BINS) $(EXAMPLE_BINS)
 
 examples: $(EXAMPLE_BINS)
 
+# Compile each public header in isolation, including the selected BLAS path.
+headers:
+	@set -e; for h in $(HEADERS); do \
+		printf '#include "%s"\n' "$$h" | $(CXX) $(CXXFLAGS) -x c++ -fsyntax-only -; \
+	done
+
 # ---- book ------------------------------------------------------------------
-# Delegates to book/Makefile, which knows about pandoc + lualatex.
+# Delegates to book/Makefile, which knows about pandoc + pdflatex.
 # That Makefile does two things:
 #   1. Converts ../notes/*.md to LaTeX (via preprocess_note.py + pandoc).
 #      This populates book/generated/*.tex (one chapter per note).
-#   2. Runs latexmk -lualatex on book/book.tex to produce the PDF.
+#   2. Runs latexmk -pdflatex on book/book.tex to produce the PDF.
 # Result lands in book/build/book.pdf.
 #
 # Tool requirements (one-time setup on macOS):
@@ -137,7 +143,3 @@ tests/%: $(TEST_DIR)/%.cpp $(HEADERS)
 examples/%: $(EXAMPLE_DIR)/%.cpp $(HEADERS)
 	@mkdir -p examples
 	$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
-
-
-
-	

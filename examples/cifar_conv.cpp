@@ -17,7 +17,7 @@
 //     ReLU
 //     Dropout(0.5)                  -- regularises the dense head
 //     Dense(256, 10)
-//     Softmax
+//     logits -> SoftmaxCrossEntropy (outside the network)
 //
 // The dense head used to be a single Dense(4096, 10) which overfit
 // badly (99% train, 60% test).  Adding a 256-unit bottleneck with
@@ -52,8 +52,7 @@
 #include "Dense.h"
 #include "ReLU.h"
 #include "Dropout.h"
-#include "Softmax.h"
-#include "CrossEntropy.h"
+#include "SoftmaxCrossEntropy.h"
 #include "Adam.h"
 #include "CIFAR10.h"
 #include "Data.h"
@@ -157,31 +156,33 @@ static std::size_t argmax_column(const Matrix<float>& P, std::size_t col) {
 }
 
 // ---------------------------------------------------------------------
-// Test-set accuracy.  Pure forward pass, batched to keep memory bounded.
+// Evaluation accuracy. Pure forward pass, batched to keep memory bounded.
 // Switches both networks to eval() mode (turns off dropout) and back to
 // train() on exit -- this matters now that the dense head has Dropout.
 // ---------------------------------------------------------------------
-static float test_accuracy(ConvNetwork<float>& conv, Network<float>& dense,
+static float evaluate_accuracy(ConvNetwork<float>& conv, Network<float>& dense,
                            const Tensor4D<float>& X, const std::vector<int>& y,
-                           std::size_t batch_size) {
+                           std::size_t batch_size,
+                           const std::vector<std::size_t>& selection = {}) {
     conv .eval();
     dense.eval();
 
-    const std::size_t N = X.N();
+    const std::size_t N = selection.empty() ? X.N() : selection.size();
     std::size_t correct = 0;
 
     for (std::size_t bs = 0; bs < N; bs += batch_size) {
         const std::size_t be = std::min(N, bs + batch_size);
         std::vector<std::size_t> idx(be - bs);
-        for (std::size_t i = 0; i < idx.size(); ++i) idx[i] = bs + i;
+        for (std::size_t i = 0; i < idx.size(); ++i)
+            idx[i] = selection.empty() ? bs + i : selection[bs + i];
 
         Tensor4D<float> Xb    = select_batch(X, idx);
         Tensor4D<float> feat  = conv.forward(Xb);
         Matrix<float>   flat  = flatten(feat);
-        Matrix<float>   probs = dense.forward(flat);
+        Matrix<float>   logits = dense.forward(flat);
 
         for (std::size_t i = 0; i < idx.size(); ++i) {
-            if (static_cast<int>(argmax_column(probs, i)) == y[idx[i]]) ++correct;
+            if (static_cast<int>(argmax_column(logits, i)) == y[idx[i]]) ++correct;
         }
     }
 
@@ -197,6 +198,7 @@ static void on_sigint(int) { g_interrupted = 1; }
 
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     if (argc < 2) {
         std::cerr <<
           "usage: cifar_conv <cifar-10-batches-bin/> [epochs] [prefix] [subsample]\n"
@@ -244,6 +246,13 @@ int main(int argc, char** argv) {
     std::cout << "\n";
 
     Matrix<float> Y_train = one_hot<float>(train.labels, N_CLASSES);
+    auto order = shuffled_indices(train.images.N(), 1);
+    if (order.size() < 2) throw std::runtime_error("need training and validation images");
+    const std::size_t n_validation = std::max<std::size_t>(1, order.size() / 10);
+    std::vector<std::size_t> validation_indices(order.begin(), order.begin() + n_validation);
+    std::vector<std::size_t> training_indices(order.begin() + n_validation, order.end());
+    std::cout << "  split: " << training_indices.size() << " train, "
+              << validation_indices.size() << " validation; official test reserved\n";
 
     // ---- Build network ----------------------------------------------
     ConvNetwork<float> conv;
@@ -259,7 +268,7 @@ int main(int argc, char** argv) {
     dense.add<ReLU>   ();
     dense.add<Dropout>(0.5f);
     dense.add<Dense>  (256, N_CLASSES);
-    dense.add<Softmax>();
+
 
     std::cout << "Architecture:\n";
     std::cout << conv.summary();
@@ -267,11 +276,11 @@ int main(int argc, char** argv) {
     std::cout << dense.summary();
     std::cout << "\n";
 
-    CrossEntropy<float> loss;
+    SoftmaxCrossEntropy<float> loss;
     Adam<float>         opt;
 
     const std::size_t BATCH_SIZE = 64;
-    const std::size_t N          = train.images.N();
+    const std::size_t N          = training_indices.size();
 
     auto save_model = [&]() {
         conv .save(prefix + ".conv");
@@ -286,7 +295,8 @@ int main(int argc, char** argv) {
     std::mt19937 aug_rng(12345);
 
     for (int epoch = 0; epoch < EPOCHS; ++epoch) {
-        auto perm = shuffled_indices(N, static_cast<unsigned>(epoch));
+        auto perm = training_indices;
+        std::shuffle(perm.begin(), perm.end(), std::mt19937(static_cast<unsigned>(epoch)));
 
         float       loss_sum = 0.0f;
         std::size_t correct  = 0;
@@ -310,19 +320,19 @@ int main(int argc, char** argv) {
 
             Tensor4D<float> feat  = conv.forward(Xb);
             Matrix<float>   flat  = flatten(feat);
-            Matrix<float>   probs = dense.forward(flat);
+            Matrix<float>   logits = dense.forward(flat);
 
-            const float L = loss.forward(probs, Yb);
+            const float L = loss.forward(logits, Yb);
             loss_sum += L * batch.size();
             seen     += batch.size();
 
             for (std::size_t i = 0; i < batch.size(); ++i)
-                if (static_cast<int>(argmax_column(probs, i)) == train.labels[batch[i]])
+                if (static_cast<int>(argmax_column(logits, i)) == train.labels[batch[i]])
                     ++correct;
 
             // ---- backward ----
-            Matrix<float>   dProbs = loss.backward();
-            Matrix<float>   dFlat  = dense.backward(dProbs);
+            Matrix<float>   dLogits = loss.backward();
+            Matrix<float>   dFlat  = dense.backward(dLogits);
             Tensor4D<float> dFeat  = unflatten(dFlat,
                                                feat.N(), feat.C(),
                                                feat.H(), feat.W());
@@ -342,18 +352,22 @@ int main(int argc, char** argv) {
         const double elapsed  = std::chrono::duration<double>(t_now - t0).count();
         const float  train_acc= 100.0f * static_cast<float>(correct) / static_cast<float>(seen);
         const float  avg_loss = loss_sum / static_cast<float>(seen);
-        const float  test_acc = test_accuracy(conv, dense, test.images, test.labels, BATCH_SIZE);
+        const float validation_acc = evaluate_accuracy(
+            conv, dense, train.images, train.labels, BATCH_SIZE, validation_indices);
 
         std::cout << "epoch " << std::setw(2) << epoch
                   << "  loss="      << std::fixed << std::setprecision(4) << avg_loss
                   << "  train_acc=" << std::setprecision(2) << train_acc << "%"
-                  << "  test_acc="  << test_acc  << "%"
+                  << "  val_acc="   << validation_acc << "%"
                   << "  elapsed="   << std::setprecision(1) << elapsed << "s"
                   << "\n";
 
         save_model();
     }
 
+    const float final_test_acc =
+        evaluate_accuracy(conv, dense, test.images, test.labels, BATCH_SIZE);
+    std::cout << "\nfinal test accuracy: " << final_test_acc << "%\n";
     std::cout << "\nDone. Model saved as "
               << prefix << ".conv / " << prefix << ".dense\n"
               << "Run cifar_filters to visualise the first-layer kernels.\n";

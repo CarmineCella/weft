@@ -93,9 +93,9 @@ Y. Dropout breaks these dependencies, because the other neuron may be
 absent in the next batch, and forces each neuron to be useful on its
 own.
 
-Both explanations lead to the same result: a network that overfits less
-and generalises better, especially when the model has many more
-parameters than the data needs.
+Both explanations motivate dropout as a regularizer. Whether it improves
+generalization for a particular model needs a validation comparison,
+especially when changing model capacity or the amount of training data.
 
 ### Common rates
 
@@ -129,7 +129,7 @@ Dense, as in the diagram, is fine. Dropout after it is what to avoid.
 template <typename T = float>
 class Dropout : public Layer<T> {
 public:
-    explicit Dropout(T rate, unsigned seed = std::random_device{}())
+    explicit Dropout(T rate, unsigned seed = random_seed())
         : rate_(rate), gen_(seed) {}
 
     Matrix<T> forward(const Matrix<T>& X) override {
@@ -163,10 +163,12 @@ The mask is stored on the layer, as `ReLU` stores its `X > 0` mask. The
 backward methods of the two layers have the same structure: both
 compute `dY ⊙ mask`. The only difference is how the mask is built.
 
-The random number generator is seeded from `std::random_device` by
-default, but the constructor accepts an explicit seed, which the tests
-use to get reproducible behaviour. A training run almost always needs
-fresh randomness each time, so this default is appropriate.
+Each layer owns a random-number stream. Its default seed is drawn from
+weft's master seed generator, and the constructor also accepts an
+explicit seed. Call `weft::set_seed(42)` before building a model to
+repeat its initialization and dropout streams on the same toolchain.
+The example programs set a seed; different seeds are useful controlled
+experiments rather than an accidental change on every run.
 
 The two early-return paths, eval mode and `rate == 0`, return the
 identity. `rate == 0` is a degenerate case, but it lets you put a

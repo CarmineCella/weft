@@ -26,6 +26,7 @@
 // backward, and the order in which their parameters are saved.
 //
 #include "Dense.h"
+#include "Checkpoint.h"
 #include "Embedding.h"
 #include "LayerNorm.h"
 #include "Matrix.h"
@@ -54,6 +55,7 @@ public:
     TokenTransformer(std::size_t vocab, std::size_t d_model, std::size_t n_heads,
                      std::size_t n_layers, std::size_t d_ff, std::size_t max_seq)
         : vocab_(vocab), d_model_(d_model), max_seq_(max_seq),
+          n_heads_(n_heads), d_ff_(d_ff > 0 ? d_ff : 4 * d_model),
           embed(vocab, d_model),
           pe(d_model, max_seq),
           final_ln(d_model),
@@ -61,23 +63,35 @@ public:
     {
         blocks.reserve(n_layers);
         for (std::size_t i = 0; i < n_layers; ++i) {
-            blocks.emplace_back(d_model, n_heads, d_ff);
+            blocks.emplace_back(d_model, n_heads, d_ff_);
             blocks.back().set_causal(true);            // autoregressive
         }
     }
 
     // Probabilities over the vocabulary at every position, (vocab x L).
     Matrix<T> forward(const std::vector<int>& tokens) {
+        return softmax.forward(forward_logits(tokens));
+    }
+
+    // Training path for SoftmaxCrossEntropy. No probability-space division.
+    Matrix<T> forward_logits(const std::vector<int>& tokens) {
+        if (tokens.empty())
+            throw std::invalid_argument("TokenTransformer: empty token sequence");
         Matrix<T> x = embed.forward(tokens);           // (d_model x L)
         x = pe.forward(x);
         for (auto& blk : blocks) x = blk.forward(x);
         x = final_ln.forward(x);
-        return softmax.forward(head.forward(x));
+        return head.forward(x);
     }
 
     // dProbs: gradient w.r.t. the output of the last forward.
     void backward(const Matrix<T>& dProbs) {
-        Matrix<T> dX = head.backward(softmax.backward(dProbs));
+        backward_logits(softmax.backward(dProbs));
+    }
+
+    // dLogits must correspond to the latest forward/forward_logits call.
+    void backward_logits(const Matrix<T>& dLogits) {
+        Matrix<T> dX = head.backward(dLogits);
         dX = final_ln.backward(dX);
         for (auto it = blocks.rbegin(); it != blocks.rend(); ++it)
             dX = it->backward(dX);
@@ -103,18 +117,32 @@ public:
     void save(const std::string& path) {
         std::ofstream out(path, std::ios::binary);
         if (!out) throw std::runtime_error("TokenTransformer: cannot create " + path);
+        detail::write_checkpoint_header<T>(out, "WTTF",
+            static_cast<std::uint32_t>(blocks.size()), configuration());
         embed.save_params(out);
         for (auto& blk : blocks) blk.save_params(out);
         final_ln.save_params(out);
         head.save_params(out);
+        out.flush();
+        if (!out) throw std::runtime_error("TokenTransformer: write failed: " + path);
     }
     void load(const std::string& path) {
         std::ifstream in(path, std::ios::binary);
         if (!in) throw std::runtime_error("TokenTransformer: cannot open " + path);
+        char magic[4] = {};
+        in.read(magic, 4);
+        if (!in) throw std::runtime_error("TokenTransformer: truncated header");
+        in.seekg(0);
+        if (std::string(magic, 4) == "WTTF")
+            detail::read_checkpoint_header<T>(in, "WTTF",
+                static_cast<std::uint32_t>(blocks.size()), configuration(), false);
+        // Older transformer files had no header. Component shape checks
+        // still validate their payload, and the final read must succeed.
         embed.load_params(in);
         for (auto& blk : blocks) blk.load_params(in);
         final_ln.load_params(in);
         head.load_params(in);
+        if (!in) throw std::runtime_error("TokenTransformer: read failed: " + path);
     }
 
     std::size_t vocab()   const { return vocab_; }
@@ -135,7 +163,14 @@ public:
     }
 
 private:
+    std::string configuration() const {
+        return "TokenTransformer(" + std::to_string(vocab_) + "," +
+            std::to_string(d_model_) + "," + std::to_string(n_heads_) + "," +
+            std::to_string(blocks.size()) + "," + std::to_string(d_ff_) + "," +
+            std::to_string(max_seq_) + ")";
+    }
     std::size_t vocab_, d_model_, max_seq_;
+    std::size_t n_heads_, d_ff_;
 
     Embedding<T>                    embed;
     SinusoidalPositionalEncoding<T> pe;

@@ -13,11 +13,14 @@
 #include "Matrix.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <numeric>
 #include <random>
 #include <stdexcept>
 #include <vector>
+#include <unordered_set>
+#include <utility>
 
 namespace weft {
 
@@ -57,7 +60,7 @@ Split<T> train_test_split(const Matrix<T>& X, const Matrix<T>& Y,
     if (X.cols() != Y.cols())
         throw std::invalid_argument(
             "train_test_split: X and Y must have the same number of columns");
-    if (test_fraction < 0.0 || test_fraction > 1.0)
+    if (!std::isfinite(test_fraction) || test_fraction < 0.0 || test_fraction > 1.0)
         throw std::invalid_argument("train_test_split: test_fraction not in [0, 1]");
 
     const std::size_t N      = X.cols();
@@ -76,6 +79,27 @@ Split<T> train_test_split(const Matrix<T>& X, const Matrix<T>& Y,
     return s;
 }
 
+template <typename T>
+struct ThreeWaySplit {
+    Matrix<T> X_train, Y_train, X_validation, Y_validation, X_test, Y_test;
+};
+
+template <typename T = float>
+ThreeWaySplit<T> train_validation_test_split(const Matrix<T>& X, const Matrix<T>& Y,
+                                             double validation_fraction,
+                                             double test_fraction, unsigned seed) {
+    if (!std::isfinite(validation_fraction) || !std::isfinite(test_fraction) ||
+        validation_fraction < 0 || test_fraction < 0 ||
+        validation_fraction + test_fraction >= 1)
+        throw std::invalid_argument("train_validation_test_split: invalid fractions");
+    auto outer = train_test_split(X, Y, test_fraction, seed);
+    auto inner = train_test_split(outer.X_train, outer.Y_train,
+                                  validation_fraction / (1 - test_fraction), seed + 1u);
+    return {std::move(inner.X_train), std::move(inner.Y_train),
+            std::move(inner.X_test), std::move(inner.Y_test),
+            std::move(outer.X_test), std::move(outer.Y_test)};
+}
+
 // ---- group-aware train/test split ---------------------------------------
 //   Splits columns by GROUP (e.g. file_id) rather than by individual column.
 //   When a dataset has multiple columns per source file (e.g. per-frame audio
@@ -91,6 +115,7 @@ struct GroupedSplit {
     Matrix<T>        X_train, Y_train;
     Matrix<T>        X_test,  Y_test;
     std::vector<int> file_ids_test;     // file id for each column of X_test
+    std::vector<int> file_ids_train;
 };
 
 template <typename T = float>
@@ -104,22 +129,19 @@ GroupedSplit<T> group_train_test_split(const Matrix<T>& X, const Matrix<T>& Y,
     if (X.cols() != file_ids.size())
         throw std::invalid_argument(
             "group_train_test_split: file_ids length must match X.cols()");
-    if (test_fraction < 0.0 || test_fraction > 1.0)
+    if (!std::isfinite(test_fraction) || test_fraction < 0.0 || test_fraction > 1.0)
         throw std::invalid_argument(
             "group_train_test_split: test_fraction not in [0, 1]");
 
     // Unique file ids, in order of first appearance.
     std::vector<int> unique_ids;
     {
-        std::vector<bool> seen;
+        std::unordered_set<int> seen;
         for (int id : file_ids) {
             if (id < 0)
                 throw std::invalid_argument(
                     "group_train_test_split: negative file_id");
-            if (static_cast<std::size_t>(id) >= seen.size())
-                seen.resize(id + 1, false);
-            if (!seen[id]) {
-                seen[id] = true;
+            if (seen.insert(id).second) {
                 unique_ids.push_back(id);
             }
         }
@@ -131,17 +153,16 @@ GroupedSplit<T> group_train_test_split(const Matrix<T>& X, const Matrix<T>& Y,
         test_fraction * unique_ids.size());
 
     // Mark each id as test or train using a flat lookup table for speed.
-    std::vector<bool> is_test(
-        *std::max_element(file_ids.begin(), file_ids.end()) + 1, false);
+    std::unordered_set<int> is_test;
     for (std::size_t i = 0; i < n_test_files; ++i)
-        is_test[unique_ids[i]] = true;
+        is_test.insert(unique_ids[i]);
 
     // Bucket the column indices accordingly.
     std::vector<std::size_t> tr_cols, te_cols;
     tr_cols.reserve(file_ids.size());
     te_cols.reserve(file_ids.size());
     for (std::size_t j = 0; j < file_ids.size(); ++j) {
-        if (is_test[file_ids[j]]) te_cols.push_back(j);
+        if (is_test.count(file_ids[j])) te_cols.push_back(j);
         else                      tr_cols.push_back(j);
     }
 
@@ -152,6 +173,8 @@ GroupedSplit<T> group_train_test_split(const Matrix<T>& X, const Matrix<T>& Y,
     s.Y_test  = Y.selectColumns(te_cols);
     s.file_ids_test.reserve(te_cols.size());
     for (auto c : te_cols) s.file_ids_test.push_back(file_ids[c]);
+    s.file_ids_train.reserve(tr_cols.size());
+    for (auto c : tr_cols) s.file_ids_train.push_back(file_ids[c]);
     return s;
 }
 

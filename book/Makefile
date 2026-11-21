@@ -2,7 +2,7 @@
 #  book/Makefile  --  build the book PDF
 #
 #  Lives in   book/   and is meant to be run from here, or via the
-#  root-level `make book` which delegates here:
+#  `make -C build book` from the repository root which delegates here:
 #
 #      cd book
 #      make             # build build/book.pdf
@@ -63,7 +63,7 @@ PANDOC_FLAGS := --from markdown+tex_math_dollars+raw_tex \
                 --template pandoc-template.latex
 
 LATEXMK       := latexmk
-LATEXMK_FLAGS := -pdf -interaction=nonstopmode -outdir=$(BUILD_DIR)
+LATEXMK_FLAGS := -pdf -interaction=nonstopmode -halt-on-error -outdir=$(BUILD_DIR)
 # Engine: pdflatex.  The preprocess_note.py script handles all Unicode
 # in the notes before pandoc, so pdflatex is sufficient (and faster
 # than lualatex).  Requires fontmethod=tex in book.tex (set there).
@@ -88,18 +88,14 @@ generated/%.tex: $(NOTES_DIR)/%.md pandoc-template.latex preprocess_note.py $(FI
 # tex (so editing a note triggers a rebuild) and on the hand-written
 # chapter files (so editing those does too).
 #
-# The leading `-` on the latexmk line tells make to ignore latexmk's
-# exit code.  latexmk will return nonzero whenever pdflatex emits any
-# error, including for undefined cross-references -- but the PDF is produced anyway in those
-# cases.  We check for the actual PDF after the run; if it's there, the
-# build succeeded; if not, fail.
-$(BUILD_DIR)/book.pdf: book.tex $(GENERATED) $(CHAPTERS) $(FIGURES)
+# Propagate LaTeX failures so CI cannot accept a stale PDF from a failed run.
+$(BUILD_DIR)/book.pdf: book.tex $(GENERATED) $(CHAPTERS) $(FIGURES) Makefile
 	@mkdir -p $(BUILD_DIR)
 	@# An editor building book.tex in place leaves book.bbl / book.bcf here.
 	@# LaTeX finds those before the ones in $(BUILD_DIR), and latexmk then
 	@# runs bibtex instead of biber and stops after one pass.
 	@rm -f book.bbl book.bcf
-	-$(LATEXMK) $(LATEXMK_FLAGS) book.tex
+	$(LATEXMK) $(LATEXMK_FLAGS) book.tex
 	@if [ -f $(BUILD_DIR)/book.pdf ]; then \
 	    echo ""; \
 	    echo "Built $(BUILD_DIR)/book.pdf"; \

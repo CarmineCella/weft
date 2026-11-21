@@ -43,8 +43,8 @@ dimensions as follows:
   that almost any TinySOL note produces at least one full patch.
   (Thirty-two frames = ~1.5 s would carry more context but would
   exclude all the shorter notes from training.) This duration assumes
-  frames remain consecutive in the original signal; section 4 describes
-  a limitation of the current cache.
+  frames remain consecutive in the original signal; section 4 explains
+  how frame offsets enforce that spacing.
 - **Frequency dimension.** Sixty-four bins is small enough for a
   tractable conv stack, but only if we pick the right 64 bins.
   Choosing them causes most of the difficulty; see §3 below.
@@ -168,8 +168,9 @@ expected single digits, and training oscillates strongly. The fix is
 a constant scale factor: divide log-mel values by 8 on the way into
 the network, multiply back by 8 on the way out. The constant is
 stored in each `MelTransform` object. Training and inference must
-construct it with the same settings; the saved network weights do not
-by themselves specify that preprocessing.
+construct it with the same settings. `AudioModelConfig` supplies those
+settings to the example programs, and its description is checked in
+each model file's configuration header.
 
 
 ## 4. Training
@@ -186,15 +187,16 @@ uses), then for each run of cached columns belonging to one
 source WAV, slide a 16-column window with a hop of 8 columns and extract
 patches. Each patch's 16 columns get mel-transformed from 2049 to 64
 bins inside the loop, and the resulting `(1, 64, 16)` tile becomes one
-training example. On TinySOL this gives about 24,000 patches, which
-fits easily in memory.
+training example. The earlier TinySOL run used about 24,000 patches.
+The count for newly extracted data depends on the contiguous runs that
+remain after removing silent frames.
 
-There is a temporal limitation in this pipeline. Per-frame feature
-extraction skips sufficiently silent frames, and the cache stores file
-IDs without original frame offsets. Consecutive retained columns can
-therefore straddle a gap in the waveform. The current patch builder
-treats them as adjacent. Preserving silent frames or retaining offsets
-would be necessary to guarantee uniformly spaced temporal patches.
+Per-frame extraction skips sufficiently silent frames. The version-three
+cache therefore retains each frame's original sample offset as well as
+its file ID. The patch builder starts a new run whenever a file changes
+or the offset difference is not one hop. It does not join across removed
+silence. Version-two caches lack that information and must be
+regenerated for this application.
 
 An epoch loss need not decrease monotonically. A representative
 TinySOL run reaches recon ≈ 13 at epoch 1 and recon ≈ 7 by epoch 10,

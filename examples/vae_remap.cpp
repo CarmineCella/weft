@@ -20,6 +20,7 @@
 //
 // Usage:  vae_remap <model_prefix> <input.wav> <output.wav>
 //
+#include "AudioModelConfig.h"
 #include "Dense.h"
 #include "Network.h"
 #include "ReLU.h"
@@ -36,12 +37,13 @@
 
 using namespace weft;
 
-constexpr std::size_t FRAME_SIZE = 4096;
-constexpr std::size_t HOP_SIZE   = 2048;
+constexpr std::size_t FRAME_SIZE = AudioModelConfig::frame_size;
+constexpr std::size_t HOP_SIZE   = AudioModelConfig::hop_size;
 constexpr std::size_t FEAT_DIM   = FRAME_SIZE / 2 + 1;   // 2049
-constexpr std::size_t LATENT     = 32;
+constexpr std::size_t LATENT     = AudioModelConfig::latent;
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     if (argc < 4) {
         std::cerr << "usage: vae_remap <model_prefix> <input.wav> <output.wav>\n";
         return 1;
@@ -68,8 +70,8 @@ int main(int argc, char** argv) {
     dec.add<Dense>(256, FEAT_DIM);
 
     try {
-        enc.load(prefix + ".enc");
-        dec.load(prefix + ".dec");
+        enc.load(prefix + ".enc", AudioModelConfig::metadata(false));
+        dec.load(prefix + ".dec", AudioModelConfig::metadata(false));
     } catch (const std::exception& e) {
         std::cerr << "error loading model: " << e.what() << "\n";
         return 1;
@@ -79,17 +81,16 @@ int main(int argc, char** argv) {
 
     // ---- Load input audio ----
     WavData wav;
-    try { wav = load_wav(in_path); }
+    try {
+        wav = load_wav(in_path);
+        AudioModelConfig::require_sample_rate(wav.sample_rate);
+    }
     catch (const std::exception& e) {
         std::cerr << "error loading audio: " << e.what() << "\n";
         return 1;
     }
     std::cout << "input: " << in_path << "  (" << wav.samples.size()
               << " samples @ " << wav.sample_rate << " Hz)\n";
-    if (wav.sample_rate != 44100)
-        std::cout << "note: model trained at 44100 Hz; other rates shift the "
-                     "frequency-to-bin mapping and may sound off-pitch\n";
-
     // ---- STFT ----
     auto frames = stft(wav.samples, FRAME_SIZE, HOP_SIZE);
     const std::size_t n = frames.size();

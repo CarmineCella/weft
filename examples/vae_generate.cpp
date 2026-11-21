@@ -32,6 +32,7 @@
 //   vae_generate <model_prefix> interp <A.wav> <B.wav> <out.wav>
 //   vae_generate <model_prefix> sample <donor.wav> <out.wav> [count] [seed]
 //
+#include "AudioModelConfig.h"
 #include "Dense.h"
 #include "Network.h"
 #include "ReLU.h"
@@ -49,10 +50,10 @@
 
 using namespace weft;
 
-constexpr std::size_t FRAME_SIZE = 4096;
-constexpr std::size_t HOP_SIZE   = 2048;
+constexpr std::size_t FRAME_SIZE = AudioModelConfig::frame_size;
+constexpr std::size_t HOP_SIZE   = AudioModelConfig::hop_size;
 constexpr std::size_t FEAT_DIM   = FRAME_SIZE / 2 + 1;   // 2049
-constexpr std::size_t LATENT     = 32;
+constexpr std::size_t LATENT     = AudioModelConfig::latent;
 
 // Rebuild the train_audio_vae architecture and load weights.
 static void load_models(const std::string& prefix,
@@ -69,8 +70,8 @@ static void load_models(const std::string& prefix,
     dec.add<ReLU>();
     dec.add<Dense>(256, FEAT_DIM);
 
-    enc.load(prefix + ".enc");
-    dec.load(prefix + ".dec");
+    enc.load(prefix + ".enc", AudioModelConfig::metadata(false));
+    dec.load(prefix + ".dec", AudioModelConfig::metadata(false));
     enc.eval();
     dec.eval();
 }
@@ -153,6 +154,8 @@ static int do_interp(Network<float>& enc, Network<float>& dec,
                      const std::string& a_path, const std::string& b_path,
                      const std::string& out_path) {
     WavData A = load_wav(a_path), B = load_wav(b_path);
+    AudioModelConfig::require_sample_rate(A.sample_rate);
+    AudioModelConfig::require_sample_rate(B.sample_rate);
     std::cout << "A: " << a_path << "  B: " << b_path << "\n";
 
     std::vector<std::vector<float>> phA, phB;
@@ -204,6 +207,7 @@ static int do_sample(Network<float>& dec,
     if (count < 1) count = 1;
 
     WavData donor = load_wav(donor_path);
+    AudioModelConfig::require_sample_rate(donor.sample_rate);
     std::vector<std::vector<float>> phD;
     stft_logmag(donor.samples, phD);          // we only need the donor's phase
     const std::size_t nD = phD.size();
@@ -253,6 +257,7 @@ static int do_sample(Network<float>& dec,
 }
 
 int main(int argc, char** argv) {
+    weft::set_seed(1);
     if (argc < 3) {
         std::cerr << "usage:\n"
                   << "  vae_generate <prefix> interp <A.wav> <B.wav> <out.wav>\n"

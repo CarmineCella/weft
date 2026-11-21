@@ -64,11 +64,12 @@ extract_averaged(const std::vector<float>& samples, float sample_rate,
 static std::vector<std::vector<float>>
 extract_per_frame(const std::vector<float>& samples, float sample_rate,
                   const std::string& type,
-                  std::size_t frame_size, std::size_t hop_size)
+                  std::size_t frame_size, std::size_t hop_size,
+                  std::vector<std::uint64_t>& offsets)
 {
     if (type == "logmag")
-        return logmag_spectrum_frames<float>(samples, frame_size, hop_size);
-    return mfcc_frames<float>(samples, sample_rate, frame_size, hop_size);
+        return logmag_spectrum_frames<float>(samples, frame_size, hop_size, &offsets);
+    return mfcc_frames<float>(samples, sample_rate, frame_size, hop_size, 40, 13, &offsets);
 }
 
 int main(int argc, char** argv) {
@@ -134,6 +135,8 @@ int main(int argc, char** argv) {
     std::vector<std::vector<float>> features;
     std::vector<int>                labels;
     std::vector<int>                file_ids;
+    std::vector<std::uint64_t>      frame_offsets;
+    std::uint32_t sample_rate = 0;
 
     std::size_t n_errors = 0;
     int next_file_id = 0;
@@ -141,6 +144,8 @@ int main(int argc, char** argv) {
         const auto& path = wav_paths[i];
         try {
             WavData wav = load_wav(path.string());
+            if (sample_rate != 0 && wav.sample_rate != sample_rate)
+                throw std::runtime_error("mixed sample rates; resample the corpus before extraction");
 
             const std::string cls = parse_class(path);
             int label;
@@ -154,15 +159,18 @@ int main(int argc, char** argv) {
             const int this_file_id = next_file_id++;
 
             if (per_frame) {
+                std::vector<std::uint64_t> offsets;
                 auto frames = extract_per_frame(wav.samples,
                                                 static_cast<float>(wav.sample_rate),
-                                                feature_type, FRAME_SIZE, HOP_SIZE);
-                for (auto& fr : frames) {
+                                                feature_type, FRAME_SIZE, HOP_SIZE, offsets);
+                for (std::size_t frame = 0; frame < frames.size(); ++frame) {
+                    auto& fr = frames[frame];
                     if (fr.size() != FEAT_DIM)
                         throw std::runtime_error("frame size mismatch");
                     features.push_back(std::move(fr));
                     labels.push_back(label);
                     file_ids.push_back(this_file_id);
+                    frame_offsets.push_back(offsets[frame]);
                 }
             } else {
                 auto feat = extract_averaged(wav.samples,
@@ -174,6 +182,7 @@ int main(int argc, char** argv) {
                 labels.push_back(label);
                 file_ids.push_back(this_file_id);
             }
+            sample_rate = wav.sample_rate;
         } catch (const std::exception& e) {
             ++n_errors;
             if (n_errors <= 5)
@@ -215,6 +224,10 @@ int main(int argc, char** argv) {
     cache.feature_type = feature_type;
     cache.per_frame    = per_frame;
     cache.file_ids     = std::move(file_ids);
+    cache.frame_offsets = std::move(frame_offsets);
+    cache.sample_rate = sample_rate;
+    cache.frame_size = FRAME_SIZE;
+    cache.hop_size = HOP_SIZE;
 
     try {
         save_features(out_path, cache);

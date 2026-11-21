@@ -23,9 +23,8 @@
 //       net.add<Dense>(4, 16);
 //       net.add<ReLU>();
 //       net.add<Dense>(16, 3);
-//       net.add<Softmax>();
 //
-//       CrossEntropy<float> ce;
+//       SoftmaxCrossEntropy<float> ce;  // consumes the Dense logits
 //       SGD<float>          opt(0.01f);
 //
 //       Matrix<float> S  = net.forward(X);
@@ -36,6 +35,7 @@
 //
 #include "Layer.h"
 #include "Matrix.h"
+#include "Checkpoint.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -123,38 +123,38 @@ public:
     // its own parameters (Dense writes weights+bias; activations write
     // nothing).  load() requires an already-constructed network with the
     // SAME architecture -- it fills in the weights, it does not build the
-    // graph.  Layer-count and per-matrix shape checks catch a mismatch.
-    void save(const std::string& path) const {
+    // graph. Version 2 also checks exact layer configuration, scalar width,
+    // and caller-supplied preprocessing metadata. Legacy version 1 has only
+    // layer-count/shape checks and cannot satisfy a metadata requirement.
+    void save(const std::string& path, const std::string& metadata = "") const {
         std::ofstream out(path, std::ios::binary);
         if (!out) throw std::runtime_error("Network::save: cannot open " + path);
-        out.write("WNET", 4);
-        const std::uint32_t version = 1;
-        const std::uint32_t n = static_cast<std::uint32_t>(layers_.size());
-        out.write(reinterpret_cast<const char*>(&version), sizeof(version));
-        out.write(reinterpret_cast<const char*>(&n), sizeof(n));
+        detail::write_checkpoint_header<T>(out, "WNET",
+            static_cast<std::uint32_t>(layers_.size()), configuration(metadata));
         for (const auto& layer : layers_) layer->save_params(out);
+        out.flush();
         if (!out) throw std::runtime_error("Network::save: write failed: " + path);
     }
 
-    void load(const std::string& path) {
+    void load(const std::string& path, const std::string& metadata = "") {
         std::ifstream in(path, std::ios::binary);
         if (!in) throw std::runtime_error("Network::load: cannot open " + path);
-        char magic[4];
-        in.read(magic, 4);
-        if (!in || std::string(magic, 4) != "WNET")
-            throw std::runtime_error("Network::load: bad magic in " + path);
-        std::uint32_t version = 0, n = 0;
-        in.read(reinterpret_cast<char*>(&version), sizeof(version));
-        in.read(reinterpret_cast<char*>(&n), sizeof(n));
-        if (n != layers_.size())
-            throw std::runtime_error(
-                "Network::load: layer count mismatch (build the same "
-                "architecture before loading)");
+        detail::read_checkpoint_header<T>(in, "WNET",
+            static_cast<std::uint32_t>(layers_.size()), configuration(metadata),
+            metadata.empty());
         for (auto& layer : layers_) layer->load_params(in);
         if (!in) throw std::runtime_error("Network::load: read failed: " + path);
     }
 
 private:
+    std::string configuration(const std::string& metadata) const {
+        std::string config;
+        for (const auto& layer : layers_) {
+            const std::string part = layer->configuration();
+            config += std::to_string(part.size()) + ":" + part;
+        }
+        return config + "\n" + metadata;
+    }
     std::vector<std::unique_ptr<Layer<T>>> layers_;
 };
 
