@@ -24,3 +24,4 @@ book/book.synctex.gz
 book/book.toc
 .vscode
 outputs
+book/*.synctex*
