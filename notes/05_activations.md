@@ -45,7 +45,7 @@ ReLU(z) = max(0, z)      element-wise
 Negative entries become zero; non-negative entries pass through. The
 shape is preserved, because the operation is element-wise.
 
-### Backward
+### Backward {#sec-05-activations-backward}
 
 ReLU's derivative is:
 
@@ -196,8 +196,10 @@ is:
 That is much simpler and numerically better-behaved than chaining the
 standalone Softmax backward with a standalone cross-entropy backward.
 [Chapter 7](07_cross_entropy.md) derives it. In weft the two stay
-separate classes, and a test checks that their composition equals
-`(S − T)/N`.
+separate classes. A test compares their composition with `(S − T)/N`
+at moderate logits. The current cross-entropy adds epsilon, so this
+agreement is approximate and can fail badly for extreme wrong
+predictions; chapter 7 explains the distinction.
 
 The standalone Softmax backward we implemented is still correct on its
 own (verified by the numerical gradient check in `test_softmax.cpp`),
@@ -225,7 +227,7 @@ We add these when we need them. For IRIS, ReLU is enough.
 
 ---
 
-## 5. The following chapters
+## 5. The following chapters {#sec-05-activations-the-following-chapters}
 
 We have everything for the forward pass of a classifier: `Dense →
 ReLU → Dense → Softmax`. To train it, we need a loss function.
@@ -236,7 +238,7 @@ of the Jacobian. [Chapter 7](07_cross_entropy.md) covers
 end-to-end network on IRIS.
 
 
-## Further reading
+## Further reading {#sec-05-activations-further-reading}
 
 The rectified linear unit became the default hidden activation after
 [@nair2010relu]. The softmax output, and its reading as a probability

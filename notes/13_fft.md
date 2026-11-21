@@ -138,7 +138,7 @@ Much of the later code depends on the FFT being correct, and therefore
 on these tests.
 
 
-## Further reading
+## Further reading {#sec-13-fft-further-reading}
 
 The fast Fourier transform in the form used here is [@cooley1965fft].
 For the discrete Fourier transform itself and its properties, see

@@ -1,30 +1,25 @@
 # 7 — Cross-entropy loss (and the Softmax+CE shortcut)
 
-This chapter covers the loss function we use for every classifier in
-weft. It also derives the Softmax + cross-entropy shortcut: the combined
-gradient with respect to the logits is `S − T`, divided by the batch
-size. Almost all classifier training code is built on that identity.
+Cross-entropy measures the probability a classifier assigns to its
+targets. Pairing it with softmax gives a particularly simple gradient
+with respect to the logits: `(S − T) / N`. We derive that identity,
+then distinguish it from the epsilon-regularised calculation currently
+used by weft. That distinction matters when a prediction is confidently
+wrong.
 
 ---
 
 ## 1. Why not squared error?
 
-Squared error penalises numeric distance: `(prediction − target)²`. That
-is the right loss when the prediction and target are real-valued
-quantities (temperature, price, pixel intensity). For classification, the
-prediction is a probability distribution (Softmax guarantees that), and
-so is the target (one-hot, or smoothed). We need a loss that measures how
-different the predicted distribution is from the target distribution.
-Squared error does not take into account that the output space is the
-simplex.
+Squared error penalises numeric distance: `(prediction − target)²`.
+It is useful for reconstructing real-valued quantities, and it can also
+score probability predictions. Here we use cross-entropy because it
+corresponds to the categorical model's negative log-likelihood.
 
-The second reason is practical. Squared error's gradient is bounded by
-the size of the prediction-minus-target vector, so a confidently wrong
-network gets only a moderate gradient. We need the opposite: a confident
-wrong prediction should be penalised more, not less.
-
-Cross-entropy solves both problems. It follows from information theory
-and from a maximum-likelihood argument.
+There is also a gradient argument. Backpropagating squared error through
+a saturated softmax can give a small logits gradient even when the
+predicted class is wrong. For the unmodified cross-entropy objective,
+the softmax factor cancels, leaving a strong correction for that error.
 
 ---
 
@@ -33,9 +28,9 @@ and from a maximum-likelihood argument.
 Given a target distribution `t` and a predicted distribution `s` over `K`
 classes:
 
-```
-H(t, s)  =  − Σᵢ tᵢ · log(sᵢ)
-```
+$$
+H(t,s) = -\sum_{i=1}^{K} t_i \log s_i.
+$$
 
 The quantity `−log(sᵢ)` is the **surprise** of seeing class `i` when the
 model assigned it probability `sᵢ`. If the model predicts 0.99 for the
@@ -46,14 +41,15 @@ surprise, weighted by the true distribution.
 For a one-hot target (the usual classifier setup, where the true class
 `c` has `t_c = 1` and the others are 0), the sum reduces to one term:
 
-```
-H(t, s)  =  − log(s_c)
-```
+$$
+H(t,s) = -\log s_c.
+$$
 
 The loss is the negative log of the probability the network assigned to
 the correct class. With 99% on the correct class the loss is ~0.01. With
-1% it is ~4.6. With 0% (impossible in practice, but instructive) it is
-infinite.
+1% it is ~4.6. At zero probability the ideal loss is infinite. Softmax
+has strictly positive outputs in exact arithmetic, but finite-precision
+exponentials can underflow to zero.
 
 > **Equivalent perspective: maximum likelihood.** If your model outputs
 > `P(class | input) = sᵢ`, then the likelihood of the data is the product
@@ -70,13 +66,14 @@ infinite.
 
 Average over `N` examples:
 
-```
-L  =  (1/N) · Σₙ Hₙ(Tₙ, Sₙ)  =  −(1/N) · Σₙ Σᵢ Tₙ[i] · log(Sₙ[i])
-```
+$$
+L = -\frac{1}{N}\sum_{n=1}^{N}\sum_{i=1}^{K}
+T_{i,n}\log S_{i,n}.
+$$
 
-Averaging (rather than summing) makes the loss magnitude independent of
-batch size, so learning rates don't need to be rescaled when the batch
-size changes.
+Averaging keeps a fixed per-example scale as batch size changes. Batch
+size can still affect optimization through gradient noise and the
+number of updates per epoch.
 
 By the convention of [chapter 3](03_backprop.md), the `1/N` factor is
 part of the gradient returned by the loss class, not of the backward
@@ -90,39 +87,49 @@ never handle batch-size arithmetic.
 Differentiating with respect to `Sₙ[i]` (one entry of the predicted
 distribution for one example):
 
-```
-∂L/∂Sₙ[i]  =  −(1/N) · Tₙ[i] / Sₙ[i]
-```
+$$
+\frac{\partial L}{\partial S_{i,n}}
+= -\frac{T_{i,n}}{N S_{i,n}}.
+$$
 
-This is what `CrossEntropy::backward()` returns. It grows without bound
-when `Sₙ[i]` is very small and `Tₙ[i] = 1`, which is the case of maximum
-error. The expression is correct, but it is fragile in float arithmetic.
+This is the derivative of the ideal objective. Its magnitude grows
+without bound as the probability of a target class approaches zero.
+Evaluating it separately from softmax is numerically fragile. The
+current `CrossEntropy::backward()` adds epsilon to the denominator;
+section 6 explains how that changes the objective and the gradient.
 
 ---
 
 ## 5. The Softmax + CE shortcut
 
 The Softmax Jacobian (from [chapter 6](06_jacobian.md)) is
-`∂Sᵢ/∂Zⱼ = Sᵢ(δᵢⱼ − Sⱼ)`. Chain it with the CE gradient:
+`∂Sᵢ/∂Zⱼ = Sᵢ(δᵢⱼ − Sⱼ)`. Chain it with the CE gradient for
+one example, temporarily omitting the batch factor:
 
-```
-∂L/∂Zⱼ  =  Σᵢ  (∂L/∂Sᵢ) · (∂Sᵢ/∂Zⱼ)
-        =  Σᵢ  (−Tᵢ / Sᵢ) · Sᵢ · (δᵢⱼ − Sⱼ)         ← Sᵢ cancels!
-        =  Σᵢ  (−Tᵢ) · (δᵢⱼ − Sⱼ)
-        =  −Tⱼ  +  Sⱼ · Σᵢ Tᵢ
-        =  Sⱼ  −  Tⱼ                                ← because Σᵢ Tᵢ = 1
-```
+$$
+\begin{aligned}
+\frac{\partial L}{\partial Z_j}
+&= \sum_i \frac{\partial L}{\partial S_i}
+           \frac{\partial S_i}{\partial Z_j} \\
+&= \sum_i \left(-\frac{T_i}{S_i}\right)
+           S_i(\delta_{ij}-S_j) \\
+&= -T_j + S_j\sum_i T_i \\
+&= S_j-T_j.
+\end{aligned}
+$$
+
+The last line uses the fact that the target probabilities sum to one.
 
 Adding the `1/N` batch factor gives:
 
-```
-∂L/∂Z  =  (S − T) / N
-```
+$$
+\frac{\partial L}{\partial Z} = \frac{S-T}{N}.
+$$
 
 The combined gradient through Softmax and cross-entropy is the
-prediction minus the target, divided by the batch size. Each of the two
-derivatives contains terms that can grow without bound; in the product
-these terms cancel.
+prediction minus the target, divided by the batch size. The reciprocal
+probability in the cross-entropy derivative cancels the probability
+factor in the softmax Jacobian.
 
 The combined form has these advantages:
 
@@ -133,27 +140,65 @@ The combined form has these advantages:
 - **Numerical**: no `Sᵢ` ever appears in a denominator in the combined
   form. Softmax probabilities that underflow cause no problem.
 
-Because of this identity, almost every classification training loop (in
-PyTorch, TensorFlow, JAX) uses a fused Softmax-cross-entropy operation
-internally. weft keeps the two separate, for the reasons in section 6.
+This identity motivates evaluating the loss directly from logits. It
+avoids forming a tiny probability only to take its logarithm and divide
+by it. Weft currently keeps the two classes separate.
 
 ---
 
-## 6. Why we still implement them separately in weft
+## 6. The current implementation and its numerical limit
 
-For pedagogy, we keep `Softmax` and `CrossEntropy` as separate classes,
-each with its own `backward`. The standalone formulas are correct and
-match the math we derived in [chapter 5](05_activations.md). The
-composition `Softmax.backward(CE.backward())` equals `(S − T)/N`, and
-test 4 verifies this identity numerically. For IRIS-scale problems the
-numerical fragility of the standalone form never appears. A library
-meant for large-K classifiers or extreme logit values would add a fused
-`SoftmaxCrossEntropy` class for stability; this book never needs one.
-The mathematics is the same either way.
+Separate `Softmax` and `CrossEntropy` classes make the chain rule easy
+to inspect. The current loss guards against `log(0)` by adding
+$\epsilon=10^{-12}$:
+
+$$
+\begin{aligned}
+L_\epsilon
+&= -\frac{1}{N}\sum_{n,i}T_{i,n}\log(S_{i,n}+\epsilon),\\
+\frac{\partial L_\epsilon}{\partial S_{i,n}}
+&= -\frac{T_{i,n}}{N(S_{i,n}+\epsilon)}.
+\end{aligned}
+$$
+
+Those two calculations agree with each other, but they are a modified
+objective. The epsilon prevents exact cancellation with the softmax
+Jacobian. For a one-hot target of class $c$, the logits gradient is:
+
+$$
+\frac{\partial L_\epsilon}{\partial Z_{:,n}}
+= \frac{S_{c,n}}{S_{c,n}+\epsilon}
+  \frac{S_{:,n}-T_{:,n}}{N}.
+$$
+
+When the target probability is comfortably above epsilon, the extra
+factor is close to one. The existing combined-gradient test checks that
+regime within its numerical tolerance. It does not establish equality
+for arbitrary logits.
+
+For a single example with double-precision logits `(50, -50)` and the
+second class as target, the ideal loss is approximately 100 and the
+logits gradient is approximately `(1, -1)`. The current implementation
+instead gives a loss near 27.631 and a gradient near
+`(3.72e-32, -3.72e-32)`. A confidently wrong prediction receives
+almost no correction. This is a limitation of the current code,
+including for a small classifier if it reaches extreme logits.
+
+A stable logits-based loss would use log-sum-exp. For one example with
+target class $c$ and $m=\max_i Z_i$:
+
+$$
+L = m + \log\!\left(\sum_i e^{Z_i-m}\right) - Z_c.
+$$
+
+Its backward pass can return `(S - T) / N` directly. That fused path is
+an implementation improvement; it is not present in the current
+classification examples. Keep the distinction between the ideal
+derivation and the epsilon-regularised code when interpreting a run.
 
 ---
 
-## 7. What we built
+## 7. What we built {#sec-07-cross-entropy-what-we-built}
 
 `src/Loss.h` is the abstract base, with `forward(predicted, target) ->
 scalar` (caches its inputs) and `backward() -> dL/d(predicted)`. By
@@ -163,16 +208,16 @@ convention, the mean-over-batch `1/N` factor is part of the gradient.
 
 - `forward`: computes the average cross-entropy. A small `eps` is added
   inside `log` to guard against an exact zero in `predicted`.
-- `backward`: computes `−(1/N) · T / S` elementwise (with the same eps in
-  the denominator).
+- `backward`: computes `−T / (N * (S + eps))` elementwise.
 
 `tests/test_crossentropy.cpp` contains these tests:
 
 1. Forward on a hand-checkable single example: `L = −log(0.7)`.
 2. Forward batch averaging.
 3. Numerical gradient check on `dL/dS`.
-4. **The combined identity**: `Softmax.backward(CE.backward()) == (S − T)/N`,
-   computed two ways and compared.
+4. **The combined identity at moderate logits**: compares
+   `Softmax.backward(CE.backward())` with `(S − T)/N` to a tolerance.
+   The epsilon makes this an approximation, as section 6 shows.
 5. Full-chain numerical gradient check: perturb each logit `Z[i,j]`,
    confirm `(L(Z+ε) − L(Z−ε))/(2ε)` matches the `dZ` produced by chaining
    `Softmax.backward(CE.backward())`.
@@ -195,8 +240,17 @@ ordered list of layers and runs them forward and backward as a unit.
 Then [chapter 9](09_iris.md) trains it on the IRIS dataset, the first
 training run on real data.
 
+## 9. Exercise: when does epsilon matter?
 
-## Further reading
+For a one-hot target, evaluate the extra gradient factor
+$S_c/(S_c+\epsilon)$ at target probabilities `1e-2`, `1e-12`, and
+`1e-20`, with `epsilon = 1e-12`. At which point does the current
+implementation stop approximating the ideal logits gradient? Explain
+why a numerical derivative check of the epsilon-modified forward loss
+can still pass.
+
+
+## Further reading {#sec-07-cross-entropy-further-reading}
 
 Entropy and cross-entropy as measures of information come from
 [@shannon1948communication]. The pairing of a softmax output with a

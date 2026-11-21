@@ -222,11 +222,15 @@ parameters at once, so its last line is the `z = 0.64`, `L = 0.065`
 case) and once with `weft::Dense`. It prints both sets of numbers so
 you can verify that they match.
 
-Build it with `make` in the `build/` directory and run
-`./examples/backprop_example` from there.
+From the `build/` directory:
+
+```
+make
+./examples/backprop_example
+```
 
 
-## Further reading
+## Further reading {#sec-04-one-weight-further-reading}
 
 Updating parameters from one noisy gradient estimate at a time goes back
 to the stochastic approximation method of [@robbins1951sgd].

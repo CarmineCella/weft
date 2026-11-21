@@ -66,12 +66,13 @@ figure is the energy of the difference divided by the energy of the
 reference. In every column the time, frequency and level go through
 the tokens. The columns differ in the phase: kept exactly, quantised
 to 16 values, restored by a rule, or drawn at random.
+The table labels follow chapter 28: Gamb denotes `Frank_Gamb_ori.wav`.
 
 | Sound | Exact phase | 16 phase values | Phase by a rule | Random phase |
 |---|---|---|---|---|
-| `cage.wav` | 8% | 9% | 47% | 46% |
-| `radiohead.wav` | 6% | 8% | 41% | 41% |
-| `Frank_Gamb_ori.wav` | 13% | 14% | 42% | 43% |
+| Cage | 8% | 9% | 47% | 46% |
+| Radiohead | 6% | 8% | 41% | 41% |
+| Gamb | 13% | 14% | 42% | 43% |
 
 The grids for time, frequency and level change the spectrogram by 6
 to 13%. Quantising the phase to 16 values adds about one point.
@@ -97,7 +98,8 @@ the three sounds came back with a spectrogram difference of about
 
 The model has three causal blocks with `d_model = 128`, four heads
 and `d_ff = 512`, 802,214 parameters. A training window is 320
-tokens, which is 64 atoms, about a third of a second of sound.
+tokens, which is 64 atoms. Its duration depends on atom density; in
+these recordings it is roughly a third of a second.
 
 The window rules of chapter 27 apply unchanged. A window starts at a
 multiple of 5 tokens, so that the position modulo 5 tells the model
@@ -105,8 +107,12 @@ which field it is writing. One window in twenty starts at the
 beginning of a sound.
 
 The corpus is three recordings of 10 to 13 seconds, 2,000 atoms each.
-The last tenth of each sound, in time, is held out. That leaves 9,001
-training tokens and 1,001 held-out tokens per sound.
+After sorting by atom centre time, the program holds out the last tenth
+of the atoms **by count**, not the last tenth of the recording's
+duration. That leaves 9,001 training tokens and 1,001 held-out tokens
+per sound. Since this held portion selects the checkpoint, it is
+within-recording validation. It does not test generalization to an
+unseen recording, and atom windows can overlap the split boundary.
 
 ```
 mp_analyze  decompose  data/cage.wav  cage  8000
@@ -126,10 +132,10 @@ training log shows the consequence.
 | 40 | 1.82 | 2.73 |
 
 After epoch 20 the training loss keeps falling and the held-out loss
-rises. The model has started to memorise its three sounds. The
+rises, a pattern consistent with overfitting. The
 program saves the weights with the lowest held-out loss, here those
 of epoch 20, and those are the weights used below. An epoch takes
-about 10 seconds.
+about 10 seconds in the recorded run.
 
 Two baselines are fitted on the same training tokens and scored on
 the same held-out tokens, in nats per token. The unigram model uses
@@ -153,7 +159,7 @@ never occur.
 ![The loss of the atom transformer over 40 epochs, with the held-out loss of the two baselines.](figures/29_training.png)
 
 
-## 4. Sampling
+## 4. Sampling {#sec-29-atom-transformer-sampling}
 
 Generation is the loop of chapter 27 with one addition. At every step
 only the tokens of the field that comes next are allowed. The
@@ -179,12 +185,14 @@ Markov baseline. Twelve seconds of sound are about 3,000 atoms, or
 
 ## 5. What the model generates
 
-The first check is whether the model copies its training sounds. With
-27,000 training tokens that is the obvious risk. The program counts
+The first check looks for exact local reuse of training tokens. With
+27,000 training tokens, memorization is a concern. The program counts
 the runs of 8 consecutive generated atoms (40 tokens) that occur,
 token for token, in a training sound. In every sound generated for
-this chapter the count is zero. The output is not a collage of pieces
-of the recordings.
+this chapter the count is zero. This rules out exact matches of that
+length in those samples. It does not detect shorter matches, near
+copies changed by quantization, or reuse of larger-scale patterns, so
+it is not a general demonstration of novelty.
 
 The second check is how the generated atoms are organised in time.
 `mp_generate stats` computes four numbers for an atom list:
@@ -198,10 +206,10 @@ The second check is how the generated atoms are organised in time.
   have another short atom within 6 ms. An attack is a group of them.
 
 | Atom list | Atoms per second | Long windows | Continuity | Clustering |
-|---|---|---|---|---|
-| `cage.wav` | 189 | 70% | 31% | 80% |
-| `radiohead.wav` | 157 | 71% | 42% | 88% |
-| `Frank_Gamb_ori.wav` | 214 | 75% | 43% | 74% |
+|----------------|----------|----------|----------|----------|
+| Cage | 189 | 70% | 31% | 80% |
+| Radiohead | 157 | 71% | 42% | 88% |
+| Gamb | 214 | 75% | 43% | 74% |
 | Transformer, temperature 1.0 (three sounds) | 250–277 | 79–81% | 39–47% | 81–83% |
 | Transformer, temperature 0.8 (two sounds) | 252–349 | 92–93% | 64–65% | 79–83% |
 | Markov chain (three sounds) | 153–204 | 69–70% | 26–27% | 82–86% |
@@ -230,27 +238,31 @@ above produce the examples.
 ![Six seconds of three atom lists, drawn as in the previous chapter: the 2,000 atoms of `cage.wav`, a sound generated by the transformer, and a sound generated by the Markov chain. The long atoms of the transformer form horizontal lines at low frequencies. The atoms of the Markov chain are spread over the whole frequency range.](figures/29_atom_lists.png)
 
 
-## 6. Limitations
+## 6. Limitations {#sec-29-atom-transformer-limitations}
 
-**The context is a third of a second.** The model sees 64 atoms. It
-can continue a partial and place the atoms of an attack together. It
-cannot know what happened one second earlier, so it cannot produce a
-phrase or a rhythm that lasts longer than its window. A longer window
-costs more: attention grows with the square of the window length.
+**The context is 64 atoms.** In these recordings that spans roughly a
+third of a second, with more or less time covered as density changes.
+The model can directly condition on only those atoms. It may repeat a
+local pattern for longer, but it has no direct access to earlier events
+once they leave the window. A longer window costs more: attention grows
+with the square of the token count.
 
 **The corpus is three sounds.** The held-out loss turns upward after
-20 epochs. A model of this size needs far more material before more
-training helps. With more recordings the same program applies
-unchanged.
+20 epochs, so training longer did not improve this validation measure.
+More recordings and a comparison with smaller models would be useful
+next experiments. Measuring generalization to new recordings would
+require a split by recording, which this example does not implement.
 
 **The output is denser than the recordings.** The model writes 250
-to 280 atoms per second where the recordings have 160 to 210, and it
+to 277 atoms per second where the recordings have 157 to 214, and it
 uses long windows more often than they do.
 
-**Quality is bounded by the token round trip.** The rendering of
-generated tokens cannot be better than the rendering of the tokens of
-a real sound (section 2), which is itself a 2,000-atom approximation
-of the recording (chapter 28).
+**The representation has its own error.** Section 2 measures
+tokenization loss relative to a 2,000-atom rendering, which is itself an
+approximation of the recording. That round trip is a reference for the
+precision of the representation, not a universal ceiling on the
+perceived quality of newly generated sounds. It helps separate
+representation error from errors introduced by the sequence model.
 
 **Phase is predicted like any other token.** Two overlapping atoms of
 one partial add up only if their phases agree. The model predicts
@@ -262,7 +274,7 @@ trained parameters. The transformer is a trained model with no
 knowledge of sound. The tokens are the interface between them.
 
 
-## Further reading
+## Further reading {#sec-29-atom-transformer-further-reading}
 
 Matching pursuit is [@mallat1993mp]. The decoder-only transformer
 trained to predict the next token is [@radford2018gpt]. Generating

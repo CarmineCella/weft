@@ -155,9 +155,9 @@ of a network like this one and re-run the numerical gradient check.
 
 ---
 
-## 7. What we built
+## 7. What we built {#sec-08-network-what-we-built}
 
-`src/Network.h` owns layers via `unique_ptr<Layer<T>>` and provides
+The network owns its layers through `unique_ptr`. Its interface provides
 `forward`, `backward`, `update`, and the `add<L>` template helper (plus
 `train()`/`eval()`, `summary()` and `save`/`load`, used from chapter 11
 on).
@@ -171,8 +171,10 @@ on).
    for 200 steps and cross-entropy loss drops by more than 3×. It is
    the first training run in the library.
 4. `summary()` and `describe()` print the architecture.
-5. `save` then `load` round-trips the parameters, and `load` rejects a
-   network with a different architecture.
+5. `save` then `load` round-trips the parameters, and loading rejects
+   mismatched layer counts or parameter shapes. These checks do not
+   distinguish every same-shaped architecture; chapter 19 describes
+   the serialization contract.
 
 ---
 
@@ -201,7 +203,7 @@ Later chapters add:
   and [22](22_convnets.md)): these need 4-D tensors.
 
 
-## Further reading
+## Further reading {#sec-08-network-further-reading}
 
 Building a network as a chain of modules, each with its own forward and
 backward function, is the design described in [@lecun1998gradient].

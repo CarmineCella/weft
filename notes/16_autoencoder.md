@@ -3,11 +3,11 @@
 Everything so far has been *supervised*: we give the network an input
 and a label, and it learns the mapping. An autoencoder uses no labels.
 It receives an input and is asked to reproduce that same input at the
-output, but the signal must first pass through a narrow middle layer,
-so the network cannot copy it. To reconstruct well through this
-bottleneck, the network has to encode the underlying structure of the
-data compactly. This is representation learning, and generative models
-build on it.
+output, but the signal must first pass through a narrow middle layer.
+That bottleneck encourages a compact representation. It does not by
+itself prevent memorization or guarantee that the code captures useful
+structure; reconstructions and new inputs let us examine what was
+learned.
 
 This chapter covers the small primitives the autoencoder needs (MSE
 loss and the Sigmoid activation), the autoencoder itself, and the
@@ -26,9 +26,9 @@ distribution. For an autoencoder reconstructing pixel intensities,
 the natural objective is squared error, which measures how far each
 output pixel is from the corresponding input pixel.
 
-```
-L = (1 / 2N) * sum over examples, sum over features  (P - T)^2
-```
+$$
+L = \frac{1}{2N}\sum_{n=1}^{N}\sum_i(P_{i,n}-T_{i,n})^2.
+$$
 
 `P` is the prediction, `T` the target, `N` the batch size. We sum over
 features (the 784 pixels) and average over examples. This is the same
@@ -39,9 +39,9 @@ size.
 The factor of `1/2` is a convenience: differentiating the square
 brings down a 2 that cancels it, leaving the gradient
 
-```
-dL/dP = (1/N) (P - T)
-```
+$$
+\frac{\partial L}{\partial P} = \frac{P-T}{N}.
+$$
 
 The gradient is the (averaged) error: each output is pushed toward its
 target in proportion to its error. `tests/test_mse.cpp` checks the
@@ -64,16 +64,16 @@ it could output any real number, including negatives and values above
 1, which are not valid pixel intensities. The logistic sigmoid maps
 any real input into (0, 1):
 
-```
-sigma(x) = 1 / (1 + e^-x)
-```
+$$
+\sigma(x) = \frac{1}{1+e^{-x}}.
+$$
 
 so the reconstruction is always a valid intensity. Its derivative has
 a compact form:
 
-```
-sigma'(x) = sigma(x) (1 - sigma(x))
-```
+$$
+\sigma'(x) = \sigma(x)(1-\sigma(x)).
+$$
 
 Since the forward pass already computed `Y = sigma(Z)`, the backward
 pass reuses `Y` directly: `dZ = dY * Y * (1 - Y)`, element-wise. Like
@@ -100,18 +100,18 @@ expanded back to 784 pixels. The loss is MSE between the output and
 the original input. The training objective contains no labels; the
 input is its own target.
 
-The bottleneck is the essential part. 16 numbers cannot store 784
-independent pixels, so the network is forced to find what is
-redundant. MNIST digits are not random pixels. They lie on a
-low-dimensional manifold (strokes, curves, a few degrees of freedom).
-The autoencoder learns a coordinate system for that manifold. The
-encoder maps an image to its coordinates, and the decoder maps
-coordinates back to an image.
+The bottleneck reduces the dimension available to represent an image.
+MNIST digits have repeated structure: strokes, curves, slant, and
+thickness. A useful encoder can exploit those regularities rather than
+represent every pixel independently. Thinking of the codes as
+coordinates on a manifold is a helpful picture, but the reconstruction
+objective does not guarantee such a coordinate system. A sufficiently
+flexible model can also memorize a finite training set.
 
-The bottleneck layer itself is **linear** (no activation). We want
-the latent code to be able to take any real value in any direction.
-Squashing it would distort the geometry that we use below for
-interpolation.
+The bottleneck layer itself is **linear** (no activation). This leaves
+the latent coordinates signed and unbounded. It is an implementation
+choice; it does not ensure that distances in latent space correspond
+to perceptual similarity.
 
 ---
 
@@ -160,13 +160,11 @@ After training, we run a few test digits through `enc` then `dec` and
 write the originals and their reconstructions to a BMP image
 (`ae_reconstructions.bmp`) using the `Bmp.h` writer: top row the
 originals, bottom row the reconstructions, each digit scaled up for
-easier viewing. A well-trained autoencoder produces a slightly blurry
-but clearly recognisable copy. The blur comes from the bottleneck:
-fine detail is the high-dimensional information that 16 numbers can't
-retain, so the network keeps the coarse shape and drops the rest. A
-side effect is that the noise in any single pixel, being unpredictable
-from the rest of the image, can't pass the bottleneck either, so
-reconstructions come out denoised relative to their inputs.
+easier viewing. In this example, reconstructions are recognisable but
+slightly blurry. Both limited model capacity and the squared-error
+objective can contribute: uncertain details may be reconstructed as an
+average. Compression can suppress some noise, but this model was not
+trained on noisy/clean pairs and is not guaranteed to denoise.
 
 ![Test digits (top row) and their reconstructions by the autoencoder (bottom row).](figures/16_reconstructions.png)
 
@@ -179,23 +177,25 @@ means of compression. Take two test digits, say a 3 and an 8. Encode
 both to get codes `za` and `zb`. Then walk a straight line between
 them in latent space and decode each point:
 
-```
-z(t) = (1 - t) za + t zb,   for 8 evenly spaced t from 0 to 1
-```
+$$
+z(t) = (1-t)z_a + tz_b,\qquad 0\leq t\leq 1.
+$$
+
+The example decodes eight evenly spaced values of $t$.
 
 Decoding each `z(t)` produces a sequence of images that morph the 3
 smoothly into the 8, written side by side into `ae_interpolation.bmp`.
-The intermediate images are not averages of the two pictures, which
-would look like a double exposure. They are plausible digit-like
-shapes that the decoder generates from points the encoder never
-visited during training. The network has learned a continuous space
-in which the points between a 3 and an 8 decode to coherent shapes.
+The intermediate images are decoded latent blends, not direct pixel
+averages. In the displayed example they remain digit-like. Other
+endpoint pairs may pass through poor reconstructions; a continuous
+decoder guarantees continuous changes in its output, not recognisable
+images everywhere along the path.
 
 Generation relies on this continuity. If decoding arbitrary points in
 latent space yields plausible outputs, then we can *sample* new points
 and get new outputs: new digits, or in the audio version, new timbres.
-The plain autoencoder comes close to this, with one limitation
-described in the next section.
+The plain autoencoder does not specify where to sample, which is the
+limitation considered next.
 
 ![A 3 changed into an 8 by interpolating between their latent codes.](figures/16_interpolation.png)
 
@@ -205,20 +205,19 @@ described in the next section.
 
 A plain autoencoder's latent space has no enforced shape. The encoder
 is free to place codes wherever is convenient: clusters in some
-places, voids in others, arbitrary scales on each axis. Interpolating
-between two real encoded points usually works because the path tends
-to stay near the data. But a random latent code with no real image
-behind it often lands in one of the voids, and the decoder produces
-meaningless output. The space is good for reconstructing and
-interpolating known points, not for sampling new ones.
+places, voids in others, arbitrary scales on each axis. A line between
+encoded inputs can leave the regions covered during training, and an
+arbitrarily sampled code has no reason to land in one of those regions.
+Good reconstruction alone therefore does not give us a sampling
+procedure.
 
-The **variational autoencoder** (next chapter) fixes this by forcing
-the latent space into a known shape without gaps, a unit Gaussian, so
-that any sample from that distribution decodes to something plausible.
-That requires encoding a distribution instead of a point (the
-reparameterisation trick), and a second loss term that pulls the
-latent distribution toward the standard normal (the KL divergence).
-Generation then consists of drawing `z` from a normal and decoding it.
+The **variational autoencoder** (next chapter) introduces a distribution
+for each encoded input and a regularizer that encourages those
+distributions to remain close to a chosen prior, here a unit Gaussian.
+We can then draw `z` from that prior and decode it. This makes sampling
+part of the model, but it does not guarantee that every draw is
+plausible. Decoded grids and random samples will show how well the
+regularization worked.
 
 Once generation works on MNIST, the same method applies to the audio
 goal: train the encoder/decoder on per-frame spectra instead of
@@ -226,7 +225,7 @@ pixels, and the latent space becomes a space of timbres to interpolate
 through and sample from.
 
 
-## Further reading
+## Further reading {#sec-16-autoencoder-further-reading}
 
 Training a network to reproduce its input through a narrow layer, and
 what the resulting codes are good for, is the subject of

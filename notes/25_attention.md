@@ -1,21 +1,16 @@
 # 25 — Attention
 
-So far the library mixes information across positions in an input
-with dense layers and with convolutions. A dense layer mixes all
-positions with all others through a fixed weight matrix that has to
-be learned for every pair, which needs many parameters and ignores
-translation. A convolution mixes only neighbours within a fixed
-receptive field, which works well when locality is the right prior
-and not at all when it isn't. Both assume that which positions
-interact, and how much, is set when the layer is constructed, through
-the shapes of the weights. Once the network is fixed, the
-relationships are fixed.
+The dense layer mixes features within each input column using a learned
+weight matrix. A convolution applies learned kernels over a local
+neighborhood. Both use the same learned coefficients for each example,
+although nonlinear networks built from them can have input-dependent
+responses.
 
-Attention drops that assumption. Each position decides at forward
-time, from the data, which other positions to draw on. The mechanism
-is small: a softmax over similarity scores. It has replaced almost
-everything else for language, and a growing share of the models for
-music and audio.
+Attention makes the mixing coefficients themselves depend on the input.
+Each query receives scores against the keys, and a softmax turns those
+scores into weights for combining the values. This gives us an explicit
+way to relate positions in a sequence, which we will use for musical
+events and audio atoms.
 
 This chapter builds the attention operator in steps:
 scaled-dot-product attention as a pure function of `(Q, K, V)`, then
@@ -53,11 +48,14 @@ n_q}`. Keys and values stack as columns of `K ∈ R^{d_k × n_k}` and
 `V ∈ R^{d_v × n_k}`. The whole batched operation reduces to two
 matrix multiplications with a per-column softmax between them:
 
-```
-S = K^T Q                  (n_k × n_q)         every column = scores for one query
-A = softmax(S, per column) (n_k × n_q)         every column = attention weights for one query
-out = V A                  (d_v × n_q)         every column = weighted value combination
-```
+$$
+S=K^\mathsf{T}Q,\qquad
+A=\operatorname{softmax}_{\mathrm{columns}}(S),\qquad
+\mathrm{out}=VA.
+$$
+
+Both $S$ and $A$ have shape $n_k\times n_q$: one column per query.
+The output has shape $d_v\times n_q$.
 
 This fits our column-as-example convention: each column of the
 output is one query's retrieval.
@@ -68,23 +66,23 @@ output is one query's retrieval.
 The formula above is unscaled attention. Scaled-dot-product attention
 divides the scores by `sqrt(d_k)` before the softmax:
 
-```
-A = softmax( (K^T Q) / sqrt(d_k) )
-```
+$$
+A=\operatorname{softmax}_{\mathrm{columns}}
+\left(\frac{K^\mathsf{T}Q}{\sqrt{d_k}}\right).
+$$
 
-The reason is statistical. If `q` and `k` are independent vectors
-with unit-variance components, then `<q, k>` has mean 0 and variance
-`d_k`. For large `d_k` the dot product spreads over a wide range, and
-the softmax becomes nearly one-hot: a small perturbation in the score
-changes the weight by a large amount, and the gradient through the
-softmax is close to zero almost everywhere. The `sqrt(d_k)` rescaling
-keeps the score variance at 1 regardless of dimension, so the softmax
-stays in the regime where its gradients are not negligible. The
-Vaswani paper [@vaswani2017attention] introduced the scaling for this
-reason. Past `d_k ≈ 64`, training works with it and fails without it.
+The reason is statistical. Under the simplifying assumption that
+components of `q` and `k` are independent, zero-mean, and unit-variance,
+their dot product has variance `d_k`. Larger score differences can
+saturate softmax toward a one-hot distribution, where its Jacobian
+entries are small. Dividing by `sqrt(d_k)` keeps the variance at one
+under those assumptions. Learned queries and keys need not retain that
+distribution, but the scaling is a useful default introduced by
+[@vaswani2017attention]. There is no universal dimension threshold at
+which an unscaled model must fail.
 
 
-## 3. Backward
+## 3. Backward {#sec-25-attention-backward}
 
 The forward pass has two matmuls with a softmax between them. The
 backward is the same in reverse: matmul backward (which we already
@@ -184,15 +182,13 @@ run without warnings, and train a broken model with no visible error.
 These are not conceptual points. They are errors that the test suite
 catches and that would otherwise take a long time to debug.
 
-**SIGFPE in the constructor.** Our first version of
-`MultiHeadAttention(d_model, n_heads)` had `d_head_(d_model /
-n_heads)` in the member-initializer list, with the validation `if
-(n_heads == 0) throw ...` in the body. Member initializers run
-before the body. Integer division by zero on Linux is `SIGFPE` (a
-hardware trap), not a C++ exception, so passing `n_heads = 0` crashed
-the test executable before any of our error messages could be
-produced. The fix is to do the validation in a static helper called
-from the initializer list, so that the throw happens first.
+**SIGFPE in the constructor.** Our first multi-head constructor computed
+`d_head_` by dividing `d_model` by `n_heads` in its initializer list.
+The body checked for `n_heads == 0`, but member initializers run before
+the body. Integer division by zero is undefined behavior; on the Linux
+test build it trapped with `SIGFPE` before our exception could be
+thrown. The fix is to validate in a static helper called from the
+initializer list, so that the check happens first.
 
 **One softmax cache per head, not one shared.** Each head needs to
 remember its own attention weights for its backward pass, because
@@ -270,10 +266,10 @@ same change does reach them. The gradients still agree with finite
 differences, to a few `1e-11` for both the operator and
 `MultiHeadAttention`.
 
-![Attention weights for a sequence of 8 positions with random scores. Each row sums to 1. With the causal mask a position gives no weight to the positions after it.](figures/25_causal_mask.png)
+![Attention weights for 8 positions with random scores. Queries are rows in this plot, transposed from the code's column-query convention, so each row sums to 1. The causal mask removes weight on future keys.](figures/25_causal_mask.png)
 
 
-## 8. What is not implemented
+## 8. What is not implemented {#sec-25-attention-what-is-not-implemented}
 
 Other common variants are not implemented:
 
@@ -293,7 +289,7 @@ encoding, LayerNorm, residual connections) and assembles a complete
 transformer block.
 
 
-## Further reading
+## Further reading {#sec-25-attention-further-reading}
 
 Attention as a learned, soft alignment between sequence positions was
 introduced for translation by [@bahdanau2015attention]. Scaled

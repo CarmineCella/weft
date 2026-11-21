@@ -1,20 +1,33 @@
 % Introduction -- hand-written.  Everything after this is generated from
 % ../notes/*.md.
 
-This book builds a neural-network library from nothing, one piece at a
-time, and uses each piece on sound and music as soon as it exists.  The
+How should a neural network represent sound? A vector of spectral
+magnitudes makes some operations easy and leaves phase unresolved. A
+set of synthesiser controls makes the output audible directly, but limits
+what the model can express. A sequence of notes preserves musical
+events while leaving their rendering to an instrument. We will build
+these alternatives and examine what each one gains and loses.
+
+The route is a small neural-network library, built one piece at a
+time and applied to sound and music. The
 library is called \texttt{weft} (\emph{Weights Estimated From Training}).
 It is written in C++, it is header-only, and it depends on nothing beyond
 the C++ standard library: the matrix product, backpropagation, the
 optimisers, the Fourier transform, convolution and attention are all
 implemented here and explained here.
 
-The book and the library were written together.  Each chapter introduces
-one part of \texttt{weft}: it states the mathematics, derives the
-gradients, shows the code that implements them, and points to a test that
-checks the result numerically.  Nothing in the library is there without a
-chapter that explains it, and no chapter describes code that you cannot
-open and run.
+The book and the library were written together. The implementation
+chapters connect mathematics, gradients, source code, and numerical
+checks; the application chapters ask what those components can do with
+data. Some experiments work better than others. Their failures help us
+separate a model's limitations from those of its representation and its
+renderer.
+
+This is a book for programmers who want to inspect neural audio models
+at the level of their arithmetic. The examples are offline CPU
+experiments. They provide material for audio applications, but meeting
+the latency and allocation constraints of a real-time audio callback
+requires a separate engineering step.
 
 \section*{What the chapters cover}
 
@@ -26,14 +39,17 @@ handwritten digits, show the core working end to end.
 Audio enters with the fast Fourier transform and spectral features, which
 lead to a classifier of orchestral instrument samples.  Autoencoders and
 variational autoencoders follow, first on digits and then on spectrograms,
-where they are used to generate sounds and to interpolate between timbres.
+where they are used to explore reconstruction, sampling, and timbre
+interpolation. Magnitude compression and borrowed phase make the
+limitations audible.
 
 A chapter on performance makes training practical with a threaded matrix
 product and an optional BLAS backend.  Four-dimensional tensors then open
 the way to convolutional networks and to a convolutional autoencoder for
 audio.  A chapter on differentiable synthesis then lets a network control
-a classical harmonic-plus-noise synthesiser, which is where the book's
-audio becomes clean.  The last chapters build attention, positional
+a classical harmonic-plus-noise synthesiser. Its output avoids the
+borrowed-phase reconstruction used by the VAEs, at the cost of the
+synthesiser's restricted sound model. The last chapters build attention, positional
 encoding and layer normalisation, assemble them into a transformer
 block, and train a small transformer that writes four-voice chorales.
 The book ends with matching pursuit, which writes a recording as a list
@@ -43,9 +59,10 @@ lists, so that what it writes is sound.
 \section*{What you need}
 
 You need to be comfortable reading C++ and to remember some linear algebra
-and calculus: matrix products, partial derivatives and the chain rule.  No
-earlier experience with machine learning is assumed.  The first chapter
-explains why the library is in C++ and not in Python.
+and calculus: matrix products, partial derivatives and the chain rule.
+You should be able to follow a templated class, a vector, and a loop over
+a flat buffer. No earlier experience with machine learning is assumed.
+The first chapter explains the implementation choices and their costs.
 
 \section*{How to read it}
 
@@ -54,3 +71,13 @@ Read with the source open.  The headers are in \texttt{src/}, the tests in
 \texttt{build/} directory, \texttt{make} compiles everything and
 \texttt{make test} runs the tests.  The chapters are meant to be read in
 order, because each one uses the code written in the chapters before it.
+Iris and MNIST provide small, inspectable tests of the machinery before
+we move to audio in chapter~\ref{ch:13_fft}.
+
+For each experiment, distinguish three questions: does the implementation
+pass its numerical checks, does the model improve its stated objective,
+and does the result serve the musical purpose? A lower loss can answer
+the second question while leaving the third unresolved. Listen to
+reconstructions alongside their inputs and compare generated results
+with the classical baselines. Keep the source revision, build options,
+data selection, and commands with any result you want to reproduce.

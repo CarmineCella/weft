@@ -194,7 +194,7 @@ are equal, and logmag costs a hundred times more training time.
 
 ---
 
-## 8. What is not implemented
+## 8. What is not implemented {#sec-15-sound-classifier-what-is-not-implemented}
 
 - **CQT (Constant-Q Transform).** Logarithmically spaced bins give
   better pitch invariance. It would be worth adding as a third
@@ -217,7 +217,7 @@ mode, standardisation, group-aware splitting, a small binary
 serialisation format) into a complete classifier.
 
 
-## Further reading
+## Further reading {#sec-15-sound-classifier-further-reading}
 
 The instrument samples come from the Studio On Line recordings;
 the dataset and its role in computer-assisted orchestration are

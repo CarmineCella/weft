@@ -1,8 +1,8 @@
 # 23 — A convolutional VAE for audio
 
 The audio VAE of [chapter 19](19_audio_vae.md) works on individual STFT
-frames. Each column of the magnitude spectrogram becomes an isolated
-2049-dimensional vector that the dense encoder reduces to 32 latent
+frames. Each spectrogram column becomes a vector of 2049 magnitudes
+that the dense encoder reduces to 32 latent
 dimensions and the dense decoder reconstructs. That gives us a learned
 dictionary of instantaneous spectra, but discards time. The
 encoder never sees that the slice taken 50 ms into a violin attack
@@ -24,8 +24,8 @@ as well as static timbre.
 
 This chapter builds that ConvVAE and applies it to interpolating
 between two timbres in latent space, sampling from the prior to
-invent new timbres, and remapping arbitrary input audio onto the
-manifold the model has learned. We also state where the result is
+explore new timbres, and remapping input audio through the learned
+representation. We also state where the result is
 good and where it is not.
 
 
@@ -37,11 +37,14 @@ each frame has 2049 magnitude bins spanning 0 to 22 kHz at ~10.77 Hz
 per bin, and consecutive frames are 46 ms apart. We choose the
 dimensions as follows:
 
-- **Time dimension.** Sixteen frames is ~0.8 seconds. This is long
+- **Time dimension.** Sixteen consecutive STFT frames span ~0.8 seconds.
+  This is long
   enough to capture attack-to-sustain transitions and short enough
   that almost any TinySOL note produces at least one full patch.
   (Thirty-two frames = ~1.5 s would carry more context but would
-  exclude all the shorter notes from training.)
+  exclude all the shorter notes from training.) This duration assumes
+  frames remain consecutive in the original signal; section 4 describes
+  a limitation of the current cache.
 - **Frequency dimension.** Sixty-four bins is small enough for a
   tractable conv stack, but only if we pick the right 64 bins.
   Choosing them causes most of the difficulty; see §3 below.
@@ -132,35 +135,41 @@ problem: the conv VAE is supposed to add something a vocoder can't
 do, but if the underlying audio quality is worse, none of the
 latent-space arguments matter.
 
-**Mel-frequency scaling solves the harmonic-smearing problem.** The
-triangular mel filterbank concentrates resolution where the ear is
-most sensitive: logarithmic spacing, narrow filters at low
-frequencies, wide at high. With 64 mel bins covering 0–22 kHz at
-44.1 kHz sample rate, roughly 35 of those bins sit below 4 kHz, where
-most of the harmonic content is. A 440 Hz tone now contributes to
-several adjacent mel bins whose triangles overlap the peak; the
-harmonic structure survives the forward transform.
+**Mel-frequency scaling reallocates the available resolution.** The
+triangular mel filterbank uses narrower filters at low frequencies and
+wider ones at high frequencies. This preserves more low-frequency
+detail than equal-width block averaging with the same output size, but
+it still merges spectral components. Sixty-four mel values cannot
+retain every harmonic peak in 2049 input bins.
 
-Going back from mel to linear uses the transpose of the filterbank
-matrix as a pseudo-inverse. Each linear bin receives the sum, over
-mel bins, of the mel bin's value weighted by the triangle that
-originally fed it. This is lossy (`M^T M` is not the identity, because
-the filters overlap), but it is the standard approximate inversion.
-The spectrogram comes back blurred but with the peaks roughly where
-they should be.
+Going back to linear magnitudes, the current `MelTransform` applies the
+transpose of the filterbank matrix. If $v$ is the linear magnitude and
+$u=Mv$ its mel representation, the return path computes:
 
-There is a stability problem that we found during training: mel
-binning concentrates energy, so raw log-mel-magnitude values are about
-9× larger than the corresponding log-mag values for the same audio.
-Feeding those larger values into the encoder's randomly-initialised
+$$
+\widehat{v}=M^\mathsf{T}u=M^\mathsf{T}Mv.
+$$
+
+This is a **backprojection**, not generally a Moore–Penrose
+pseudoinverse. Each mel value is spread over the triangle that collected
+it. Overlapping filters and dimensional reduction mean that the round
+trip changes both detail and scale. A pseudoinverse or a constrained
+least-squares reconstruction would be a different algorithm. The method
+name `logmel_to_linear_mag` describes the output format; it does not
+imply an exact inverse.
+
+There is a stability problem that we found during training: summing
+magnitudes through the mel filters changed the input scale. Feeding
+the resulting larger log-mel values into the encoder's randomly-initialised
 final dense layer produces correspondingly larger `log σ²` outputs at
 initialisation, and the `exp(log σ²)` term in the KL loss becomes very
 large: we see KL values in the hundreds of thousands instead of the
 expected single digits, and training oscillates strongly. The fix is
 a constant scale factor: divide log-mel values by 8 on the way into
 the network, multiply back by 8 on the way out. The constant is
-stored in `MelTransform`'s state so training and inference always
-agree.
+stored in each `MelTransform` object. Training and inference must
+construct it with the same settings; the saved network weights do not
+by themselves specify that preprocessing.
 
 
 ## 4. Training
@@ -173,19 +182,26 @@ epochs.
 
 The data pipeline differs from the dense case. We read
 the per-frame logmag cache (the same one [chapter 19](19_audio_vae.md)
-uses), then for each contiguous run of frames belonging to one
-source WAV, slide a 16-frame window with a hop of 8 frames and extract
+uses), then for each run of cached columns belonging to one
+source WAV, slide a 16-column window with a hop of 8 columns and extract
 patches. Each patch's 16 columns get mel-transformed from 2049 to 64
 bins inside the loop, and the resulting `(1, 64, 16)` tile becomes one
 training example. On TinySOL this gives about 24,000 patches, which
 fits easily in memory.
 
-In a healthy run the reconstruction loss decreases monotonically and
-KL stays stable in single digits, with no oscillation. A representative
+There is a temporal limitation in this pipeline. Per-frame feature
+extraction skips sufficiently silent frames, and the cache stores file
+IDs without original frame offsets. Consecutive retained columns can
+therefore straddle a gap in the waveform. The current patch builder
+treats them as adjacent. Preserving silent frames or retaining offsets
+would be necessary to guarantee uniformly spaced temporal patches.
+
+An epoch loss need not decrease monotonically. A representative
 TinySOL run reaches recon ≈ 13 at epoch 1 and recon ≈ 7 by epoch 10,
-with KL around 2 throughout. If KL spikes by factors of 100 or
-recon bounces, the mel scale factor is wrong and the encoder is
-producing pathological `log σ²` at init.
+with KL around 2 throughout. A large KL spike is a reason to inspect
+input scaling and `log σ²`, as in the debugging example above, but it
+does not uniquely identify a wrong mel scale. The learning rate and
+other numerical errors can also destabilize training.
 
 
 ## 5. Applications
@@ -237,23 +253,24 @@ engineering.
 
 The limitations of this build, from most to least damaging:
 
-- **Mel inversion is lossy.** The transpose-as-pseudo-inverse blurs
-  the spectrogram on the way back. Better mel inverters exist
-  (learned vocoders like HiFi-GAN, iterative methods, Griffin-Lim
-  starting from a good initialisation), but none are in the library.
+- **Mel reconstruction is lossy.** Transpose backprojection spreads
+  each band over several linear bins. A different reconstruction method
+  could reduce that approximation error, but information discarded by
+  the filterbank is not uniquely recoverable. First measure the
+  filterbank round trip without the VAE to isolate this cost.
 - **Phase mismatch.** In remap, the output pairs the input's phase
   with the VAE's reconstructed magnitude. The phase encodes
   interference patterns specific to the original magnitude, so the
   pairing causes partial cancellations and an audible coloration.
-  Griffin-Lim iteration would reconstruct phase from magnitude alone
-  and remove this problem (~100 lines we don't have yet).
+  Griffin–Lim iteration could seek a more consistent magnitude/phase
+  pairing. It is approximate, is not implemented here, and would not
+  restore detail lost through mel compression or the latent bottleneck.
 - **The latent bottleneck is severe.** 1024 pixels → 32 latents → 1024
   pixels is a 32× compression. Sustained tones survive the round trip
   well; rapid spectral changes (a piano attack, a percussive
   transient) blur into the surrounding sustain.
 
-This chapter does not produce a finished audio system; for that one
-would use a vocoder. What we have is the architectural pattern:
+What this chapter establishes is an architectural pattern:
 encoder as `ConvNetwork → Flatten → Network`, decoder as
 `Network → Unflatten → ConvNetwork`, latent in the middle,
 reparameterise to sample. With that pattern in place the same code
@@ -261,18 +278,27 @@ applies to any 2-D data with local spatial correlations, such as
 spectrogram patches or image tiles, and in 1-D to raw waveforms.
 
 Judged by ear, the audio from this model and from the dense VAE of
-chapter 19 is poor, and the limitations above are structural: training
-longer does not remove them. They all come from the same decision,
-which is to make the network produce a spectrum and then turn that
-spectrum back into a waveform.
+chapter 19 is poor. More training may change the learned reconstruction,
+but it cannot recover information discarded by the representation or
+fix the renderer's phase assumptions. These costs need to be separated
+from model fitting when comparing experiments.
 [Chapter 24](24_differentiable_synthesis.md) keeps the goal and
 changes the decision: the network there outputs the controls of a
 synthesiser, and the synthesiser makes the sound.
 
 ![Spectrograms of the first 8 seconds of `cage.wav` and of its remap by the convolutional VAE, each scaled to its own maximum. The output has energy at all frequencies, and the harmonics of the input are no longer separate lines.](figures/23_remap.png)
 
+## 7. Exercise: separate the round trips
 
-## Further reading
+Compare three versions of the same input: its STFT/iSTFT round trip,
+its mel/backprojection round trip with original phase, and the VAE
+remap. Keep the display scale and playback level consistent. Which
+differences appear before the network is involved? Which could plausibly
+change with more training, and which require a different representation
+or renderer?
+
+
+## Further reading {#sec-23-convvae-further-reading}
 
 The model combines the variational autoencoder of [@kingma2014vae] with
 the convolutional layers of chapter 22. The checkerboard artefacts of

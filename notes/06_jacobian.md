@@ -27,9 +27,12 @@ at `x`. If `x` changes by `ε`, `f` changes by approximately
 For `f: ℝⁿ → ℝ`, we need one partial derivative per input, collected in
 a vector, the **gradient**:
 
-```
-∇f = [ ∂f/∂x₁,  ∂f/∂x₂,  …,  ∂f/∂xₙ ]
-```
+$$
+\nabla f=
+\begin{bmatrix}
+\partial f/\partial x_1 & \cdots & \partial f/\partial x_n
+\end{bmatrix}^{\mathsf{T}}.
+$$
 
 It has the same content as the slope, but is vector-valued because
 there are several directions in which the input can change.
@@ -38,14 +41,17 @@ there are several directions in which the input can change.
 For `f: ℝⁿ → ℝᵐ`, with `m` outputs and `n` inputs, each output has its
 own gradient. Stacked as rows they form a matrix, the **Jacobian**.
 
-```
-       ┌                              ┐
-       │ ∂f₁/∂x₁  ∂f₁/∂x₂  …  ∂f₁/∂xₙ │      shape: m × n
-   J = │ ∂f₂/∂x₁  ∂f₂/∂x₂  …  ∂f₂/∂xₙ │
-       │   ⋮         ⋮              ⋮ │
-       │ ∂fₘ/∂x₁  ∂fₘ/∂x₂  …  ∂fₘ/∂xₙ │
-       └                              ┘
-```
+$$
+J=
+\begin{bmatrix}
+\dfrac{\partial f_1}{\partial x_1} & \cdots &
+\dfrac{\partial f_1}{\partial x_n} \\
+\vdots & \ddots & \vdots \\
+\dfrac{\partial f_m}{\partial x_1} & \cdots &
+\dfrac{\partial f_m}{\partial x_n}
+\end{bmatrix}
+\in\mathbb{R}^{m\times n}.
+$$
 
 `J[i,j] = ∂fᵢ/∂xⱼ` says how output `i` responds to a small change in
 input `j`.
@@ -58,9 +64,9 @@ input `j` on every output.
 The Jacobian is the **local linearisation** of `f` at the point `x`. For
 small `ε`:
 
-```
-f(x + ε)  ≈  f(x)  +  J · ε
-```
+$$
+f(x+\varepsilon)\approx f(x)+J\varepsilon.
+$$
 
 This is the multi-variable generalisation of `f(x + ε) ≈ f(x) + f'(x)·ε`.
 It is the perturbation argument we used to derive Dense's backward pass
@@ -73,16 +79,18 @@ the response of every output to a small change in every input.
 
 The chain rule for a layer `f: x → y` reads:
 
-```
-∂L/∂xⱼ  =  Σᵢ (∂L/∂yᵢ) · (∂yᵢ/∂xⱼ)
-        =  Σᵢ (dL/dyᵢ) · J[i,j]
-```
+$$
+\frac{\partial L}{\partial x_j}
+=\sum_i\frac{\partial L}{\partial y_i}
+       \frac{\partial y_i}{\partial x_j}
+=\sum_i\frac{\partial L}{\partial y_i}J_{i,j}.
+$$
 
 That sum is the `j`-th entry of `Jᵀ · dL/dy`. In matrix form:
 
-```
-dL/dx = Jᵀ · dL/dy
-```
+$$
+\nabla_x L=J^\mathsf{T}\nabla_y L.
+$$
 
 This formula is the content of "backward" for any layer. Backprop is
 the chain rule, and the chain rule for vector functions is matrix
@@ -106,9 +114,9 @@ With this view, everything we have built is a variation on
 Nothing needs to be materialised, because `W` is already in memory as a
 layer parameter. The chain rule gives:
 
-```
-dX = Wᵀ · dY     i.e.    dX = Jᵀ · dY
-```
+$$
+dX=W^\mathsf{T}dY=J^\mathsf{T}dY.
+$$
 
 The `Wᵀ` that appears in `Dense::backward` is `Jᵀ` for this particular
 Jacobian. The "transpose symmetry" of [chapter 3](03_backprop.md) is the
@@ -119,9 +127,16 @@ general `Jᵀ` rule, specialised to the linear case.
 `y = max(0, z)` element-wise, so `∂yᵢ/∂zⱼ = 0` whenever `i ≠ j`. The
 Jacobian is **diagonal**, with:
 
-```
-J[i,i] = 1 if zᵢ > 0 else 0
-```
+$$
+J_{i,i}=
+\begin{cases}
+1,&z_i>0,\\
+0,&z_i<0.
+\end{cases}
+$$
+
+At zero the derivative is undefined; the implementation chooses zero
+for its backward rule.
 
 Multiplying by a diagonal matrix is the same as multiplying
 element-wise by its diagonal, a Hadamard product. That is why
@@ -132,9 +147,10 @@ mask, never the `K × K` matrix.
 
 `sᵢ = exp(zᵢ) / Σₖ exp(zₖ)`. Every output depends on every input, so:
 
-```
-J[i,j] = ∂sᵢ/∂zⱼ = sᵢ · (δᵢⱼ - sⱼ)
-```
+$$
+J_{i,j}=\frac{\partial s_i}{\partial z_j}
+=s_i(\delta_{ij}-s_j).
+$$
 
 This is the first non-diagonal Jacobian in the library. It has
 structure:
@@ -161,13 +177,14 @@ s      ≈ (0.665, 0.245, 0.090)
 
 Build `J` from `J[i,j] = sᵢ(δᵢⱼ - sⱼ)`:
 
-```
-       ┌                          ┐
-   J ≈ │  0.223  -0.163  -0.060   │
-       │ -0.163   0.185  -0.022   │
-       │ -0.060  -0.022   0.082   │
-       └                          ┘
-```
+$$
+J\approx
+\begin{bmatrix}
+ 0.223 & -0.163 & -0.060\\
+-0.163 &  0.185 & -0.022\\
+-0.060 & -0.022 &  0.082
+\end{bmatrix}.
+$$
 
 (The matrix is symmetric and every row sums to approximately 0.)
 
@@ -206,7 +223,7 @@ example.
 
 The shortcut formula avoids both: one dot product (`O(K)`) plus one
 element-wise pass (`O(K)`) per column. The cost is `O(K)` instead of
-`O(K²)`, with no extra allocation.
+`O(K²)`, without allocating a Jacobian.
 
 This is the general principle of efficient backprop:
 
@@ -244,7 +261,7 @@ rewritten in the cheapest form that the structure of `J` allows, so
 that an expensive Jacobian is never materialised.
 
 
-## Further reading
+## Further reading {#sec-06-jacobian-further-reading}
 
 The view of backpropagation as a sequence of vector-Jacobian products is
 that of reverse-mode automatic differentiation; [@baydin2018autodiff] is

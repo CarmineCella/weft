@@ -3,8 +3,7 @@
 This chapter covers how a neural network learns. It builds on the
 matrix class from the last chapter. We derive backpropagation for a
 `Dense` layer, implement it in `src/Layer.h` and `src/Dense.h`, and
-verify the implementation with a numerical gradient check, the most
-important debugging technique in deep learning.
+verify the implementation with a numerical gradient check.
 
 ---
 
@@ -12,16 +11,17 @@ important debugging technique in deep learning.
 
 A neural network is a composition of functions:
 
-```
-L  =  Loss( f_N( ... f_2( f_1( X ) ) ... ), target )
-```
+$$
+L=\operatorname{Loss}\!\left(f_N(\cdots f_2(f_1(X))\cdots),
+\mathrm{target}\right).
+$$
 
 `L` is a single scalar, the loss. Training means finding parameters
 that minimise `L`. Gradient descent does this with the update
 
-```
-p  <-  p  -  η · ∂L/∂p          for every parameter p
-```
+$$
+p\leftarrow p-\eta\frac{\partial L}{\partial p}.
+$$
 
 So we need `∂L/∂p` for each weight and bias. The chain rule is the only
 mathematical tool required. Backpropagation is the chain rule applied
@@ -67,18 +67,19 @@ Before the formulas, here is the idea for a Dense layer with
 Pick a single weight `W[i,j]` and change it by a small `ε`. The forward
 formula is
 
-```
-Z[i] = Σ_k W[i,k] · X[k]  +  b[i]
-```
+$$
+Z_i=\sum_k W_{i,k}X_k+b_i.
+$$
 
 so only the `k = j` term changes. `Z[i]` changes by `ε · X[j]`, and no
 other `Z[r ≠ i]` changes at all. That `ε · X[j]` propagates forward
 through whatever comes next, and changes the loss by
 `ε · X[j] · ∂L/∂Z[i]`. Dividing both sides by `ε`:
 
-```
-∂L/∂W[i,j]  =  X[j] · ∂L/∂Z[i]
-```
+$$
+\frac{\partial L}{\partial W_{i,j}}
+=X_j\frac{\partial L}{\partial Z_i}.
+$$
 
 In words:
 
@@ -100,17 +101,21 @@ The element-wise result above becomes a matrix formula:
 product and they sum together. Writing the expression as a matmul
 performs that summation. Letting `dZ` denote `∂L/∂Z`:
 
-```
-dW  =  dZ · X^T          shapes: (out × batch)(batch × in)  =  (out × in)
-```
+$$
+dW=dZ\,X^\mathsf{T}.
+$$
+
+The shapes are `(out × batch)(batch × in) = (out × in)`.
 
 **For the bias.** `Z[i,k] = ... + b[i]` for every example `k` in the
 batch, so `∂Z[i,k] / ∂b[i] = 1`. Summing the chain rule across the
 batch:
 
-```
-db  =  dZ summed across columns      shape: (out × 1)
-```
+$$
+db_i=\sum_{n=1}^{N}dZ_{i,n}.
+$$
+
+The result has shape `(out × 1)`.
 
 This is what `Matrix::sumColumns()` returns, and it is the reason we
 built that method.
@@ -119,11 +124,13 @@ built that method.
 `Z[i,k] = Σ_j W[i,j] · X[j,k]`, so `∂Z[i,k] / ∂X[j,k] = W[i,j]`.
 Summing over `i`:
 
-```
-∂L/∂X[j,k]  =  Σ_i W[i,j] · dZ[i,k]  =  (W^T · dZ)[j,k]
+$$
+\frac{\partial L}{\partial X_{j,k}}
+=\sum_i W_{i,j}\,dZ_{i,k},\qquad
+dX=W^\mathsf{T}dZ.
+$$
 
-dX  =  W^T · dZ          shapes: (in × out)(out × batch)  =  (in × batch)
-```
+The matrix shapes are `(in × out)(out × batch) = (in × batch)`.
 
 The full backward pass of Dense is:
 
@@ -155,9 +162,10 @@ We have found many gradient bugs this way.
 ### Caching
 
 `forward()` saves a copy of `X` in `X_cache_`. `backward()` needs it to
-compute `dW = dZ · X^T`. For a 32-example batch this copy is cheap. For
-larger batches we can revisit it, but it is almost never the
-bottleneck.
+compute `dW = dZ · X^T`. The cache belongs to the most recent forward
+call. Run its backward pass before another forward overwrites that
+input, and update the parameters after backward has used the original
+weights.
 
 ### The Layer base class
 
@@ -201,12 +209,10 @@ added later, shows this directly.
 
 ## 7. Testing with the numerical gradient check
 
-Backprop code that runs without crashing and produces
-reasonable-looking outputs is almost always wrong on the first try. A
-subtle sign error, a missing transpose or a forgotten sum across the
-batch does not crash. It makes the network learn poorly, and finding
-the cause can take days. The remedy is the **numerical gradient
-check**.
+A sign error, missing transpose, or forgotten sum across the batch can
+leave plausible-looking outputs while giving the wrong update.
+A **numerical gradient check** compares backward with the change in the
+implemented forward calculation.
 
 For every parameter `p` independently, we compare:
 
@@ -214,10 +220,15 @@ For every parameter `p` independently, we compare:
 - **Numerical**: the definition of a derivative,
   `(L(p+ε) − L(p−ε)) / (2ε)`.
 
-If they agree to within the tolerance, the backward pass matches the
-math. (Our `float` tests use `ε = 10⁻³` and accept a difference below
+Agreement checks the derivative of that implementation at the sampled
+points. It does not establish that the forward function is the intended
+objective or that every input regime is covered. (Our `float` tests use
+`ε = 10⁻³` and accept a difference below
 `10⁻²`; later tests in `double` demand agreement to `10⁻⁸` or better.)
-If they don't, there is a bug.
+If they disagree, first check the finite-difference step and whether the
+perturbation crosses a nondifferentiable point, such as ReLU at zero.
+A persistent discrepancy at smooth points is evidence of a derivative
+error.
 
 In `tests/test_dense.cpp`:
 
@@ -238,7 +249,7 @@ For a stricter check, use `double` and a tight tolerance.
 
 ---
 
-## 8. The following chapters
+## 8. The following chapters {#sec-03-backprop-the-following-chapters}
 
 A `Dense` layer alone can only fit linear maps. To make a network
 expressive we need **nonlinearities**: `ReLU`, then `Softmax` paired
@@ -250,7 +261,7 @@ this chapter's arithmetic by hand on a single weight.
 everything for our first classifier (IRIS, [chapter 9](09_iris.md)).
 
 
-## Further reading
+## Further reading {#sec-03-backprop-further-reading}
 
 Backpropagation as a practical way to train multi-layer networks was
 established by [@rumelhart1986backprop]. The initialisation that `Dense`

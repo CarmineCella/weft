@@ -207,7 +207,7 @@ systematically, and `src/Layer.h` and `src/Dense.h` build the first
 learnable layer (`Dense`) on top of `Matrix`.
 
 
-## Further reading
+## Further reading {#sec-02-matrix-further-reading}
 
 The linear algebra used throughout is covered in chapter 2 of
 [@goodfellow2016deep]. Why the order of the three loops in a matrix

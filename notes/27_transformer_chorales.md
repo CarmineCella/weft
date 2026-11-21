@@ -1,37 +1,30 @@
 # 27 — A transformer that writes chorales
 
-The examples in this book so far have done things that classical
-signal processing already does. Phase vocoders cross-synthesised
-timbres in the 1980s. Markov chains have generated plausible-sounding
-folk melodies since the 1950s. If a book on neural networks stops at
-examples that match those older methods, the reader may reasonably
-ask what the gradient computations were for.
+Can a sequence model coordinate four voices, rather than generate four
+independent melodic lines? We use chorales in the style of Bach to
+investigate that question. Our baseline gives each voice its own
+first-order Markov chain. It can imitate local motion within a voice,
+but it cannot condition a note on what the other voices are doing.
 
-This chapter answers that question for the attention chapters. The
-task is the generation of four-voice chorales in the style of Bach,
-and Markov chains cannot do it. A first-order Markov chain over one
-voice produces a plausible melody. Extending it to four voices means
-joint transitions over the cartesian product of the voice states.
-The number of states grows exponentially, and on any realistic corpus
-most transitions are never observed. Higher-order Markov chains make
-the same problem worse. The constraint we want to model is correct
-voice leading across four simultaneous voices over many bars. It is a
-long-range, joint, structured dependency, which is the kind of
-dependency transformer attention is designed to model.
+The transformer instead sees an interleaved stream containing all four
+voices. Attention gives it a way to relate simultaneous pitches and
+earlier events within its context. We will compare prediction loss and
+several properties of the generated music. They answer different
+questions, and some results will disagree.
 
-This was the motivation for DeepBach [@hadjeres2017deepbach] and
-Coconet [@huang2017coconet]: chorales are a test case where neural
-sequence models clearly do better than the classical methods before
-them. We build a much smaller version of the same idea. Ours is
-autoregressive, which is simpler than either (DeepBach rewrites
-iteratively and Coconet is masked and orderless), but it demonstrates
-the same thing.
+This is a comparison with a particular baseline, not a claim that
+Markov models in general cannot represent polyphony. Joint-state or
+conditioned models are possible, although naive joint transition tables
+become sparse as the state space grows. Neural chorale systems such as
+DeepBach [@hadjeres2017deepbach] and Coconet [@huang2017coconet] use
+different architectures and generation procedures. Our smaller
+autoregressive model is a way to exercise the components built here.
 
 
 ## 1. What this chapter adds
 
-Chapters 25 and 26 built `MultiHeadAttention`, `SinusoidalPositionalEncoding`,
-`LayerNorm` and `TransformerEncoderBlock`. With the causal mask of
+Chapters 25 and 26 built attention, positional encoding, layer
+normalization, and a transformer block. With the causal mask of
 chapter 25 switched on (`set_causal(true)` on every block), a stack of
 those blocks can already generate: each position sees only the
 positions before it, so the model can be trained to predict the next
@@ -54,6 +47,12 @@ interface and call it from `TokenTransformer<T>`
 (`src/TokenTransformer.h`), the class that fixes the order of the
 layers in section 3.
 
+Its saved weights require the same model configuration on loading.
+The current `TokenTransformer::load` also lacks a final stream-state
+check, so a truncated parameter file can escape detection. The
+serialization is a limited weight-storage mechanism, not a validated
+complete-model format.
+
 **MIDI in and out.** MIDI is a binary format with big-endian
 multi-byte values and delta times stored as variable-length
 quantities. `Midi.h` reads Format 0 and Format 1 and writes Format 1,
@@ -75,12 +74,9 @@ that writes a note at velocity 90 and reads it back does not.
 
 ## 2. Tokenisation
 
-Tokenisation is the choice with the largest consequences and the
-least theoretical interest. Every successful music transformer paper
-has invented its own.
-
-For four-voice chorales we use the scheme that DeepBach shows to be
-adequate:
+Tokenisation determines which musical distinctions the model can learn
+and how far its context reaches. Here we put the four voices on a
+regular time grid and interleave them into one stream:
 
 1. **Quantise** every voice to 16th-note onsets. This loses
    ornamentation but keeps the structural content of a chorale.
@@ -178,7 +174,7 @@ of a chorale about once in two hundred windows, and a generator that
 has rarely seen an opening starts badly.
 
 
-## 4. Sampling
+## 4. Sampling {#sec-27-transformer-chorales-sampling}
 
 Generation is a loop:
 
@@ -234,9 +230,12 @@ cross-entropy of the held-out chorales, in nats per token:
 | Transformer, 10 epochs | 0.60 |
 | Transformer, 40 epochs (8 min) | 0.49 |
 
-A loss of 0.49 is a perplexity of 1.6: at each step the model is, on
-average, undecided between fewer than two tokens. The transformer
-does better than the Markov chain within its first epoch.
+A loss of 0.49 nats per token gives perplexity `exp(0.49) ≈ 1.6`.
+This summarizes the geometric mean inverse probability assigned to the
+observed targets; it does not mean every position has only two plausible
+choices. Frequent HOLD tokens make many positions easier than note
+onsets. In this measurement the transformer has lower held-out loss
+than the per-voice Markov baseline within its first epoch.
 
 **Generation.** A low loss says the model predicts Bach well. It does
 not say that what it writes is good, and the two can differ widely,
@@ -250,17 +249,17 @@ of a note. We compare ten chorales of 256 time steps from each
 generator with the 365 originals:
 
 | | Consonant with bass | Voices crossed | Parallel 5ths/8ves | Quarter notes per attack |
-|---|---|---|---|---|
+|--------|-------|-------|-------|-------|
 | Bach | 85% | 2% | 0.2% | 0.95 |
 | Markov chain per voice | 57% | 44% | 2.8% | 0.92 |
 | Transformer | 82% | 3% | 5.8% | 0.94 |
 
-The Markov chain produces four plausible lines that are independent
-of one another: its voices cross almost half the time and its harmony
-is not far from what chance would give. The transformer keeps the
-voices in order about as reliably as Bach does, is consonant nearly
-as often, and has the same rhythmic density. This is the difference
-that attention was expected to make, and it is measured here.
+The Markov baseline's lines are independent of one another, and its
+voices cross frequently. On these generated samples, the transformer is
+closer to the corpus in voice ordering, consonance with the bass, and
+rhythmic density. This supports the use of a joint sequence model here.
+It does not isolate attention as the sole cause: that would require
+ablations or comparisons with other joint models.
 
 The output still differs from Bach. Parallel fifths and octaves,
 which the chorale style avoids almost completely, are thirty times as
@@ -306,17 +305,25 @@ transformer_chorales markov   data/chorales  markov.mid  256  1
 The dense classifier, the convnet, the audio VAEs and the
 differentiable synthesiser each did something that classical signal
 processing or classical statistics already does, sometimes better.
-This is the first example in the book where the classical baseline is
-measured on the same data and is clearly worse, and where the reason
-is the architecture: a per-voice Markov chain cannot represent an
-agreement between voices, and a model that attends across the whole
-texture can.
+This example measures a simple classical baseline and a joint neural
+model on the same corpus. The neural model has lower held-out
+prediction loss and better values for several generated-music
+statistics. It is worse on parallel fifths and octaves. The per-voice
+baseline lacks cross-voice conditioning, while the transformer can use
+it; these results show the value of that modeling capacity without
+establishing that attention is uniquely responsible.
 
 The model is small, the corpus is small, and the output is a student
 exercise in the style. Nobody would mistake it for a real chorale.
 The claim is narrower: with only the layers built in this book,
 running on a laptop CPU for eight minutes, a network learns a joint,
 structured property of four-voice music from examples alone.
+
+The held-out chorales are useful diagnostics, but repeatedly consulting
+them while choosing settings makes them validation material. An
+independent final evaluation would freeze those choices and use a
+further untouched set. The times and tables above describe the recorded
+runs, not a guarantee for another initialization or machine.
 
 The last two chapters apply the same model to sound instead of
 symbols. [Chapter 28](28_matching_pursuit.md) builds a way to write
@@ -325,8 +332,18 @@ matching-pursuit decomposition [@mallat1993mp].
 [Chapter 29](29_atom_transformer.md) trains this transformer on those
 atoms, so that what it writes can be heard directly.
 
+## 7. Exercise: choose an evaluation
 
-## Further reading
+Use the generation table to rank the two models separately by
+consonance, voice crossing, and parallel fifths/octaves. Explain why a
+single declaration of "better music" would hide a tradeoff. Then propose
+a comparison that could distinguish the benefit of joint voice
+conditioning from the benefit of attention specifically. State which
+settings would be chosen on validation data and what a final untouched
+evaluation would measure.
+
+
+## Further reading {#sec-27-transformer-chorales-further-reading}
 
 Generating Bach chorales with neural networks has a long history.
 [@boulanger2012modeling] established the chorales as a benchmark for

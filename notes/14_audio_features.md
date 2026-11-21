@@ -132,8 +132,13 @@ shows up in the FFT as a wide sinc-shaped smear instead of a narrow
 peak. This is **spectral leakage**, and it degrades everything
 downstream.
 
-The Hann window, `w[i] = 0.5 * (1 - cos(2π i / (N-1)))`, tapers
-smoothly to zero at both endpoints. Its highest side-lobe is about
+The Hann window tapers smoothly to zero at both endpoints:
+
+$$
+w[i]=\frac{1}{2}\left(1-\cos\frac{2\pi i}{N-1}\right).
+$$
+
+Its highest side-lobe is about
 −31 dB, against −13 dB for a rectangular window, and the side-lobes
 fall off much faster, so leakage becomes a small effect instead of a
 dominant one. Other windows (Hamming, Blackman, Kaiser) have different
@@ -253,11 +258,16 @@ to speech recognition in the 1960s.
 
 ## 5. Averaged vs per-frame output
 
-Both feature functions come in two forms. The averaged forms
-(`logmag_spectrum`, `mfcc`) collapse the whole signal into a single
-energy-weighted vector. The per-frame forms (`logmag_spectrum_frames`,
-`mfcc_frames`) keep one vector per non-silent frame and return a list
-of them.
+Both feature functions come in two forms. The averaged output collapses
+the whole signal into one energy-weighted vector:
+
+- `logmag_spectrum`;
+- `mfcc`.
+
+The per-frame output keeps one vector per non-silent frame:
+
+- `logmag_spectrum_frames`;
+- `mfcc_frames`.
 
 The windowing, FFT, mel filterbank and DCT are the same. The only
 difference is whether the per-frame results are averaged at the end or
@@ -346,7 +356,7 @@ log-mag spectrum or MFCC output are enough to get a representative
 result.
 
 
-## Further reading
+## Further reading {#sec-14-audio-features-further-reading}
 
 The mel scale of pitch is [@stevens1937mel], and mel-frequency cepstral
 coefficients were introduced for speech recognition by [@davis1980mfcc].

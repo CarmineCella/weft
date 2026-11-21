@@ -3,8 +3,8 @@
 The audio VAEs of chapters [19](19_audio_vae.md) and
 [23](23_convvae.md) train, their latent spaces are smooth, and the
 three applications run. Next to the recordings they came from,
-however, the results sound poor. The cause is not a bug, and more
-epochs would not fix it. We asked a small network to regenerate a
+however, the results sound poor. Several costs remain even with a
+better fit: we asked a small network to regenerate a
 spectrum from 32 numbers, and then we had to turn that spectrum back
 into a waveform. Each step loses fidelity. Squared error makes the
 network output the average of plausible spectra, which blurs sharp
@@ -14,13 +14,13 @@ stretched back to 2049 bins.
 
 This chapter takes a different approach to the same goal. We do not
 ask the network for sound. We ask it for the controls of a
-synthesiser that can only make plausible sounds. The synthesiser is
+synthesiser with a defined family of outputs. The synthesiser is
 classical signal processing: a bank of sinusoids at multiples of a
 fundamental, plus filtered noise. It has no trainable parameters. The
-network never outputs an audio sample. Every operation in the
-synthesiser is differentiable, so the error measured on the audio can
-be propagated back through it to tell the network how to change the
-controls.
+network never outputs an audio sample. With pitch and the noise
+realization fixed, the audio is differentiable with respect to the
+amplitude controls. The error measured on that audio can therefore be
+propagated back to tell the network how to change the controls.
 
 The idea is known as differentiable digital signal processing, or
 DDSP [@engel2020ddsp]. The synthesiser inside it is much older: it is
@@ -44,31 +44,36 @@ A[k, t]    amplitude of harmonic k+1 at frame t      (K x T)
 
 and produces
 
-```
-y[n] = sum_k  a_k[n] * sin( (k+1) * phi[n] )
-phi[n] = 2 pi * cumulative sum of f0[n] / sample_rate
-```
+$$
+y[n]=\sum_k a_k[n]\sin((k+1)\phi[n]),\qquad
+\phi[n]=\frac{2\pi}{f_s}\sum_{r=0}^{n-1}f_0[r].
+$$
+
+Here $f_s$ is the sample rate and $\phi[0]=0$. The sum over harmonics
+includes only those below Nyquist.
 
 Controls arrive once every 512 samples (11.6 ms at 44.1 kHz) and are
 interpolated linearly up to the sample rate. A harmonic whose
-frequency reaches the Nyquist limit is silenced, so the output never
-aliases. All of this is `HarmonicSynth<T>`.
+frequency reaches the Nyquist limit is silenced. All of this is
+`HarmonicSynth<T>`.
 
 The backward pass is easy because the output is linear in the
 amplitudes. Write the interpolation weight of frame `t` as `w_t[n]`.
 Then
 
-```
-y[n] = sum_{k,t}  A[k,t] * w_t[n] * sin((k+1) phi[n])
-```
+$$
+y[n]=\sum_{k,t} A_{k,t}\,w_t[n]\sin((k+1)\phi[n]).
+$$
 
 and the gradient of any loss with respect to one amplitude is a
 correlation of the upstream gradient with that amplitude's own basis
 signal:
 
-```
-dA[k, t] = sum_n  dy[n] * w_t[n] * sin((k+1) phi[n])
-```
+$$
+\frac{\partial L}{\partial A_{k,t}}
+=\sum_n\frac{\partial L}{\partial y[n]}\,
+w_t[n]\sin((k+1)\phi[n]).
+$$
 
 No gradient flows to `f0`. Pitch is an input here and is not learned
 (section 4 explains where it comes from).
@@ -209,8 +214,11 @@ audio, recording -> SpectralLoss -> dL/d(audio)
 dL/d(audio) -> synthesiser backward -> dL/d(controls) -> Adam
 ```
 
-Whatever a network later predicts, it cannot do better than controls
-fitted directly to the target. This is the upper limit.
+This is a reference for the network: how well can direct optimization
+fit this target with the chosen synthesiser and loss? A global optimum
+over the same controls would bound the attainable loss, but a finite
+Adam run is not proof of that optimum. Another initialization or
+optimization procedure could improve on the fit.
 
 ```
 synth_fit fit  Fl-ord-A4-mf.wav  A4  flute
@@ -284,8 +292,9 @@ apply unchanged to the network.
 
 ## 7. The network
 
-`synth_train` trains one network to produce the controls for any note
-of any instrument. For every control frame it reads 26 numbers:
+`synth_train` trains one network to produce controls from pitch,
+loudness, and one of the instrument identities in the training corpus.
+For every control frame it reads 26 numbers:
 
 - **Pitch**: `log2(f0 / 440)`, scaled.
 - **Loudness**: the level of the sound around the frame, in dB, at
@@ -381,9 +390,10 @@ instrument. On held-out notes the trumpet and trombone are close to
 the recordings. The clarinet comes out with a full set of harmonics
 although a real clarinet's even harmonics are weak. A pianissimo
 flute is too bright. A fortissimo double bass is 7 dB too quiet. A
-longer run would reduce the difference but not remove it, because a
-network that must explain every note with one function is solving a
-harder problem than a fit of one note.
+longer run might reduce the difference, but that needs to be measured.
+The network fits many notes with shared parameters and must generalize
+to held-out inputs; the direct fit optimizes a separate set of controls
+for each target.
 
 The limits of the approach come from the synthesiser:
 
@@ -401,9 +411,10 @@ The method does not produce a new kind of sound. The synthesiser is
 the one signal processing has used for decades, the training loop is
 the one we have used since chapter 9, and the only new idea is that
 the first can be placed inside the second. The network supplies a
-mapping from musical intentions to synthesis parameters, which the
-classical method lacks. The synthesiser supplies a guarantee that
-whatever comes out is a sound, which the network lacks.
+mapping from musical controls to synthesis parameters. The synthesiser
+supplies a waveform renderer with explicit assumptions about pitch,
+partials, and noise. Those assumptions make the output easier to
+interpret while limiting the sounds it can represent.
 
 The next chapters return to architecture. Everything so far has
 processed one frame, one patch or one image at a time. Attention
@@ -411,7 +422,7 @@ relates the elements of a sequence to one another, and the generative
 models at the end of the book are built from it.
 
 
-## Further reading
+## Further reading {#sec-24-differentiable-synthesis-further-reading}
 
 Training a network through a differentiable harmonic-plus-noise
 synthesiser with a multi-scale spectral loss is [@engel2020ddsp]; this

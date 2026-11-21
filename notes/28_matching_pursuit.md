@@ -104,8 +104,8 @@ atoms could have done.
 
 ## 4. Making it fast
 
-Finding the best atom is a search over millions of candidates.
-`MatchingPursuit.h` makes it cheap in the following ways.
+Finding the best atom involves millions of candidates. The search in
+`MatchingPursuit.h` uses two shortcuts.
 
 **The search is a Fourier transform.** The correlation of the
 residual with every atom of one window length at one time position
@@ -150,12 +150,18 @@ how much of the signal's energy the first `n` atoms explain:
 mp_analyze decompose  data/cage.wav  cage  8000
 ```
 
+The recordings are `cage.wav`, `radiohead.wav`,
+`Frank_Gamb_ori.wav` (abbreviated as Gamb), and a TinySOL cello note.
+
 | Sound (duration) | 500 atoms | 2,000 atoms | 8,000 atoms |
 |---|---|---|---|
-| `cage.wav`, 11.4 s | 86% | 98% | 99.8% |
-| `radiohead.wav`, 12.8 s | 93% | 98.5% | 99.6% |
-| `Frank_Gamb_ori.wav`, 10.0 s | 75% | 91% | 97% |
-| Cello A4 from TinySOL, 7.5 s | 86% | 97% | 98.7% (4,000) |
+| Cage, 11.4 s | 86% | 98% | 99.8% |
+| Radiohead, 12.8 s | 93% | 98.5% | 99.6% |
+| Gamb, 10.0 s | 75% | 91% | 97% |
+| Cello A4, 7.5 s | 86% | 97% | 98.7% |
+
+The last result for the cello uses 4,000 atoms; the other rows use
+8,000 in that column.
 
 Eight thousand atoms are five numbers each, 40,000 numbers for half a
 million samples: under a tenth of the waveform. Two thousand atoms,
@@ -232,7 +238,7 @@ ordered, meaningful description, with a way back to audio that cannot
 blur.
 
 
-## Further reading
+## Further reading {#sec-28-matching-pursuit-further-reading}
 
 Matching pursuit with time-frequency dictionaries, including the
 Gabor dictionary used here and the energy argument of section 3, is

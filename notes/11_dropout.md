@@ -204,7 +204,7 @@ architecture, training loop with eval-mode test passes, results) is the
 subject of the next chapter.
 
 
-## Further reading
+## Further reading {#sec-11-dropout-further-reading}
 
 Dropout is [@srivastava2014dropout]. Batch normalisation, mentioned here
 as the other layer that behaves differently in training and inference,

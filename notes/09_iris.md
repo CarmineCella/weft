@@ -193,8 +193,8 @@ In this output:
   at 100%.
 - Your numbers will differ. The split and the batch order are seeded,
   but the initial weights are not, so every run starts from different
-  weights. This is deliberate, and the next section discusses the
-  consequences.
+  weights. The next section discusses the consequences of that current
+  initialization behaviour.
 
 ![Loss and accuracy of the IRIS classifier during training, as printed by the program every ten epochs.](figures/09_iris_training.png)
 
@@ -215,17 +215,17 @@ The model, the data, the split and the batch order are the same; only
 the random initial weights differ. With 30 test examples, one example is
 3.3 percentage points, and a difference of one or two examples between
 runs is ordinary. A different train/test split moves the number at
-least as much. On a small test set a single accuracy number is mostly
-noise. Therefore:
+as well. On a small test set, a single accuracy number is a coarse
+measurement and can conceal substantial run-to-run variation. Therefore:
 
 - Never report a single test accuracy from a tiny test set without
   noting the variance.
 - For real evaluation, use **k-fold cross-validation**: split the data
   into k disjoint folds, train k models leaving one fold out each time,
   and average the per-fold accuracies. This reduces variance and uses
-  every example for both training and evaluation. The library does not
-  have a `kfold` helper; the larger datasets of the following chapters
-  have test sets big enough not to need one.
+  every example for training and for held-out evaluation in separate
+  runs. Keep model selection inside the training portion of each fold.
+  The library does not have a `kfold` helper.
 
 ---
 
@@ -242,14 +242,17 @@ did not:
   this size. The next chapter adds Adam; its practical advantage
   appears on MNIST.
 
-We can skip k-fold cross-validation: with 10,000 test examples, a single
-accuracy number is no longer noisy.
+With 10,000 test examples, MNIST gives a finer estimate of accuracy for
+a fixed model. A separate validation split is still needed for model
+selection, and repeated seeds are useful when comparing training
+procedures. A larger test set does not remove initialization or
+optimization variance.
 
 After MNIST come orchestral instrument sounds, then the autoencoder,
 then ConvNets.
 
 
-## Further reading
+## Further reading {#sec-09-iris-further-reading}
 
 The Iris measurements were published, with the first statistical
 classifier applied to them, by [@fisher1936iris].

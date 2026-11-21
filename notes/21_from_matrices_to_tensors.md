@@ -209,7 +209,7 @@ turns a `Tensor4D(N, in_C, H, W)` into a `Tensor4D(N, out_C, H', W')`
 with the im2col-and-matmul approach.
 
 
-## Further reading
+## Further reading {#sec-21-from-matrices-to-tensors-further-reading}
 
 The NCHW layout follows the convention of PyTorch [@paszke2019pytorch].
 The convolutional architectures that make a four-dimensional tensor

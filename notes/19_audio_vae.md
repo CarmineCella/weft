@@ -5,8 +5,8 @@ chapter adds the last audio component, `STFT.h`, a short-time
 Fourier transform and its inverse by weighted overlap-add, whose
 round trip reproduces a signal to the quantisation floor. It then
 connects the STFT to the VAE: we train the VAE on the spectra of
-orchestral sounds, save it, and use it to "remap" an arbitrary input
-sound onto the manifold of orchestral timbres.
+orchestral sounds, save it, and examine how it transforms a new input
+through that learned representation.
 
 The chapter covers model serialization (so we train once), the
 log-magnitude pipeline (which turns audio into VAE input and back
@@ -38,6 +38,13 @@ the wrong shape throws (the layer count and each matrix's dimensions are
 checked). For this reason the application tools rebuild the identical
 encoder/decoder before calling `load`.
 
+These files contain parameters, not a complete model description or a
+resumable training state. The current `Network::load` reads the version
+field without rejecting unsupported versions, and same-shaped
+architectures with different activations are not distinguished. Keep the
+matching model definition and preprocessing settings with the weights.
+Adam's running moments and random-generator state are not saved here.
+
 The scheme needs no `dynamic_cast` and no central registry of layer
 types. The convolutional layers of chapter 22 use the same two-method
 scheme in their own parallel hierarchy.
@@ -49,9 +56,9 @@ converts one to the other: it slices the signal into overlapping
 frames, windows each frame, and takes its FFT. Each frame becomes a
 complex spectrum, from which we take the **magnitude** (how much energy
 at each frequency) and the **phase** (the alignment of each frequency).
-We feed the VAE magnitude only. Phase is unstructured and known to be
-hard for a network to model, so the standard approach is to model
-magnitude and handle phase separately (see §4).
+We feed the VAE magnitude only. This is a simplifying representation
+choice: phase carries structure too, but this model does not learn it.
+Rendering therefore needs a separate phase choice (see §4).
 
 We feed **log-magnitude**, `log(1 + |X|)`, not raw magnitude.
 Spectral magnitudes span a large dynamic range (a few loud harmonics
@@ -60,9 +67,11 @@ loud bins. The logarithm compresses that range into roughly `[0, 6]`,
 so the network's capacity is used across the whole spectrum. This is
 the same `logmag` feature the classifier used, so the existing
 `extract_features ... logmag per_frame` produces the training set, and
-the remap computes the identical quantity from its own STFT (same Hann
-window, same FFT, same `log(1 + mag)`). There is no mismatch between
-training and inference.
+the remap computes the same feature formula from its own STFT. This
+requires matching the sample rate, Hann window, FFT size, hop, and
+channel handling. The current cache does not record all those settings,
+so the applications must be configured consistently. Matching a formula
+alone does not establish matching preprocessing.
 
 The VAE is the MNIST one with bigger layers and a 32-D latent. We
 don't need a 2-D latent here, because there is no manifold picture to
@@ -88,25 +97,26 @@ is checkpointed periodically, so an interrupted long run does not lose
 everything. These techniques, and the parallelised matmul they rely
 on, are the subject of chapter 20.
 
-On the balance of the loss terms: because MSE is summed over 2049
-bins, the reconstruction term is two to three times the KL term at
-`beta = 1`, so the latent isn't pulled tightly onto the unit Gaussian.
-This is the "ignored prior" regime from chapter 17. It is fine for the
-remap (which encodes real frames and uses `mu`, never sampling the
-prior), but for clean sampling and interpolation we need a larger
-`beta`. It is a constant in the file.
+In the recorded run, reconstruction is two to three times the KL term
+at `beta = 1`. Their scalar ratio alone does not tell us whether the
+prior is well matched: their gradients and the resulting samples matter
+too. Remapping uses encoded means rather than prior samples. If prior
+sampling is poor, changing `beta` is one experiment, with a possible
+cost to reconstruction. It is a constant in the file.
 
-## 4. Remapping (`vae_remap`): projection onto the manifold
+## 4. Remapping (`vae_remap`): a learned spectral transformation
 
 This is the application that the audio chapters lead to. Take any
 input (a song, a voice) and pass each of its magnitude frames through
-the VAE. The decoder has only ever learned to produce TinySOL-like
-spectra, so an out-of-distribution frame (a drum hit, a vocal formant)
-is reconstructed as its nearest orchestral interpretation. The result
-is the input's rhythm and structure rendered in orchestral timbre.
-Conceptually, this autoencodes out-of-distribution input through a
-decoder constrained to one manifold: it projects the song onto the
-space of orchestral sounds.
+the VAE. Training on TinySOL biases the reconstruction toward the
+spectra represented in that dataset. An unfamiliar frame, such as a drum
+hit or vocal formant, may therefore change substantially.
+
+"Projection onto a manifold" is an intuition for this application, not
+an optimization the forward pass performs. The encoder does not search
+for a nearest orchestral sound, and the decoder is not guaranteed to
+stay within the training distribution for an unfamiliar code. We inspect
+and listen to the result as a learned transformation.
 
 The pipeline:
 
@@ -121,21 +131,19 @@ The pipeline:
 5. iSTFT, a short fade at both ends, and normalisation to the 99th
    percentile of the absolute sample values.
 
-Step 4 reuses the input's phase. The VAE changes the magnitude (which
-frequencies are present), and we keep the input's phase (when they
-occur and how they are aligned). We do not have to estimate a phase,
-so there are no phase-reconstruction artifacts. This is why remapping
-is more robust than pure generation (section 6).
+Step 4 reuses the input's phase while changing its magnitude. This
+avoids estimating phase, but it does not guarantee a consistent STFT or
+artifact-free audio: the phase and the altered magnitudes may no longer
+fit one another across frames. Retaining source phase is a useful
+reference choice, especially when the magnitude change is modest.
 
 ## 5. What to expect from the remap
 
-This is a dense network on magnitude frames with reused phase. Expect
-the input rendered with orchestral timbre, recognisable and of
-demonstration quality, not the quality of a commercial timbre-transfer
-plugin. Each frame is treated independently (the model has no notion
-of time), so sustained tones fare better than sharp transients. The
-orchestral colour comes from the decoder being unable to represent
-anything but TinySOL spectra.
+This is a dense network on magnitude frames with reused phase. Its
+output is a demonstration of learned spectral remapping. Each frame is
+treated independently, so the model has no temporal context for an
+attack or a transition. The training corpus influences its timbre but
+does not restrict the decoder to producing only valid TinySOL spectra.
 
 ![Spectrograms of the first 8 seconds of `cage.wav` and of its remap by the dense VAE. Each panel is scaled to its own maximum. The output follows the timing of the input. Its spectrum is denser than the input's, and the pauses are not silent.](figures/19_remap.png)
 
@@ -172,16 +180,15 @@ artifacts. It is the case a real phase-reconstruction method
 because hearing a timbre drawn from the prior, however rough, is the
 reason to have a VAE rather than a plain autoencoder.
 
-The phase problem is not a limitation of the VAE. Sampling produces a
-complete, valid magnitude spectrum. The difficulty is that our chosen
-representation (magnitude only) discards phase, so turning that
-spectrum back into a waveform needs phase from somewhere. On images
-there is no such cost: a sampled image is the finished output. The
-cost comes from the audio representation, not from the generative
-model. This is the historical motivation for the neural-vocoder line
-of work; here we borrow phase and go no further.
+There are two distinct quality questions. The VAE must produce useful
+magnitude frames, and the renderer must turn a sequence of them into a
+waveform. A sequence of nonnegative frames is not necessarily a
+consistent STFT magnitude. Borrowed phase addresses rendering only
+approximately, while model errors remain in the magnitudes themselves.
+Here we leave those errors visible rather than adding a learned
+waveform renderer.
 
-## 7. Limitations
+## 7. Limitations {#sec-19-audio-vae-limitations}
 
 A weak `beta` keeps the latent loosely organised. This matters little
 for the remap but does matter for sampling and interpolation, where a
@@ -203,11 +210,11 @@ different route, with a network that controls a synthesiser instead of
 producing spectra.
 
 
-## Further reading
+## Further reading {#sec-19-audio-vae-further-reading}
 
 The model is the variational autoencoder of [@kingma2014vae] applied to
 spectrogram frames of the samples described in [@cella2020orchidea].
-Estimating a phase for a given magnitude spectrogram, which we avoid by
-borrowing one, is the problem solved iteratively by
+Estimating phase for a magnitude spectrogram, which we avoid by
+borrowing one, is the reconstruction problem approached iteratively by
 [@griffin1984signal]. The learned alternative, a network that produces
 the waveform directly, begins with [@vandenoord2016wavenet].

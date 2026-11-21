@@ -58,10 +58,10 @@ linear function of `PE(pos)`. In principle the network can learn to
 attend by offset ("look 3 positions back") from the encoding alone,
 without learning an explicit indexing scheme.
 
-`SinusoidalPositionalEncoding<T>` precomputes the full
-`(d_model × max_seq_len)` `PE` matrix at construction and adds
-it column-wise in forward. Backward is the identity: `d(X + PE)/dX
-= I`, so `dX = dY`. It has no parameters and no training cost.
+The class is `SinusoidalPositionalEncoding<T>`. It precomputes the
+encoding table at construction, with shape $d_{\mathrm{model}}\times
+L_{\max}$, and adds it column-wise in forward. Backward is the identity:
+`d(X + PE)/dX = I`, so `dX = dY`. It has no learned parameters.
 
 A learned alternative (a `(d_model × max_seq_len)` matrix of free
 parameters, no sinusoids) is also common in modern transformers.
@@ -263,7 +263,7 @@ chorales, so that sampling from it one token at a time produces new
 ones.
 
 
-## Further reading
+## Further reading {#sec-26-transformer-block-further-reading}
 
 The transformer and its sinusoidal positional encoding are
 [@vaswani2017attention]. Layer normalisation is [@ba2016layernorm], and

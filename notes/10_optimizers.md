@@ -198,14 +198,15 @@ The gradient in `y` is 100× larger than in `x`. After 100 steps from
 | SGD (lr = 0.01)     | 1.67       |
 | Adam (lr = 0.1)     | 0.08       |
 
-Adam's loss is 22× lower. SGD's single learning rate has to be small
+For these learning rates and this step budget, Adam reaches a lower
+loss. SGD's single learning rate has to be small
 enough not to oscillate on `y`, so `x` hardly moves. Adam adapts the two
 axes independently and makes progress on both.
 
-On IRIS the difference would be small: the problem is well-scaled and
-small enough that SGD is sufficient, which is why that example keeps
-SGD. Adam's advantage appears on larger, less well-behaved problems, and
-every example from MNIST onwards uses it.
+This comparison illustrates the effect of coordinate-wise adaptation;
+it does not establish which optimizer is best on another dataset. The
+IRIS example keeps SGD, which is sufficient for that small model. The
+later examples use Adam as a practical starting point.
 
 ![SGD and Adam on the quadratic of this section, 100 steps from (5, 5). Left: the path of each optimiser; the cross marks the minimum. Right: the loss at each step, on a logarithmic scale. SGD brings `y` to 0 in its first step and then moves slowly along `x`. Adam moves both coordinates at the same rate.](figures/10_sgd_adam.png)
 
@@ -213,16 +214,17 @@ every example from MNIST onwards uses it.
 
 ## 7. Practical recommendations
 
-- **Start with Adam at `lr = 1e-3`.** Keep the default β1/β2/ε. This
-  almost always works for a first trained model.
-- **Switch to SGD with a tuned schedule for the last few epochs** if
-  you need the final 0.5% of accuracy. Plain SGD + decay is often
-  reported to generalise slightly better at the end of training. None
-  of the examples in this book is tuned to that level.
-- **The `lr` for Adam is much less sensitive than for SGD** because the
-  adaptive part normalises gradient magnitudes. Conversely, if Adam is
-  not working, the learning rate is almost always the first thing to
-  halve.
+- **Use Adam at `lr = 1e-3` as an initial experiment.** The examples
+  keep its default β1/β2/ε. Check the loss and gradient scale rather
+  than assuming these settings will work for every model.
+- **Compare optimizers on validation data.** Give each a reasonable
+  learning-rate search and a stated training budget. This chapter's
+  quadratic does not justify a particular accuracy gain or a rule to
+  switch optimizers near the end of training.
+- **Treat learning rate as a parameter to investigate.** Adam adapts
+  coordinate scales, but it is still sensitive to its global learning
+  rate. If training oscillates or diverges, reducing it is one useful
+  experiment alongside checking the data, loss, and derivatives.
 
 ---
 
@@ -236,11 +238,11 @@ MNIST still needs:
   pass through during inference.
 - **MNIST data loader** for the IDX binary format.
 
-Then we train the MNIST classifier, where the advantage of Adam over SGD
-becomes visible.
+Then we train the MNIST classifier using Adam. That example demonstrates
+the full training pipeline; it is not a controlled optimizer comparison.
 
 
-## Further reading
+## Further reading {#sec-10-optimizers-further-reading}
 
 Plain stochastic gradient descent is [@robbins1951sgd]; momentum is
 [@polyak1964momentum]; RMSProp was never published as a paper and is

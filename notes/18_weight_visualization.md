@@ -85,7 +85,7 @@ The same `Bmp.h` writer renders the autoencoder reconstructions, the VAE
 manifolds, and the learned weights.
 
 
-## Further reading
+## Further reading {#sec-18-weight-visualization-further-reading}
 
 Looking at what a network's weights and features respond to is developed
 much further, for convolutional networks, in [@zeiler2014visualizing].

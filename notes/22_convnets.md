@@ -420,7 +420,7 @@ route to clean sound, a network that drives a synthesiser. Chapters
 apply it to recorded sound.
 
 
-## Further reading
+## Further reading {#sec-22-convnets-further-reading}
 
 Convolutional networks trained by backpropagation are
 [@lecun1998gradient]; the architecture that established them for

@@ -1,64 +1,67 @@
 # 1 — Why C++?
 
-Readers with a background in modern machine learning will ask why this
-library is in C++, when PyTorch and NumPy exist and the field has
-consolidated around Python. C++ is not better than Python in general.
-It is better than Python for what this book is trying to teach. This
-chapter makes that case, so that the choice of language does not
-distract from the material later.
+This book uses a small C++ library to investigate neural networks for
+sound. We write the matrix operations, derive the gradients, and follow
+the data from a waveform to a model and back to audible output. C++ lets
+us keep that work close to the memory layout and DSP code an audio
+programmer already uses.
+
+The important teaching choice is to implement the operations ourselves.
+We could do that in another language. Here we use C++17 and the standard
+library so that the implementation remains small enough to read and the
+default build has few dependencies.
 
 
 ## What the book is for
 
-The goals of the book point at the same language:
+There are two goals:
 
 1. To teach how every piece of a neural network works (the matrix
    algebra, the gradients, the optimizers, the convolutions, the
    attention mechanism) at the level of someone who could implement
    each piece themselves, with a pencil if they had to.
-2. To build a foundation that is directly usable for deploying neural
-   networks in audio applications: VST plugins, audio units, embedded
-   sound systems, real-time DSP. All of these are written in C++,
-   without exception.
+2. To connect those operations to audio applications: instrument
+   recognition, reconstruction, timbre manipulation, synthesis, and
+   musical generation.
 
-Goal 1 rules out heavy ML frameworks. Goal 2 rules out Python for the
-eventual application target. What remains is to implement everything
-from scratch, in the language audio software runs in, which is C++.
+C++ is common in plugin and embedded audio development, which makes it
+a useful setting for these experiments. The programs in this book are
+offline CPU applications. Using the same language as an audio host does
+not make them ready for an audio callback: allocation, latency, and
+threading would need separate measurement and engineering.
 
 
-## Why frameworks hide what we want to teach
+## Why implement the operations ourselves?
 
-If we wrote this library in Python with PyTorch, the entire chapter on
-backpropagation would be one line:
+In PyTorch, a training program can ask for gradients with:
 
 ```python
 loss.backward()
 ```
 
-That line works and gives correct gradients, but it teaches nothing
-about how those gradients are computed. The framework's autograd hides
-the math.
+That interface is useful once we trust the operations below it. Our
+question is how those operations work. For each convenience a framework
+provides, there is something we want to inspect:
 
-The same happens at every other level:
+- `nn.Linear(in, out)` leads us to the weight matrix, bias, and their
+  gradients.
+- `nn.Conv2d` leads us to the im2col-and-matmul implementation used here.
+- `optim.Adam` leads us to running moments, bias correction, and the
+  update rule.
+- `nn.MultiheadAttention` leads us to queries, keys, values, scaling,
+  softmax, and the output projection.
 
-- `nn.Linear(in, out)` hides the weight matrix, the bias, and the
-  forward pass.
-- `nn.Conv2d` hides the im2col-and-matmul trick that makes 2-D
-  convolution fast.
-- `optim.Adam` hides the per-parameter first and second moments, the
-  bias correction, the update rule.
-- `nn.MultiheadAttention` hides the queries, keys, values, scaling,
-  softmax, and the multi-head projection.
-
-PyTorch is a good productivity tool, but the features that make it
-productive make it poor for understanding. Our goal is to explain each
-of these pieces, and hiding them defeats that goal.
+Framework source is available to study and modify, and frameworks are
+useful for checking a small implementation. We build a separate library
+to keep the relevant path short: from an equation to a loop, then to a
+numerical test.
 
 
-## What C++ requires
+## What we implement by hand
 
-C++ has no autograd, no `nn.Module`, no decorator that records a
-computation graph. To do backprop in C++, you have to:
+The C++ standard library has no automatic differentiation, although
+libraries such as PyTorch provide it for C++. We deliberately leave it
+out of weft. For a dense layer, that means we:
 
 1. Allocate a weight matrix `W` and bias `b`, explicitly, with shapes.
 2. Implement the forward pass: `Z = W * X + b`.
@@ -70,10 +73,10 @@ computation graph. To do backprop in C++, you have to:
 5. Hand `dW` and `db` to the optimizer, which uses them to update `W`
    and `b`.
 
-These steps are the content of backprop. A student learns them by
-writing them, not by calling PyTorch. The steps are the same for every
-layer, so writing them for one layer is enough to understand the
-algorithm.
+These steps expose the chain rule and the state a backward pass needs.
+Later layers use the same pattern, but each has its own derivative and
+shape conventions to check. Implementing one layer gives us a method for
+approaching the next.
 
 The same is true of every other piece. Once you have written `im2col`
 yourself and seen convolution become a matrix multiply, you know that
@@ -88,33 +91,29 @@ One could avoid frameworks and still use Python with NumPy, without the
 boilerplate of C++. Some introductory courses do that, and it works. We
 went the additional step to C++ for the following reasons.
 
-**Type safety as a teaching tool.** In Python, `dense.forward(x)`
-accepts anything that responds to multiplication. Pass the wrong shape
-and you get a runtime error somewhere deep in the call stack. In C++
-with templates, `Dense::forward(const Matrix<float>&)` cannot accept a
+**Visible data boundaries.** In our C++ interface,
+`Dense::forward(const Matrix<float>&)` cannot accept a
 `Tensor4D<float>`: the compiler refuses. A wrong rank or wrong scalar
-type is caught at the call site, before the program runs. (A wrong
-shape is caught at run time, by an explicit check that throws at the
-offending operation.) For someone learning the data flow of a neural
-network, this compile-time enforcement is useful. It shows where the
-boundaries between data structures are.
+type is caught before the program runs. Matrix dimensions remain runtime
+values, so dimensional compatibility still needs runtime checks. The
+Matrix/Tensor4D distinction makes the boundary between dense and
+convolutional operations explicit.
 
 **Memory layout becomes visible.** Our `Matrix` stores numbers in a flat
 row-major buffer. This is visible in the code: it is
 `std::vector<T> data_` and an indexing formula. Our `Tensor4D` stores
 them in NCHW order, and the index formula is in the code:
-`data[((n*C + c)*H + h)*W + w]`. Understanding why this layout makes
-2-D spatial convolution cache-friendly teaches something about how
-hardware works. In Python the layout is hidden by NumPy and you never
-have to think about it.
+`data[((n*C + c)*H + h)*W + w]`. Following how the convolution loops
+visit that buffer helps explain their cache behavior.
+NumPy also exposes shape, strides, and storage order; here we implement
+the indexing ourselves.
 
 **Parallelism becomes visible.** Our matmul parallelises across rows
 with `std::thread`. The code shows the threads being spawned and
 joined, the work threshold below which threading is not worth its
-overhead, and the row-chunking that avoids synchronisation. In Python,
-threads are essentially useless because of the GIL, and the real
-parallelism happens inside NumPy or PyTorch in code you cannot see or
-modify.
+overhead, and the row-chunking that avoids overlapping writes. Threading
+and tuned numerical kernels are also available through Python tools.
+Here the scheduling decision is part of the implementation we read.
 
 **Performance is visible and modifiable.** When this library trains a
 network slowly, you can profile it, see where the time goes, and fix
@@ -122,17 +121,8 @@ it. We did this when we added the `make BLAS=1` opt-in: profiling
 showed `Matrix::operator*` was the bottleneck, so we optionally route
 it to a tuned BLAS library via an `if constexpr` dispatch. The threads,
 the BLAS dispatch and the option to leave it off are all in `Matrix.h`,
-where you can read and change them. In Python with PyTorch, performance
-is whatever the framework decides. You can benchmark it, but you cannot
-open it and change it.
-
-**C++ is the language of audio software.** This is a book for music
-applications. The eventual goal is for what you learn here to be used
-in audio tools: VST plugins, audio units, embedded systems, real-time
-DSP. All of those are written in C++. There is no path from a Python
-prototype to a JUCE plugin that doesn't involve rewriting in C++.
-Starting in C++ avoids that rewrite, because the language you learn the
-math in is the language your final application runs in.
+where you can read and change them. The small implementation makes it
+practical to connect a profile to a particular loop.
 
 **C++ teaches systems thinking.** Beyond the math, neural networks are
 systems: they consume data, allocate memory, run computations in
@@ -140,16 +130,15 @@ parallel, share resources, serialise to disk. C++ exposes these
 concerns. You make choices about ownership (`unique_ptr` for layers,
 raw pointers for transient optimiser state), move semantics, binary
 serialisation formats with magic headers, optional dependencies guarded
-by macros. Python hides these engineering concerns almost entirely, and
-you need to understand them to build anything that runs outside a
-notebook.
+by macros. These concerns exist in other languages too; keeping them in
+this small codebase lets us examine them alongside the mathematics.
 
-**C++ is stable across versions.** PyTorch's API changes frequently;
-models written in 2018 don't always run cleanly in 2024. A Python ML
-codebase needs maintenance to keep running. A C++ codebase using
-`-std=c++17` and the standard library will compile and run identically
-in 2044. The numerical methods we teach don't change, and the language
-we teach them in should not add changes of its own.
+**A small dependency surface.** The default build uses C++17 and the
+standard library; a tuned BLAS backend is optional. This reduces the
+number of packages needed to run an example. Reproducibility still
+depends on compiler settings, hardware, random initialization, and data.
+A language standard alone cannot guarantee identical numerical results
+across machines or future toolchains.
 
 
 ## Costs
@@ -162,38 +151,18 @@ The choice has costs:
 - **Slower to iterate.** Every architectural experiment requires a
   recompile. We accept this too; compile time is negligible at our
   scale.
-- **No autograd, so we derive every gradient by hand.** This is often
-  listed as a downside of C++. For a learning project it is the
-  purpose.
-- **Less ecosystem.** PyTorch has pretrained models, datasets, model
-  hubs, deployment tools. We have none of that. For a finished
-  application you would eventually use those; for learning, you don't
-  need any of them.
+- **Manual derivatives.** Every new operation needs a backward pass and
+  a numerical check. This is a choice of this project, and it creates
+  work whenever we extend a model.
+- **A limited toolset.** Weft has no GPU backend, automatic
+  differentiation, or pretrained-model ecosystem. The examples are
+  deliberately small enough for CPU experiments.
 
-There is also one place where C++ is worse: for the kind of
-large-scale empirical experimentation that drives most modern ML
-research (sweeping hyperparameters across hundreds of runs, comparing
-dozens of architectures on huge datasets), Python's REPL and notebook
-ecosystem are the right tools. We are not doing that kind of research
-in this book. We are building a small set of architectures carefully.
-
-
-## When you would not use C++
-
-This argument is for this project specifically, not for machine
-learning in general. If you are:
-
-- prototyping a new model architecture quickly,
-- working with very large datasets that need distributed training,
-- using off-the-shelf pretrained models (BERT, Whisper, CLIP),
-- writing research papers that need rapid iteration on ideas,
-- training in the cloud on GPUs you don't own,
-
-you should use Python with PyTorch. That is what PyTorch is for.
-
-The argument here is narrower: for learning how neural networks work,
-and for deploying them in audio applications, C++ is the right choice.
-For research at scale on general datasets, it isn't.
+For rapid architecture changes, pretrained models, or large training
+runs, an established framework offers capabilities we do not reproduce.
+Python and NumPy also provide a good setting for learning the same
+mathematics. The reason to follow this implementation is the combination
+of explicit gradients, systems details, and audio experiments.
 
 
 ## What you will have at the end
@@ -202,14 +171,14 @@ In this library every gradient is derived by hand, every operation is
 written out, and every optimisation can be profiled and changed. No
 step is hidden behind a call such as `loss.backward()`.
 
-When you finish this book, you will have written a complete
-neural-network library from scratch in C++, including backprop, conv
-layers with im2col, and attention with positional encoding. You can
-then use PyTorch if you want to, and you will know what it does
-internally, because you will have built each piece yourself.
+By the end, those operations support several ways of representing sound:
+features for recognition, spectra for reconstruction, controls for a
+synthesiser, symbolic notes, and sparse time-frequency atoms. Comparing
+what those representations preserve and lose is as important as getting
+the networks to train.
 
 
-## Further reading
+## Further reading {#sec-01-why-cpp-further-reading}
 
 PyTorch [@paszke2019pytorch] and NumPy [@harris2020numpy] are the tools
 this book deliberately does not use. What a framework's automatic
