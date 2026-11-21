@@ -1,0 +1,6 @@
+weft :: vae_remap
+loaded model: outputs/book_v020/vae/model.enc / .dec
+input: data/TinySOL_2020/Brass/TpC/ordinario/TpC-ord-A4-pp.wav  (273966 samples @ 44100 Hz)
+frames: 132
+projecting onto the SOL manifold...
+wrote outputs/book_v020/vae/trumpet.wav  (fade + 99th-percentile normalised)

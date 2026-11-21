@@ -22,6 +22,12 @@ with a transformer to generate sound.
 Each chapter of the book explains part of the library, and each part of
 the library is explained by a chapter.
 
+Begin with the [listening prologue](notes/00_listening.md) and its
+[offline audio player](notes/audio/index.html). The refreshed MNIST,
+dense audio VAE, and differentiable-synthesis experiments have a
+[fixed reproduction protocol](book/experiments/README.md), recorded
+commands, file hashes, logs, and results.
+
 The matrix product, backpropagation, the FFT, convolution and attention
 are implemented in the library and explained in the book. PyTorch,
 NumPy and BLAS are not used by the default build.
@@ -119,6 +125,10 @@ GitHub Actions builds all examples and runs the test programs on Linux
 It also checks independent header compilation, runs synthetic-data
 example pipelines, validates the Markdown chapters, and compiles the
 book PDF as a downloadable workflow artifact.
+The book job also verifies the recorded experiment evidence and audio
+hashes, and packages a ZIP containing the PDF and its offline listening
+files. Dataset training runs are reproduced with the protocol above;
+they are not rerun by CI.
 
 The end-to-end smoke checks need Python 3 and no downloaded datasets:
 

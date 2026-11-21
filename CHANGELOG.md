@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Reran MNIST with three declared seeds, the dense audio VAE, and the
+  synthesis-control network using the v0.2.0 C++ sources. Recorded
+  data hashes, complete file splits, commands, raw logs, and measurements.
+- Added a Markdown listening prologue, 13 RMS-scaled audio examples,
+  an offline player, and new experiment figures. Updated chapters
+  12, 19, and 24 while identifying the remaining historical results.
+- Added evidence/audio integrity checks and a portable PDF/listening
+  archive to the book workflow.
+
 ## 0.2.0 — 2026-11-21
 
 - Added stable logits-based SoftmaxCrossEntropy and moved classifier

@@ -191,6 +191,12 @@ def figure_files(text):
     return _FIGURE.sub(fix, text)
 
 
+# Listening links are relative to notes/ in Markdown and to book/ in the
+# PDF companion bundle. Keep the same notes/audio/ assets for both readers.
+def audio_links(text):
+    return re.sub(r"\]\((audio/[^)]+)\)", r"](../notes/\1)", text)
+
+
 def main():
     src = sys.stdin.read()
     # Optional argument: this chapter's file stem, used as its label so
@@ -214,6 +220,7 @@ def main():
             part = "".join(lines)
             part = chapter_links(part)
             part = figure_files(part)
+            part = audio_links(part)
             part = replace_prose(part)
         else:
             part = replace_code(part)

@@ -1,0 +1,32 @@
+weft :: synth_fit
+  input:     data/TinySOL_2020/Strings/Vc/ordinario/Vc-ord-A4-mf-1c.wav  (332688 samples @ 44100 Hz, 7.54 s)
+  pitch:     A4 = 440.00 Hz nominal
+  refined:   median 440.00 Hz (+0.00 cents from nominal), range 435.95 - 443.83 Hz
+  controls:  651 frames x (50 harmonics + 65 noise bands) = 74865 values
+  knots:     every 1 frame(s) = 11.6 ms (5.11 periods of the note)
+
+  loss FFTs: 256 512 1024 2048 4096 
+iter    loss     time
+----    ------   -----
+   0    8.0164   0.1s
+  25    2.0492   7.3s
+  50    1.6919   14.3s
+  75    1.6465   21.4s
+ 100    1.6382   28.4s
+ 125    1.6360   35.5s
+ 150    1.6348   42.6s
+ 175    1.6343   49.7s
+ 200    1.6338   56.8s
+ 225    1.6335   63.9s
+ 250    1.6332   71.0s
+ 275    1.6330   78.1s
+ 300    1.6330   85.1s
+ 325    1.6330   92.2s
+ 350    1.6329   99.2s
+ 375    1.6328   106.3s
+ 400    1.6326   113.3s
+
+final loss 1.6326;  energy: target 1857.4489, resynthesis 1893.8049 (harmonic 1890.0994, noise 8.2185)
+spectrogram difference (energy of the difference of the two magnitude spectrograms / energy of the target's): 2.99%
+median fitted amplitude of harmonics 3-6 over the middle half of the note: 0.019 0.023 0.031 0.042
+wrote outputs/book_v020/synthesis/cello_fit_resynth.wav, _harmonic.wav, _noise.wav, .ctl

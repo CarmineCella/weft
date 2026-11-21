@@ -1,0 +1,10 @@
+weft :: extract_features
+data dir:   outputs/book_v020/vae_corpus
+feature:    logmag (2049 dim)
+mode:       per_frame
+output:     outputs/book_v020/vae/train.feat
+
+scanning... 1433 WAV files
+extracting features .............. done (22.3s)
+
+saved 196804 frames, 12 classes to outputs/book_v020/vae/train.feat

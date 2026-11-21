@@ -1,0 +1,6 @@
+weft :: vae_remap
+loaded model: outputs/book_v020/vae/model.enc / .dec
+input: data/TinySOL_2020/Strings/Vc/ordinario/Vc-ord-A4-mf-1c.wav  (332688 samples @ 44100 Hz)
+frames: 161
+projecting onto the SOL manifold...
+wrote outputs/book_v020/vae/cello.wav  (fade + 99th-percentile normalised)

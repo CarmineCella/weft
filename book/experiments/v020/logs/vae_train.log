@@ -1,0 +1,56 @@
+weft :: train audio VAE
+feature file: outputs/book_v020/vae/train.feat
+feature type: logmag (2049 dim)
+mode:         per_frame
+frames:       196804
+
+architecture:
+  encoder (last layer = mu[32] ++ logvar[32]):
+    Dense(2049, 256)
+    ReLU
+    Dense(256, 64)
+    ReLU
+    Dense(64, 64)
+  sample: z = mu + sigma * eps,  eps ~ N(0, I)
+  decoder:
+    Dense(32, 64)
+    ReLU
+    Dense(64, 256)
+    ReLU
+    Dense(256, 2049)
+loss:        MSE + 1 * KL
+optimiser:   Adam (lr=1e-3)
+batch:       256
+subsample:   every 1 frame(s)  -> 196804 of 196804 frames
+epochs:      20  (checkpoint every 5)
+
+epoch  recon       KL        total      time
+-----  ---------   -------   ---------   -----
+    1   142.4686   19.7501    162.2187    11.1s
+    2    90.6256   14.2194    104.8450    10.9s
+    3    75.8497   12.6355     88.4851    11.0s
+    4    62.4879   11.6692     74.1571    11.4s
+    5    52.1413   11.3155     63.4568    11.6s
+  [checkpoint @ epoch 5 saved -> outputs/book_v020/vae/model.enc/.dec]
+    6    44.8584   11.1155     55.9739    11.9s
+    7    39.8056   11.0427     50.8483    11.8s
+    8    36.0990   11.1033     47.2023    12.3s
+    9    33.6657   11.1395     44.8052    11.3s
+   10    31.9916   11.1724     43.1640    11.8s
+  [checkpoint @ epoch 10 saved -> outputs/book_v020/vae/model.enc/.dec]
+   11    30.7979   11.2110     42.0090    12.2s
+   12    29.8841   11.2327     41.1168    10.9s
+   13    29.1382   11.2672     40.4054    11.8s
+   14    28.4536   11.2751     39.7287    11.8s
+   15    27.9002   11.3002     39.2005    11.7s
+  [checkpoint @ epoch 15 saved -> outputs/book_v020/vae/model.enc/.dec]
+   16    27.4601   11.3022     38.7623    11.9s
+   17    27.0351   11.3314     38.3665    11.4s
+   18    26.6504   11.3551     38.0054    12.1s
+   19    26.3441   11.3592     37.7033    11.7s
+   20    26.0208   11.3713     37.3921    12.3s
+
+total training time: 232.9s
+  [final saved -> outputs/book_v020/vae/model.enc/.dec]
+
+latent dim: 32  (apps must rebuild this same architecture before loading)

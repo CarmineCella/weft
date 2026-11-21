@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Designing Musical Networks — listening examples</title>
+<style>
+body{margin:2rem auto;padding:0 1.2rem;max-width:68rem;background:#faf9f5;color:#202520;font:17px/1.55 system-ui,sans-serif}
+h1{font:2.25rem/1.15 Georgia,serif;max-width:24ch}h2{font:1.5rem Georgia,serif;margin-top:2.4rem}
+h3{font-size:1rem;margin:0 0 .8rem}a{color:#245a75}section{border-top:1px solid #d9ddd4}
+.clips{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,19rem),1fr));gap:1rem}
+article{padding:1rem;background:white;border:1px solid #d9ddd4;border-radius:.35rem}audio{width:100%}
+article p{font-size:.85rem;margin-bottom:0}.note{max-width:75ch}footer{border-top:1px solid #d9ddd4;margin-top:3rem;padding-top:1rem;font-size:.88rem}
+</style>
+<main><h1>Listen before building</h1>
+<p class="note">Companion examples for <em>Designing Musical Networks</em>, rerun with weft v0.2.0.
+Start with the recording, then compare the attack, sustained partials, breath/bow noise, and release.
+The cello includes a transform-only reference and a direct per-note fit.</p>
+<p class="note">Copies in each recording group have matched whole-clip RMS and a common peak constraint.
+This does not equalize perceived loudness. The VAE application already normalizes and fades its output;
+its original processing has not been undone. Training and raw-output measurements are documented in the
+<a href="../../book/experiments/README.md">experiment protocol</a>.</p>
+<section><h2>1. Cello A4, mezzoforte</h2><div class="clips"><article><h3>Recording</h3><audio controls preload="none" src="v020/cello_original.wav"></audio><p><a href="v020/cello_original.wav" download>Download WAV</a> · 7.54 s</p></article><article><h3>STFT round trip</h3><audio controls preload="none" src="v020/cello_stft.wav"></audio><p><a href="v020/cello_stft.wav" download>Download WAV</a> · 7.54 s</p></article><article><h3>Dense VAE, input phase</h3><audio controls preload="none" src="v020/cello_vae.wav"></audio><p><a href="v020/cello_vae.wav" download>Download WAV</a> · 7.54 s</p></article><article><h3>Directly fitted synthesiser</h3><audio controls preload="none" src="v020/cello_fit.wav"></audio><p><a href="v020/cello_fit.wav" download>Download WAV</a> · 7.54 s</p></article><article><h3>Network-controlled synthesiser</h3><audio controls preload="none" src="v020/cello_network.wav"></audio><p><a href="v020/cello_network.wav" download>Download WAV</a> · 7.53 s</p></article></div></section>
+<section><h2>2. Trumpet A4, pianissimo</h2><div class="clips"><article><h3>Recording</h3><audio controls preload="none" src="v020/trumpet_original.wav"></audio><p><a href="v020/trumpet_original.wav" download>Download WAV</a> · 6.21 s</p></article><article><h3>Dense VAE, input phase</h3><audio controls preload="none" src="v020/trumpet_vae.wav"></audio><p><a href="v020/trumpet_vae.wav" download>Download WAV</a> · 6.21 s</p></article><article><h3>Network-controlled synthesiser</h3><audio controls preload="none" src="v020/trumpet_network.wav"></audio><p><a href="v020/trumpet_network.wav" download>Download WAV</a> · 6.21 s</p></article></div></section>
+<section><h2>3. Flute D5, pianissimo</h2><div class="clips"><article><h3>Recording</h3><audio controls preload="none" src="v020/flute_original.wav"></audio><p><a href="v020/flute_original.wav" download>Download WAV</a> · 6.08 s</p></article><article><h3>Dense VAE, input phase</h3><audio controls preload="none" src="v020/flute_vae.wav"></audio><p><a href="v020/flute_vae.wav" download>Download WAV</a> · 6.08 s</p></article><article><h3>Network-controlled synthesiser</h3><audio controls preload="none" src="v020/flute_network.wav"></audio><p><a href="v020/flute_network.wav" download>Download WAV</a> · 6.07 s</p></article></div></section>
+<section><h2>4. Controls without a target recording</h2><div class="clips"><article><h3>Prescribed eight-note flute phrase</h3><audio controls preload="none" src="v020/gesture_phrase.wav"></audio><p><a href="v020/gesture_phrase.wav" download>Download WAV</a> · 4.59 s</p></article><article><h3>Prescribed flute-to-cello morph</h3><audio controls preload="none" src="v020/gesture_morph.wav"></audio><p><a href="v020/gesture_morph.wav" download>Download WAV</a> · 5.99 s</p></article></div></section>
+<footer><p>All three recordings were reserved for validation before training. The direct fit uses its own target.
+The phrase and morph follow explicit controls; the network does not compose their score or trajectory.</p>
+<p>Source recordings: TinySOL, derived from Studio On Line, recorded at Ircam. Dataset creators:
+Carmine-Emanuele Cella, Daniele Ghisi, Vincent Lostanlen, Fabien Lévy, Joshua Fineberg, and Yan Maresz.
+<a href="https://www.orch-idea.org/datasets/">Orchidea distribution</a> ·
+<a href="https://zenodo.org/records/3685367">TinySOL credits and terms</a> ·
+<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+Copies are RMS-scaled; the other files are transformations or synthesized outputs. See
+<a href="README.md">the file guide</a> for source paths and processing.</p></footer></main></html>

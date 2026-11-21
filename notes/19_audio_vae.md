@@ -103,12 +103,72 @@ is checkpointed periodically, so an interrupted long run does not lose
 everything. These techniques, and the parallelised matmul they rely
 on, are the subject of chapter 20.
 
-In the recorded run, reconstruction is two to three times the KL term
-at `beta = 1`. Their scalar ratio alone does not tell us whether the
-prior is well matched: their gradients and the resulting samples matter
-too. Remapping uses encoded means rather than prior samples. If prior
+### Recorded v0.2.0 run {#sec-19-recorded-v020}
+
+The new run uses 1,433 complete training recordings and reserves
+75 other recordings for validation, matching the synthesis experiment
+in [chapter 24](24_differentiable_synthesis.md). Another 24 short
+recordings are excluded by that protocol. Extraction produces
+196,804 training frames. No frame of a validation recording enters
+this cache.
+
+The settings are 20 epochs, batch 256, no frame subsampling,
+initialization seed 1, reparameterization seeds starting at 1234,
+and Adam at 0.001. We use the final checkpoint, with the epoch count
+fixed before listening to the reserved recordings.
+
+The final training reconstruction term is 26.0208 and KL is 11.3713
+at `beta = 1`. The reconstruction term is half the sum of squared
+errors across 2,049 log-magnitude bins per frame, averaged over the
+batch. It is not an error per bin or a waveform-quality score.
+
+![Dense audio VAE training with weft v0.2.0. Both curves are training averages; they do not measure reconstruction on the reserved recordings.](figures/19_audio_training_v020.png)
+
+Their scalar ratio alone does not tell us whether the prior is well
+matched: gradients and resulting samples matter too. The listening
+applications decode encoded means rather than prior samples. If prior
 sampling is poor, changing `beta` is one experiment, with a possible
-cost to reconstruction. It is a constant in the file.
+cost to reconstruction.
+
+Training reports 232.9 seconds on an Apple M3 Max with Apple Clang 16,
+`-O3`, and Accelerate, requesting one BLAS thread. Other recorded runs
+overlap this one, so this is a reproduction record rather than a
+performance comparison. The [protocol](../book/experiments/README.md)
+contains exact commands, data hashes, and logs.
+
+### Reserved recordings {#sec-19-reserved-recordings}
+
+The [listening player](audio/index.html) includes three recordings
+chosen before training: cello A4 mf, trumpet A4 pp, and flute D5 pp.
+All three belong to the validation list. They illustrate other
+recordings of known instruments; they do not measure transfer to a
+new instrument or recording setup.
+
+For a numerical comparison, form magnitude spectrograms with Hann
+4,096 and hop 1,024. Compare the original with the application's
+written waveform after fitting one global magnitude gain:
+
+$$
+R=\frac{\sum (|X|-g|Y|)^2}{\sum |X|^2},\qquad
+g=\frac{\sum |X||Y|}{\sum |Y|^2}.
+$$
+
+The sums cover bins and complete frames of the common-length signals.
+Gain alignment removes a scalar level difference; it cannot assess
+loudness fidelity. The application waveform already contains its
+edge fades, normalization, PCM quantization, and any clipping.
+
+| Reserved recording | Gain-aligned spectral residual | Raw output samples at PCM rails |
+| --- | --- | --- |
+| Cello A4 mf | 22.57% | 0.378% |
+| Trumpet A4 pp | 7.40% | 0.052% |
+| Flute D5 pp | 1.99% | 0.201% |
+
+These percentages describe a spectral discrepancy for three specific
+files, not perceived quality or a corpus average. The original-level
+residuals and all gains are retained in the record. RMS matching the
+listening copies changes their level; it cannot undo the raw
+application's clipping.
 
 ## 4. Remapping (`vae_remap`): a learned spectral transformation
 

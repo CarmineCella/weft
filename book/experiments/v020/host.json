@@ -1,0 +1,9 @@
+{
+  "cpu": "Apple M3 Max",
+  "logical_cpus": 14,
+  "memory_bytes": 38654705664,
+  "training_binary_architecture": "arm64",
+  "hardware_measurement": "sysctl -n machdep.cpu.brand_string hw.memsize hw.ncpu",
+  "analysis_python": "Python 3.9.13 (Anaconda, x86_64)",
+  "analysis_packages": {"numpy": "1.21.5", "matplotlib": "3.5.2", "scipy": "1.9.1"}
+}

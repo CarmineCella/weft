@@ -358,9 +358,11 @@ def ch12():
     fig.subplots_adjust(wspace=0.05, hspace=0.05)
     save(fig, "12_mnist_digits", pdf=False)
 
-    t = read_table(os.path.join(O, "12_mnist/log.txt"), 5, "train loss")
+    t = read_table(os.path.join(ROOT, "book/experiments/v020/logs/mnist_seed_1.log"),
+                   5, "train loss")
     fig, (a, b) = plt.subplots(1, 2, figsize=(W, 2.3))
-    curves(a, b, t[:, 0], t[:, 1], t[:, 2], t[:, 3], t[:, 4])
+    curves(a, b, t[:, 0], t[:, 1], t[:, 2], t[:, 3], t[:, 4],
+           names=("training (dropout)", "validation"))
     b.set_ylim(0.86, 1.0)
     save(fig, "12_mnist_training")
 

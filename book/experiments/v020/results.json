@@ -1,0 +1,302 @@
+{
+  "analysis": {
+    "numpy": "1.21.5",
+    "scipy": "1.9.1",
+    "script_sha256": "764fa722f11b07b98208ac096dede5269e82493c418c13c9fd4278922d9c62bb"
+  },
+  "audio_measurements": {
+    "cello": {
+      "fit": {
+        "common_samples": 332688,
+        "gain_aligned_magnitude_residual": 0.02927710168694737,
+        "magnitude_alignment_gain": 0.9757772478626981,
+        "magnitude_residual": 0.029875294057650537,
+        "output_samples": 332688,
+        "raw_output_peak_dbfs": -10.87327994161207,
+        "raw_output_rail_fraction": 0.0,
+        "raw_output_rms_dbfs": -22.447285340927312,
+        "target_samples": 332688
+      },
+      "network": {
+        "common_samples": 332288,
+        "gain_aligned_magnitude_residual": 0.2876836672661978,
+        "magnitude_alignment_gain": 1.0674631937371883,
+        "magnitude_residual": 0.29052878915985536,
+        "output_samples": 332288,
+        "raw_output_peak_dbfs": -13.564808143170229,
+        "raw_output_rail_fraction": 0.0,
+        "raw_output_rms_dbfs": -24.56312283788641,
+        "target_samples": 332688
+      },
+      "stft": {
+        "common_samples": 332688,
+        "gain_aligned_magnitude_residual": 5.106502130560768e-17,
+        "magnitude_alignment_gain": 0.9999999999999993,
+        "magnitude_residual": 5.106502130764684e-17,
+        "output_samples": 332688,
+        "raw_output_peak_dbfs": -9.642936671742886,
+        "raw_output_rail_fraction": 0.0,
+        "raw_output_rms_dbfs": -22.53120264980218,
+        "target_samples": 332688
+      },
+      "vae": {
+        "common_samples": 332688,
+        "gain_aligned_magnitude_residual": 0.22568325487494606,
+        "magnitude_alignment_gain": 0.20112248115749895,
+        "magnitude_residual": 12.442493121600288,
+        "output_samples": 332688,
+        "raw_output_peak_dbfs": -0.00026507636037961915,
+        "raw_output_rail_fraction": 0.003778314817486654,
+        "raw_output_rms_dbfs": -9.706842797638362,
+        "target_samples": 332688
+      }
+    },
+    "flute": {
+      "network": {
+        "common_samples": 267776,
+        "gain_aligned_magnitude_residual": 0.015531803215286374,
+        "magnitude_alignment_gain": 1.122133256781984,
+        "magnitude_residual": 0.027194008970851988,
+        "output_samples": 267776,
+        "raw_output_peak_dbfs": -16.55128820222025,
+        "raw_output_rail_fraction": 0.0,
+        "raw_output_rms_dbfs": -21.05739134538757,
+        "target_samples": 268134
+      },
+      "vae": {
+        "common_samples": 268134,
+        "gain_aligned_magnitude_residual": 0.01993118673791496,
+        "magnitude_alignment_gain": 0.20126006297823346,
+        "magnitude_residual": 15.45654931390909,
+        "output_samples": 268134,
+        "raw_output_peak_dbfs": -0.00026507636037961915,
+        "raw_output_rail_fraction": 0.002010188935383055,
+        "raw_output_rms_dbfs": -6.154419013599157,
+        "target_samples": 268134
+      }
+    },
+    "trumpet": {
+      "network": {
+        "common_samples": 273920,
+        "gain_aligned_magnitude_residual": 0.2667734642326838,
+        "magnitude_alignment_gain": 1.1782286274324525,
+        "magnitude_residual": 0.28355122346383205,
+        "output_samples": 273920,
+        "raw_output_peak_dbfs": -14.799702512279573,
+        "raw_output_rail_fraction": 0.0,
+        "raw_output_rms_dbfs": -23.83999558443228,
+        "target_samples": 273966
+      },
+      "vae": {
+        "common_samples": 273966,
+        "gain_aligned_magnitude_residual": 0.07400015773887009,
+        "magnitude_alignment_gain": 0.23665190961755742,
+        "magnitude_residual": 9.708654385070973,
+        "output_samples": 273966,
+        "raw_output_peak_dbfs": -0.00026507636037961915,
+        "raw_output_rail_fraction": 0.0005183124913310411,
+        "raw_output_rms_dbfs": -8.887785834562248,
+        "target_samples": 273966
+      }
+    }
+  },
+  "listening_assets": [
+    {
+      "gain": 0.8444231384267243,
+      "group": "cello",
+      "path": "notes/audio/v020/cello_original.wav",
+      "peak_dbfs": -11.111959603202253,
+      "rms_dbfs": -24.00026380158504,
+      "sample_rate": 44100,
+      "samples": 332688,
+      "sha256": "f9e558958d42e2d2b669c51b53e33eae64abec3fe6425099c1bbec51db7e5539",
+      "variant": "original"
+    },
+    {
+      "gain": 0.8444231527928626,
+      "group": "cello",
+      "path": "notes/audio/v020/cello_stft.wav",
+      "peak_dbfs": -11.111959603202253,
+      "rms_dbfs": -24.000263948997087,
+      "sample_rate": 44100,
+      "samples": 332688,
+      "sha256": "6e1975d52d1b5a250bb85463c5cb74692383f9fa220db2586101667956932475",
+      "variant": "stft"
+    },
+    {
+      "gain": 0.19290440275577256,
+      "group": "cello",
+      "path": "notes/audio/v020/cello_vae.wav",
+      "peak_dbfs": -14.293282892639105,
+      "rms_dbfs": -24.000251880215227,
+      "sample_rate": 44100,
+      "samples": 332688,
+      "sha256": "e1e2869360230f01fd9c67e3b2df851e75b08655b5a9950adbe57ac5aa98609e",
+      "variant": "vae"
+    },
+    {
+      "gain": 0.8363041791787975,
+      "group": "cello",
+      "path": "notes/audio/v020/cello_fit.wav",
+      "peak_dbfs": -12.426001763835917,
+      "rms_dbfs": -24.00026520354509,
+      "sample_rate": 44100,
+      "samples": 332688,
+      "sha256": "9c2edeccfd48d70b06050a1b1128154c54db6178d95b330f432f619bf8105fb5",
+      "variant": "fit"
+    },
+    {
+      "gain": 1.066979663475202,
+      "group": "cello",
+      "path": "notes/audio/v020/cello_network.wav",
+      "peak_dbfs": -13.00218058670268,
+      "rms_dbfs": -24.000266864368317,
+      "sample_rate": 44100,
+      "samples": 332288,
+      "sha256": "7c6b40633f6676a71a61ebca415131021443d738ad12e4995975696b5c989dbc",
+      "variant": "network"
+    },
+    {
+      "gain": 0.7139604156248908,
+      "group": "trumpet",
+      "path": "notes/audio/v020/trumpet_original.wav",
+      "peak_dbfs": -14.785148404252919,
+      "rms_dbfs": -24.000266576828245,
+      "sample_rate": 44100,
+      "samples": 273966,
+      "sha256": "fbc95365559147e0283270970aed644186ea842fabd29d268eac977dcb8b127e",
+      "variant": "original"
+    },
+    {
+      "gain": 0.17554533453884374,
+      "group": "trumpet",
+      "path": "notes/audio/v020/trumpet_vae.wav",
+      "peak_dbfs": -15.112621151697834,
+      "rms_dbfs": -24.00026161842673,
+      "sample_rate": 44100,
+      "samples": 273966,
+      "sha256": "83b5748a5e10c06fe5626d8e68ffe2a597d54a709d344a8cec0faf67179d8976",
+      "variant": "vae"
+    },
+    {
+      "gain": 0.9817474439377251,
+      "group": "trumpet",
+      "path": "notes/audio/v020/trumpet_network.wav",
+      "peak_dbfs": -14.959944337238895,
+      "rms_dbfs": -24.0002618677254,
+      "sample_rate": 44100,
+      "samples": 273920,
+      "sha256": "b82c42a43a3956a96c8cb3391dc523894b23bd9f05a83cf7ffdecec4c2e01e67",
+      "variant": "network"
+    },
+    {
+      "gain": 0.6307286967404913,
+      "group": "flute",
+      "path": "notes/audio/v020/flute_original.wav",
+      "peak_dbfs": -18.241780212226747,
+      "rms_dbfs": -24.00026461806233,
+      "sample_rate": 44100,
+      "samples": 268134,
+      "sha256": "b417fcde3016ed03af4ddabceef17880afc6f2923d46abba36e4e2e2f1c4904a",
+      "variant": "original"
+    },
+    {
+      "gain": 0.12815069052747707,
+      "group": "flute",
+      "path": "notes/audio/v020/flute_vae.wav",
+      "peak_dbfs": -17.846081206435564,
+      "rms_dbfs": -24.000262818345934,
+      "sample_rate": 44100,
+      "samples": 268134,
+      "sha256": "c60d3510bd7842371f7c43752608f3a54edb39e34066282038073bed5820d3f5",
+      "variant": "vae"
+    },
+    {
+      "gain": 0.7126389693678371,
+      "group": "flute",
+      "path": "notes/audio/v020/flute_network.wav",
+      "peak_dbfs": -19.49490303297911,
+      "rms_dbfs": -24.00026818567836,
+      "sample_rate": 44100,
+      "samples": 267776,
+      "sha256": "77c184910e7bd09b9e5df9d4e47471be4d53d1737c83322e153229f5b6358197",
+      "variant": "network"
+    },
+    {
+      "gain": 1.5055467645843355,
+      "group": "gesture",
+      "path": "notes/audio/v020/gesture_phrase.wav",
+      "peak_dbfs": -14.193546060480974,
+      "rms_dbfs": -24.000268055947064,
+      "sample_rate": 44100,
+      "samples": 202240,
+      "sha256": "dff5b73c1e7b4b24a09d381e7993756a2f741e94461d036afaf12e97b9cabc05",
+      "variant": "phrase"
+    },
+    {
+      "gain": 0.680003990999758,
+      "group": "gesture",
+      "path": "notes/audio/v020/gesture_morph.wav",
+      "peak_dbfs": -17.154499615092192,
+      "rms_dbfs": -24.00025547404779,
+      "sample_rate": 44100,
+      "samples": 264192,
+      "sha256": "1604c9f2169cbd07484a3eab9754c87ae711057821727105367270fbb634967b",
+      "variant": "morph"
+    }
+  ],
+  "mnist": [
+    {
+      "seed": 1,
+      "selected_epoch": 10,
+      "test_accuracy": 0.9801,
+      "test_correct": 9801,
+      "test_total": 10000,
+      "training_seconds": 9.3,
+      "validation_accuracy": 0.9767,
+      "validation_loss": 0.0751
+    },
+    {
+      "seed": 2,
+      "selected_epoch": 7,
+      "test_accuracy": 0.9789,
+      "test_correct": 9789,
+      "test_total": 10000,
+      "training_seconds": 9.8,
+      "validation_accuracy": 0.9792,
+      "validation_loss": 0.0726
+    },
+    {
+      "seed": 3,
+      "selected_epoch": 9,
+      "test_accuracy": 0.9797,
+      "test_correct": 9797,
+      "test_total": 10000,
+      "training_seconds": 10.3,
+      "validation_accuracy": 0.9762,
+      "validation_loss": 0.078
+    }
+  ],
+  "mnist_test_mean": 0.9795666666666667,
+  "mnist_test_sample_sd": 0.000611010092660772,
+  "protocol": "book-v020-1",
+  "stft_reference": {
+    "covered_sample_max_error": 1.0435315805912282e-13,
+    "covered_samples": 331748,
+    "frames": 161,
+    "last_frame_end": 331776
+  },
+  "synthesis": {
+    "epochs": 40,
+    "final_training_loss": 2.1986,
+    "final_validation_loss": 2.4227,
+    "training_seconds": 532.0
+  },
+  "vae": {
+    "epochs": 20,
+    "final_kl": 11.3713,
+    "final_reconstruction": 26.0208,
+    "training_frames": 196804,
+    "training_seconds": 232.9
+  }
+}

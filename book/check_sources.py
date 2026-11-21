@@ -45,8 +45,11 @@ def main():
         if not pdf.is_file() or not pdf.read_bytes().startswith(b"%PDF-"):
             errors.append(f"missing or invalid PDF: {pdf}")
         else:
-            text = subprocess.check_output(["pdftotext", "-layout", str(pdf), "-"], text=True)
-            if "??" in text:
+            parsed = subprocess.run(["pdftotext", "-layout", str(pdf), "-"],
+                                    capture_output=True, text=True)
+            if parsed.returncode or "Syntax Error" in parsed.stderr:
+                errors.append("PDF parser reported an error: " + parsed.stderr.strip()[:500])
+            elif "??" in parsed.stdout:
                 errors.append("PDF contains unresolved-reference markers")
             log = pdf.with_suffix(".log")
             if log.exists() and re.search(r"^!|LaTeX Error|Undefined control sequence", log.read_text(), re.M):

@@ -6,9 +6,9 @@ digits, labelled 0-9. It is small enough for laptop CPU experiments, and
 large enough to examine how the regularisation and optimisation choices
 of the last few chapters affect a model.
 
-This is the first weft example that uses every part of the library at
-once: the IDX loader, an MLP with hidden Dense layers, ReLU,
-Dropout, Softmax, cross-entropy, Adam, and train/eval mode switching.
+This example combines the training core: the IDX loader, an MLP with
+hidden Dense layers, ReLU, dropout, stable logits-based cross-entropy,
+Adam, and train/eval mode switching.
 
 ---
 
@@ -45,7 +45,7 @@ Dense(128, 10)  -> logits
 part of the objective, but is not a separate final layer in this model.
 
 The network has about 235,000 parameters. That is large enough relative
-to 60,000 training examples that overfitting is a risk, which is the
+to 54,000 training examples that overfitting is a risk, which is the
 regime where dropout is useful.
 
 Two hidden layers keep the example small while giving it more capacity
@@ -77,7 +77,7 @@ a validation criterion, and repeated runs.
 SoftmaxCrossEntropy<float> ce;
 for (int epoch = 1; epoch <= epochs; ++epoch) {
     net.train();                                  // (a)
-    auto idx = shuffled_indices(X.cols(), epoch);
+    auto idx = shuffled_indices(X.cols(), random_seed());
 
     for (mini-batches) {
         Matrix logits = net.forward(X_batch);
@@ -119,15 +119,15 @@ seed.
 
 ---
 
-## 5. Train vs test accuracy: reading the gap
+## 5. Training and validation accuracy: reading the gap
 
-The "train acc" reported in the recorded run is the running accuracy during
-the training pass, measured with dropout still active. The "test acc"
-is measured in eval mode.
+The "train acc" in the v0.2.0 run is the running accuracy during the
+training pass, measured with dropout still active. The validation
+accuracy is measured in eval mode after each epoch.
 
-Test accuracy can exceed the running training accuracy, especially
+Validation accuracy can exceed the running training accuracy, especially
 early in training. Dropout is active during the training pass, and the
-weights also change throughout that pass. The test evaluation uses one
+weights also change throughout that pass. Validation uses one
 fixed set of weights with dropout disabled. These are different
 measurement conditions, so the gap alone is not an overfitting test.
 
@@ -136,7 +136,33 @@ eval mode after an epoch. Use validation performance to investigate
 early stopping or regularisation. Repeatedly consulting test accuracy
 for those choices would make it part of model selection.
 
-![The earlier MNIST run over ten epochs, with training values measured under dropout. This figure predates the validation split; the current program reports validation metrics during training and final test accuracy once.](figures/12_mnist_training.png)
+![The v0.2.0 run with seed 1. Training values are accumulated with dropout active; validation uses eval mode after each epoch. The official test set is evaluated once after loading the checkpoint with lowest validation loss.](figures/12_mnist_training.png)
+
+### Recorded v0.2.0 results
+
+Three seeds were fixed before running. Each uses 54,000 training
+images, 6,000 validation images, and the official 10,000-image test
+set. The seed changes both the development split and the model's
+initialization, dropout, and shuffling. The saved checkpoint is selected
+within each run by validation loss.
+
+| Seed | Selected epoch | Validation loss | Test correct / 10,000 | Test accuracy |
+| --- | --- | --- | --- | --- |
+| 1 | 10 | 0.0751 | 9,801 | 98.01% |
+| 2 | 7 | 0.0726 | 9,789 | 97.89% |
+| 3 | 9 | 0.0780 | 9,797 | 97.97% |
+
+Mean test accuracy is 97.96%, with a sample standard deviation of
+0.06 percentage points across these three procedures. This small set
+of runs illustrates variation; it does not estimate the performance
+of another configuration or provide a confidence interval.
+
+The runs use Apple Clang 16, C++17, `-O3`, and Accelerate on an
+Apple M3 Max. Requested BLAS thread limits are one. Reported training
+times are 9.3, 9.8, and 10.3 seconds; these runs overlap other
+experiments and are not a speed comparison. Commands, data hashes,
+toolchain settings, and all epoch logs are in the
+[experiment record](../book/experiments/README.md).
 
 ---
 
@@ -159,8 +185,8 @@ make
 ./examples/mnist_classifier /some/path 42 mnist.wnet  # seed and checkpoint
 ```
 
-The recorded example reaches about 98% test accuracy after ten epochs.
-Your result and runtime depend on initialization, hardware, compiler
+The recorded runs above reach about 98% test accuracy. Your result
+and runtime depend on initialization, hardware, compiler
 options, and the matrix backend. [Chapter 20](20_performance.md)
 discusses the performance choices.
 
@@ -171,9 +197,10 @@ discusses the performance choices.
 A more complete MNIST classifier would do the following, which we
 deliberately omit:
 
-- **Repeated seeds.** The current program already uses validation
-  checkpoint selection and one final test evaluation. Repeat that
-  procedure across declared seeds when comparing configurations.
+- **Broader comparisons.** Three declared seeds illustrate this
+  configuration. Comparing architectures or optimizers would require
+  a declared validation procedure for each and a larger study of
+  variation.
 - **Learning-rate schedule and augmentation.** A schedule, small
   translations, and rotations are possible experiments. Measure
   their effect on validation data instead of assuming an accuracy gain.

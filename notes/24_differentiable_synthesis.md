@@ -341,9 +341,42 @@ head, into the network and into the instrument vectors.
 synth_train train  data/TinySOL_2020  synth_model  60
 ```
 
-On TinySOL (1,508 usable notes of 12 instruments, 75 of them held
-out) sixty epochs take 17 minutes. The loss falls from 3.25 to 2.19
-on the training notes and from 2.87 to 2.37 on the held-out ones.
+In the earlier recorded run, 60 epochs on 1,508 usable notes of
+12 instruments, with 75 reserved for validation, took 17 minutes.
+Its training loss fell from 3.25 to 2.19 and validation loss from
+2.87 to 2.37. Those are historical results; the new fixed run below
+uses 40 epochs and the v0.2.0 initialization.
+
+### Recorded v0.2.0 run {#sec-24-recorded-v020}
+
+The new run uses the same 1,532-file TinySOL package. The example
+excludes 24 short notes, then reserves every twentieth accepted
+recording at offset ten for validation: 1,433 training recordings
+and 75 validation recordings. Both the file order and all hashes
+are in the [experiment record](../book/experiments/README.md).
+The dense VAE in [chapter 19](19_audio_vae.md) uses these same
+training files.
+
+We fixed 40 epochs before running, with batch 14, 128-frame
+training crops, initialization seed 1, embedding seed 7, and
+crop/shuffle RNG 1234. Validation uses fixed crops beginning at
+control frame 4. The final network is used for the listening
+examples; validation did not select the number of epochs.
+
+Training loss changes from 3.2691 to 2.1986; validation changes
+from 2.8580 to 2.4227. These losses concern different crop
+distributions, and this validation set is not an untouched final
+test set. The example also uses all accepted notes when estimating
+the typical loudness used by its gesture generators. Its timbre
+weights train only on the training notes.
+
+![Network-controlled synthesis with weft v0.2.0. Training samples new crops each epoch; validation evaluates fixed crops. The displayed final epoch was fixed before the run.](figures/24_network_training_v020.png)
+
+The reported training-loop time is 532 seconds on an Apple M3 Max,
+using Apple Clang 16, `-O3`, and Accelerate with a requested BLAS
+thread limit of one. Pitch analysis and loading occur before that
+timer. Other experiments overlap part of the run, so this timing
+does not establish a speedup over the earlier run.
 
 
 ## 8. What the network adds
@@ -377,13 +410,15 @@ produced by the oscillators and the noise filter.
 
 ## 9. Results and limitations
 
-Compared with the VAEs, the output is clean. There is no phase
+In the earlier recorded listening examples, the output sounded clean
+compared with the VAEs. There is no phase
 problem because the synthesiser generates coherent sinusoids, and no
 inversion problem because there is no spectrogram to invert. The
 loudness envelope and the pitch, vibrato included, are reproduced
 closely.
 
-The timbre is less faithful than a direct fit. The figures are 2.4
+In that sixty-epoch run, the timbre was less faithful than a direct
+fit. The reported losses were 2.4
 for the network on unseen notes against 0.4 to 1.6 for the direct
 fits. The network has learned a somewhat generic version of each
 instrument. On held-out notes the trumpet and trombone are close to
@@ -415,6 +450,54 @@ mapping from musical controls to synthesis parameters. The synthesiser
 supplies a waveform renderer with explicit assumptions about pitch,
 partials, and noise. Those assumptions make the output easier to
 interpret while limiting the sounds it can represent.
+
+### A shared listening comparison {#sec-24-shared-listening}
+
+The new [listening examples](audio/index.html) compare this network
+with the dense VAE on three validation recordings fixed before
+training. Both models use the same training-file list. The network
+receives the target's measured pitch and loudness; the VAE receives
+its frame magnitudes and reuses its phase. Their supplied information
+and output representations differ.
+
+The following values use the gain-aligned magnitude-spectrogram
+residual defined in [chapter 19](19_audio_vae.md), evaluated on the
+raw application outputs. Each is a percentage of the target
+magnitude-spectrogram energy.
+
+| Reserved recording | Dense VAE | Network-controlled synthesiser |
+| --- | --- | --- |
+| Cello A4 mf | 22.57% | 28.77% |
+| Trumpet A4 pp | 7.40% | 26.68% |
+| Flute D5 pp | 1.99% | 1.55% |
+
+For the cello, fitting controls directly for 400 iterations produces
+a 2.93% gain-aligned residual in 113.3 seconds. This fit uses the
+target throughout optimization. The network's larger residual
+therefore motivates investigating its shared mapping and training;
+it does not establish a global optimum for the direct fit.
+
+The network has a smaller residual than the VAE on the flute case
+and a larger one on the other two. This small comparison gives no
+general ranking of the models or their musical usefulness. A
+renderer with coherent oscillator phases can still have the wrong
+spectral envelope. The VAE's borrowed phase, normalization, and
+observed clipping also remain part of its result.
+
+![The reserved cello recording and the three v0.2.0 reconstructions. Waveform RMS is matched for display, and all panels share one spectral reference and grey scale. The direct fit follows this recording's changing partials closely; the VAE and network introduce different spectral errors.](figures/00_cello_comparison_v020.png)
+
+The STFT-only reference in the prologue retains both magnitude and
+phase. Its independent double-precision round trip has maximum
+sample error below `1.1e-13` where window-power coverage exceeds
+`1e-8`; uncovered boundaries are excluded from that particular
+sample-error statement. This separates transform inversion from
+the learned reconstruction problem.
+
+The file guide records the source identities and RMS gains.
+Listen for the attack, pitch motion during the sustain, and release,
+then decide which differences matter for the transformation you
+want to make. The prescribed phrase and flute/cello morph
+demonstrate control beyond reconstructing a single target recording.
 
 The next chapters return to architecture. Everything so far has
 processed one frame, one patch or one image at a time. Attention

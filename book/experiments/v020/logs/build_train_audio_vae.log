@@ -1,0 +1,25 @@
+In file included from examples/train_audio_vae.cpp:28:
+In file included from src/Adam.h:29:
+In file included from src/Optimizer.h:15:
+src/Matrix.h:189:13: warning: 'cblas_sgemm' is deprecated: first deprecated in macOS 13.3 - An updated CBLAS interface supporting ILP64 is available.  Please compile with -DACCELERATE_NEW_LAPACK to access the new headers and -DACCELERATE_LAPACK_ILP64 for ILP64 support. [-Wdeprecated-declarations]
+  189 |             cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+      |             ^
+src/Dense.h:54:19: note: in instantiation of member function 'weft::Matrix<>::operator*' requested here
+   54 |         return W_ * X + b_;
+      |                   ^
+src/Dense.h:34:5: note: in instantiation of member function 'weft::Dense<>::forward' requested here
+   34 |     Dense(std::size_t in_features, std::size_t out_features,
+      |     ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/unique_ptr.h:597:30: note: in instantiation of member function 'weft::Dense<>::Dense' requested here
+  597 |   return unique_ptr<_Tp>(new _Tp(std::forward<_Args>(__args)...));
+      |                              ^
+src/Network.h:63:25: note: in instantiation of function template specialization 'std::make_unique<weft::Dense<>, const unsigned long &, int>' requested here
+   63 |         auto ptr = std::make_unique<L<T>>(std::forward<Args>(args)...);
+      |                         ^
+examples/train_audio_vae.cpp:97:9: note: in instantiation of function template specialization 'weft::Network<>::add<weft::Dense, const unsigned long &, int>' requested here
+   97 |     enc.add<Dense>(FEAT_DIM, 256);
+      |         ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/vecLib.framework/Headers/cblas.h:610:6: note: 'cblas_sgemm' has been explicitly marked deprecated here
+  610 | void cblas_sgemm(const enum CBLAS_ORDER __Order,
+      |      ^
+1 warning generated.

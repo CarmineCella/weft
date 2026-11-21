@@ -68,14 +68,20 @@ jobs:
             texlive-plain-generic texlive-bibtex-extra tex-gyre cm-super
       - name: Validate chapter sources
         run: python3 book/check_sources.py
+      - name: Verify recorded experiments and listening assets
+        run: python3 book/experiments/check.py
       - name: Build book
         run: make -C book
       - name: Check rendered text and LaTeX errors
         run: python3 book/check_sources.py --pdf book/build/book.pdf
+      - name: Package PDF and offline listening files
+        run: python3 book/experiments/bundle.py --pdf book/build/book.pdf
       - name: Save compiled book
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: designing-musical-networks
-          path: book/build/book.pdf
+          path: |
+            book/build/book.pdf
+            book/build/designing-musical-networks.zip
           if-no-files-found: error
           retention-days: 14
