@@ -8,7 +8,9 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <algorithm>
 #include <random>
+#include <sstream>
 #include <string>
 
 using namespace weft;
@@ -152,12 +154,66 @@ void test_save_load_roundtrip() {
     check(diff, "fresh layer's output differs from saved layer's (sanity)");
 }
 
+// Causal mode: output column j may depend only on input columns 0..j,
+// and the input gradient must still match finite differences.
+void test_causal() {
+    std::cout << "causal mode:\n";
+    using D = double;
+    const std::size_t d_model = 6, n_heads = 2, seq_len = 5, t = 2;
+    auto X  = rand_mat<D>(d_model, seq_len, 77, -0.5, 0.5);
+    auto Wt = rand_mat<D>(d_model, seq_len, 78);     // loss = sum(Wt .* Y)
+
+    MultiHeadAttention<D> mha(d_model, n_heads);
+    check(!mha.causal(), "layer starts bidirectional");
+    mha.set_causal(true);
+    check(mha.causal(), "set_causal(true) is remembered");
+
+    auto Y0 = mha.forward(X);
+    auto X2 = X;
+    for (std::size_t i = 0; i < d_model; ++i) X2(i, t) += 0.8;
+    auto Y1 = mha.forward(X2);
+    D before = 0.0, after = 0.0;
+    for (std::size_t j = 0; j < seq_len; ++j)
+        for (std::size_t i = 0; i < d_model; ++i) {
+            const D e = std::fabs(Y1(i, j) - Y0(i, j));
+            if (j < t) before = std::max(before, e);
+            else       after  = std::max(after,  e);
+        }
+    check(before == 0.0, "changing token t leaves earlier outputs untouched");
+    check(after > 1e-4,  "changing token t changes later outputs (sanity)");
+
+    // Head 0's attention map must be lower-triangular in (query, key).
+    bool tri = true;
+    const auto& A = mha.attention(0);
+    for (std::size_t i = 0; i < seq_len; ++i)
+        for (std::size_t j = i + 1; j < seq_len; ++j)
+            if (A(j, i) != 0.0) tri = false;
+    check(tri, "head 0 puts zero weight on future tokens");
+
+    mha.forward(X);
+    auto dX = mha.backward(Wt);
+    const D eps = 1e-5;
+    D worst = 0.0;
+    for (std::size_t j = 0; j < seq_len; ++j)
+        for (std::size_t i = 0; i < d_model; ++i) {
+            auto Xp = X, Xm = X;
+            Xp(i, j) += eps; Xm(i, j) -= eps;
+            const D lp = sum_all(hadamard(Wt, mha.forward(Xp)));
+            const D lm = sum_all(hadamard(Wt, mha.forward(Xm)));
+            worst = std::max(worst,
+                             std::fabs((lp - lm) / (2.0 * eps) - dX(i, j)));
+        }
+    std::cout << "  worst |num - analytic| for dX (causal) = " << worst << "\n";
+    check(worst < 1e-8, "dX matches numerical in causal mode");
+}
+
 int main() {
     std::cout << "test_multi_head_attention\n";
     test_shape_and_constraints();
     test_describe();
     test_dx_numerical();
     test_save_load_roundtrip();
+    test_causal();
     std::cout << n_passed << " passed, " << n_failed << " failed\n";
     return n_failed == 0 ? 0 : 1;
 }

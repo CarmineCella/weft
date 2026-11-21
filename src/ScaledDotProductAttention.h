@@ -39,11 +39,20 @@
 // just feed dA in.)  Verified by finite-difference test in
 // tests/test_scaled_dot_product_attention.cpp.
 //
+// Causal mask.  With `causal = true`, query i may only attend to keys
+// 0..i: before the softmax we set S[j, i] = -infinity for every j > i,
+// so those weights come out exactly zero.  This is what an
+// autoregressive model needs (position i must not see the tokens it is
+// trying to predict).  The backward needs no change: a masked entry has
+// A[j, i] = 0, the softmax backward multiplies by A, so dS[j, i] = 0 and
+// nothing flows to Q or K through a masked pair.
+//
 #include "Matrix.h"
 #include "Softmax.h"
 
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <stdexcept>
 #include <tuple>
 
@@ -53,9 +62,11 @@ template <typename T = float>
 class ScaledDotProductAttention {
 public:
     // Q (d_k x n_q), K (d_k x n_k), V (d_v x n_k)  ->  out (d_v x n_q)
+    // causal = true masks every (key j, query i) pair with j > i.
     Matrix<T> forward(const Matrix<T>& Q,
                       const Matrix<T>& K,
-                      const Matrix<T>& V)
+                      const Matrix<T>& V,
+                      bool causal = false)
     {
         if (Q.rows() != K.rows())
             throw std::invalid_argument(
@@ -69,6 +80,14 @@ public:
 
         Matrix<T> S = K.transpose() * Q;         // (n_k x n_q)
         S = S * scale_;                          // scale BEFORE softmax
+        if (causal) {
+            // Row j = key, column i = query.  Key 0 is never masked, so
+            // every column keeps at least one finite score.
+            const T neg_inf = -std::numeric_limits<T>::infinity();
+            for (std::size_t i = 0; i < S.cols(); ++i)
+                for (std::size_t j = i + 1; j < S.rows(); ++j)
+                    S(j, i) = neg_inf;
+        }
         A_ = softmax_.forward(S);                // per-column softmax (n_k x n_q)
         return V * A_;                           // (d_v x n_q)
     }

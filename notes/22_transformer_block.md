@@ -119,8 +119,15 @@ dX[i, j] = (1 / (D * sqrt(var_j + eps))) *
 `dgamma[i]` and `dbeta[i]` accumulate as `sum_j dY[i, j] * x_hat[i,
 j]` and `sum_j dY[i, j]` respectively (the parameters are shared
 across the batch, so their gradients sum across it). The
-finite-difference test verifies all three to better than `1e-10` in
-double precision, which is plenty to trust the implementation.
+finite-difference test verifies all three to about `1e-10` in double
+precision, which is plenty to trust the implementation.
+
+One detail of that test is worth knowing. The usual scalar loss for a
+gradient check, the sum of all outputs, is useless here: with
+`gamma = 1` every normalised column sums to zero, so the loss does not
+depend on `X` at all and *any* `dX` would pass. The test weights each
+output entry by a random number instead, so that every entry of the
+gradient matters.
 
 
 ## 4. The transformer encoder block
@@ -190,10 +197,27 @@ Matrix<T> backward(const Matrix<T>& dZ) {
 ```
 
 The finite-difference check on `dX` agrees with the analytical
-gradient to about `1e-8` in double precision — looser than the
-individual sub-layer checks (which were near `1e-11`) because numerical
-error accumulates across the six-layer chain, but well within the
-range that catches real bugs.
+gradient to a few `1e-9` in double precision — looser than the
+individual sub-layer checks (which were near `1e-11`) because the
+block is a long chain. With the step `1e-5` used for single layers the
+disagreement is `1e-8` to `1e-7`, and it shrinks a hundredfold when
+the step shrinks tenfold. That scaling is the signature of the finite
+difference's own truncation error, not of a wrong gradient, so the
+block's test uses a step of `1e-6`.
+
+**A causal block.** `set_causal(true)` on the block switches its
+attention sub-layer to the causal mask of note 21. Nothing else has to
+change, because LayerNorm, the feed-forward sub-stack and the
+residuals all act on one token at a time and cannot carry information
+from a later position to an earlier one. A stack of causal blocks is
+therefore a *decoder-only* transformer, the architecture of every
+autoregressive language model, and it is the form we use from here on.
+The test changes one token and checks that every earlier output is
+bit-identical. (The change has to differ from feature to feature:
+LayerNorm removes a constant added to a whole column, so a uniform
+shift would be invisible to the block and the test would prove
+nothing. We made exactly that mistake in the first version of the
+test.)
 
 
 ## 5. What we have
@@ -214,29 +238,23 @@ transformer sizes already outweighs the entire ConvVAE. This is the
 order-of-magnitude scaling that defines modern deep learning: not
 because the *operations* are any deeper, but because the
 *architectures* duplicate small blocks dozens of times. Twelve of
-these blocks stacked is a small transformer (~38M parameters);
-ninety-six of them stacked is GPT-2 large.
+these blocks stacked is a small transformer (~38M parameters). GPT-2
+large stacks thirty-six wider ones (`d_model = 1280`) for about 774M.
 
 
 ## 6. What's next
 
-Two directions from here.
+We now have every part of a transformer: attention with an optional
+causal mask, positional encoding, LayerNorm, and a block that composes
+them. What we have not done is train one.
 
-**The decoder side** of a full encoder–decoder transformer needs
-*causal* masked self-attention (each position attends only to earlier
-ones), and a *cross-attention* layer (the decoder queries the encoder
-output). Both are minor extensions of what we have: the score matrix
-gains an additive `-inf` mask before softmax, and the cross-attention
-just takes `Q` from one source and `K, V` from another. We've
-already separated those inputs in the SDPA interface, so it's a usage
-pattern, not new code.
+The full encoder–decoder transformer of the original paper adds
+*cross-attention*, where the decoder queries the encoder output. We
+don't build it: it is the same operator with `Q` taken from one
+source and `K, V` from another, and the generative models in the next
+notes are decoder-only, which need only the causal block above.
 
-**The applied direction** is what closes Part II: a generative audio
-system that combines matching pursuit (note 3) with attention. The
-form is up for design — attention selecting MP atoms from a learned
-dictionary, attention over MP residuals, attention as a re-ranking
-step after greedy MP. Whatever the choice, it brings the two
-generative families we've built (dictionary-based and
-representation-based) into one place and points toward the chapters
-of Part III, which will be about creative applications rather than
-mechanism.
+Note 23 puts the pieces to work. It adds a token embedding, stacks
+causal blocks into an autoregressive model, and trains it on four-voice
+chorales, so that sampling from it one token at a time writes new
+ones.

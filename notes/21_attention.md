@@ -206,28 +206,87 @@ own `ScaledDotProductAttention` (which in turn owns its own
 ownership.
 
 
-## 7. What's not here yet
+## 7. The causal mask
 
-Attention as written above is *bidirectional* — every query attends
-to every key in the sequence, no constraints. Three useful variants
-need a small extension to support:
+Attention as written above is *bidirectional*: every query attends to
+every key in the sequence, no constraints. That is right for an
+encoder, which reads a whole sequence at once. It is wrong for a model
+that *generates* a sequence one token at a time. Such a model is
+trained to predict token `i + 1` from tokens `0..i`, and if position
+`i` can attend to position `i + 1` it simply copies the answer. The
+training loss goes to zero and the model has learned nothing.
 
-- **Causal masking.** For language models that predict the next
-  token, position *i* must not attend to positions `> i`. The fix is
-  to set `S[j, i] = -inf` for `j > i` *before* the softmax (so those
-  weights become zero). One mask matrix, one entrywise add.
+The fix is to forbid looking forward. In the score matrix `S`, row `j`
+is a key and column `i` is a query, so "query `i` may not see key `j`"
+for `j > i` means overwriting the part of `S` below the diagonal
+before the softmax:
+
+```
+S[j, i] = -inf      for every j > i
+```
+
+`exp(-inf)` is exactly zero, so after the softmax those weights are
+exactly zero and the remaining ones in the column still sum to 1. Key
+0 is never masked, so every column keeps at least one finite score
+and the softmax is always well defined. For four tokens the attention
+map (keys down, queries across) has this shape:
+
+```
+        q0   q1   q2   q3
+  k0     1    *    *    *
+  k1     0    *    *    *
+  k2     0    0    *    *
+  k3     0    0    0    *
+```
+
+In code it is a flag on the operator and five lines in the forward:
+
+```cpp
+Matrix<T> forward(const Matrix<T>& Q, const Matrix<T>& K,
+                  const Matrix<T>& V, bool causal = false);
+
+if (causal) {
+    const T neg_inf = -std::numeric_limits<T>::infinity();
+    for (std::size_t i = 0; i < S.cols(); ++i)
+        for (std::size_t j = i + 1; j < S.rows(); ++j)
+            S(j, i) = neg_inf;
+}
+```
+
+**The backward needs no change at all.** The softmax backward is
+`dS[j, i] = A[j, i] * (dA[j, i] - ...)`. A masked entry has
+`A[j, i] = 0`, so its `dS[j, i]` is zero, and nothing reaches `Q` or
+`K` through a masked pair. The mask removes those paths from the
+forward computation and the existing formulas remove them from the
+gradient.
+
+`MultiHeadAttention` exposes the flag as `set_causal(bool)` and passes
+it to every head. It is a switch, not a parameter: it is not saved
+with the weights, and the same layer can be run both ways.
+
+The tests check three things. The attention map has exact zeros below
+the diagonal and its columns still sum to 1. Changing token `t` leaves
+every output before `t` *bit-identical*, while without the mask the
+same change does reach them. And the gradients still agree with finite
+differences, to about `1e-11` for the operator and `1e-10` through
+`MultiHeadAttention`.
+
+
+## 8. What's not here
+
+Two other variants are common and are not implemented:
+
 - **Padding masking.** Variable-length sequences in a batch get
   padded to a common length; the padded positions shouldn't
   contribute to anyone's attention. Same trick: `-inf` in the score
-  matrix at padded positions.
+  matrix at padded positions. We process one sequence per forward
+  pass, so there is nothing to pad.
 - **Encoder–decoder cross-attention.** The query comes from the
   decoder's previous layer; the keys and values come from the
   encoder's output. Same operator, different sourcing of `(Q, K, V)`.
-  We've already separated `Q` from `K, V` in the API, so this is just
+  We've already separated `Q` from `K, V` in the operator, so this is
   a usage pattern, not new code.
 
-These all fit on top of `ScaledDotProductAttention` without changing
-its interface. Note 22 builds the surrounding pieces — sinusoidal
-positional encoding, LayerNorm, residual connections — and assembles
-a complete transformer encoder block, with all of those features in
-position to be added when we need them.
+Note 22 builds the surrounding pieces — sinusoidal positional
+encoding, LayerNorm, residual connections — and assembles a complete
+transformer block.

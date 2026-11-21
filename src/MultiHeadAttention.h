@@ -29,6 +29,11 @@
 // One head per SDPA instance (each owns its own Softmax cache); this
 // makes the per-head backward independent and correct.
 //
+// set_causal(true) makes every head use the causal mask (token i attends
+// only to tokens 0..i), which turns the layer into the self-attention of
+// an autoregressive model.  It is a switch, not a parameter: it is not
+// saved, and it can be flipped without rebuilding the layer.
+//
 #include "Dense.h"
 #include "Layer.h"
 #include "Matrix.h"
@@ -77,7 +82,7 @@ public:
             Matrix<T> Qh = head_slice(Q, h);
             Matrix<T> Kh = head_slice(K, h);
             Matrix<T> Vh = head_slice(V, h);
-            Matrix<T> Yh = heads_[h].forward(Qh, Kh, Vh);   // (d_head x seq_len)
+            Matrix<T> Yh = heads_[h].forward(Qh, Kh, Vh, causal_);  // (d_head x seq_len)
             head_join(concat, h, Yh);
         }
 
@@ -143,6 +148,16 @@ public:
     std::size_t n_heads() const { return n_heads_; }
     std::size_t d_head()  const { return d_head_;  }
 
+    // Causal (autoregressive) masking on/off for every head.
+    void set_causal(bool c) { causal_ = c; }
+    bool causal() const     { return causal_; }
+
+    // Attention map of head h from the last forward, (seq_len x seq_len):
+    // column i holds the weights query i put on each key.
+    const Matrix<T>& attention(std::size_t h) const {
+        return heads_.at(h).attention();
+    }
+
 private:
     // Rows [h*d_head, (h+1)*d_head) of M, all columns.
     Matrix<T> head_slice(const Matrix<T>& M, std::size_t h) const {
@@ -160,6 +175,7 @@ private:
     }
 
     std::size_t d_model_, n_heads_, d_head_;
+    bool        causal_ = false;
     Dense<T>    Wq_, Wk_, Wv_, Wo_;
     std::vector<ScaledDotProductAttention<T>> heads_;
 

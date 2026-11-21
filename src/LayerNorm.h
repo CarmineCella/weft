@@ -148,6 +148,8 @@ public:
     // Accessors for tests / inspection.
     const Matrix<T>& gamma()  const { return gamma_; }
     const Matrix<T>& beta()   const { return beta_;  }
+          Matrix<T>& gamma()        { return gamma_; }
+          Matrix<T>& beta()         { return beta_;  }
     const Matrix<T>& dgamma() const { return dgamma_;}
     const Matrix<T>& dbeta()  const { return dbeta_; }
     std::size_t d_model()     const { return d_model_; }

@@ -32,6 +32,12 @@
 // learnable; update() walks them in fixed order so save/load is
 // trivially correct.
 //
+// set_causal(true) switches the attention sub-layer to causal masking,
+// which is all it takes to use the same block in an autoregressive
+// (decoder-only) model.  LayerNorm, the feed-forward sub-layer and the
+// residuals all act on one token at a time, so they cannot leak
+// information from later positions.
+//
 #include "Dense.h"
 #include "Layer.h"
 #include "LayerNorm.h"
@@ -57,19 +63,15 @@ public:
           d_ff_(d_ff > 0 ? d_ff : 4 * d_model),
           ln1_(d_model), mha_(d_model, n_heads),
           ln2_(d_model),
-          ff1_(d_model, d_ff_ > 0 ? d_ff_ : 4 * d_model),
-          ff2_(d_ff_ > 0 ? d_ff_ : 4 * d_model, d_model)
+          ff1_(d_model, d_ff_),
+          ff2_(d_ff_, d_model)
     {}
 
     Matrix<T> forward(const Matrix<T>& X) override {
-        X_cache_ = X;                                  // for residual backward
-
         // ---- attention sublayer ----
         Matrix<T> a = ln1_.forward(X);                 // LN(X)
         Matrix<T> b = mha_.forward(a);                 // Attn(LN(X))
         Matrix<T> Y = X + b;                           // residual
-
-        Y_cache_ = Y;                                  // for second residual backward
 
         // ---- feed-forward sublayer ----
         Matrix<T> c = ln2_.forward(Y);                 // LN(Y)
@@ -136,6 +138,13 @@ public:
     std::size_t n_heads() const { return n_heads_; }
     std::size_t d_ff()    const { return d_ff_;    }
 
+    // Causal (autoregressive) masking on/off for the attention sub-layer.
+    void set_causal(bool c) { mha_.set_causal(c); }
+    bool causal() const     { return mha_.causal(); }
+
+    // The attention sub-layer, for inspecting attention maps.
+    const MultiHeadAttention<T>& attention_layer() const { return mha_; }
+
 private:
     std::size_t d_model_, n_heads_, d_ff_;
 
@@ -145,9 +154,6 @@ private:
     Dense<T>                ff1_;
     ReLU<T>                 relu_;
     Dense<T>                ff2_;
-
-    Matrix<T> X_cache_, Y_cache_;    // unused after construction, but kept
-                                     // alive in case future variants need them
 };
 
 } // namespace weft
