@@ -196,3 +196,9 @@ The accuracy ceiling for a well-tuned MLP on MNIST is around 98-98.5%.
 The state of the art (deep ConvNets with augmentation and ensembling)
 sits at 99.8%, where the remaining errors are images even humans
 disagree about.
+
+
+## Further reading
+
+The MNIST database and the first convolutional and fully connected
+results on it are described in [@lecun1998gradient].

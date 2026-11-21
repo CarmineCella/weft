@@ -83,3 +83,9 @@ hide behind, so the weights are the entire model.
 This is also a nice closing demonstration of why we built `Bmp.h` when we
 did: the same writer renders autoencoder reconstructions, VAE manifolds, and
 now the learned weights themselves.
+
+
+## Further reading
+
+Looking at what a network's weights and features respond to is developed
+much further, for convolutional networks, in [@zeiler2014visualizing].

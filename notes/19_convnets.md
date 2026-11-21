@@ -367,9 +367,9 @@ What you should see, after a successful training run:
   activated and never learned. This is normal; on a small budget of
   filters, a few often end up at random init.
 
-This is exactly the picture Krizhevsky's AlexNet paper (2012) and
+This is exactly the picture Krizhevsky's AlexNet paper (2012) [@krizhevsky2012imagenet] and
 Zeiler & Fergus's *Visualizing and Understanding Convolutional
-Networks* (2014) made famous. Our version, trained on CPU on a much
+Networks* (2014) [@zeiler2014visualizing] made famous. Our version, trained on CPU on a much
 smaller architecture and dataset, shows the same qualitative pattern.
 That's not a coincidence — the structure falls out of the operator and
 the data, not the depth or scale.
@@ -400,3 +400,14 @@ After ConvVAE the architecture path goes one more direction —
 **attention** — and then the capstone, the matching-pursuit + attention
 generative audio system. The work to get to that point is now mostly
 mechanical, because the foundation is in place.
+
+
+## Further reading
+
+Convolutional networks trained by backpropagation are
+[@lecun1998gradient]; the architecture that established them for
+natural images is [@krizhevsky2012imagenet]. The CIFAR-10 dataset is
+described in [@krizhevsky2009cifar]. Computing a convolution as one
+matrix product over unrolled patches, our `im2col`, is described in
+[@chellapilla2006high]. For what the learned filters look like in
+larger networks, see [@zeiler2014visualizing].

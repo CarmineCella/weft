@@ -37,6 +37,8 @@
 // Usage:
 //   transformer_chorales train    <data_dir> <model_prefix> [epochs] [block]
 //   transformer_chorales generate <model_prefix> <out.mid> [n_steps] [temperature]
+//   transformer_chorales markov   <data_dir> <out.mid> [n_steps] [seed]
+//       the per-voice Markov baseline, for comparison by ear
 //
 // `epochs` default 5, `block` default 128 tokens (32 time-steps),
 // `n_steps` default 256 time-steps (~16 bars at 4/4), `temperature`
@@ -88,6 +90,8 @@ constexpr std::size_t D_FF       = 4 * D_MODEL;
 constexpr std::size_t N_LAYERS   = 2;
 constexpr std::size_t MAX_SEQ    = 1024;     // positional encoding budget
 constexpr std::size_t N_VOICES   = 4;
+constexpr std::size_t GEN_CONTEXT = 128;    // tokens of context when sampling;
+                                            // must not exceed the training block
 
 // =========================================================================
 // Tokenisation
@@ -329,15 +333,24 @@ sample_sequence(CharLM& model, std::size_t n_time_steps,
     std::vector<int> ctx = {TOK_BOS};
     const std::size_t target_len = 1 + n_time_steps * N_VOICES;
 
-    while (ctx.size() < target_len && ctx.size() < MAX_SEQ) {
-        // Window the context to the last MAX_SEQ - 1 tokens if it grows
-        // past the positional encoding budget (won't happen with default
-        // MAX_SEQ = 1024 unless the user asks for very long output).
-        std::vector<int> window = ctx;
-        if (window.size() >= MAX_SEQ) {
-            window.erase(window.begin(),
-                         window.begin() + (window.size() - MAX_SEQ + 1));
-        }
+    while (ctx.size() < target_len) {
+        // The model may only be shown what it was trained on: windows of at
+        // most GEN_CONTEXT tokens, starting at position 0 of the positional
+        // encoding.  So the context is always the LAST GEN_CONTEXT tokens.
+        //
+        // An earlier version passed the whole sequence so far, up to
+        // MAX_SEQ = 1024 tokens.  Training never used positions beyond the
+        // block size, so everything after the first 32 time steps was
+        // produced from positional encodings the model had never seen --
+        // and it showed: voices crossed four times out of five.  The loss
+        // curve gave no hint of it, because the loss is measured on
+        // training-sized windows.
+        // The window also starts at a multiple of 4, as in training, so
+        // that position mod 4 still identifies the voice.
+        std::size_t start = 0;
+        if (ctx.size() > GEN_CONTEXT)
+            start = ((ctx.size() - GEN_CONTEXT + N_VOICES - 1) / N_VOICES) * N_VOICES;
+        std::vector<int> window(ctx.begin() + static_cast<long>(start), ctx.end());
         Matrix<float> probs = model.forward(window);
         const int next = sample_token(probs, probs.cols() - 1, temperature, rng);
         ctx.push_back(next);
@@ -406,6 +419,53 @@ static int cmd_train(int argc, char** argv) {
               << total_tokens << " tokens total ("
               << (corpus.empty() ? 0.0 : double(total_tokens) / corpus.size())
               << " avg per file)\n\n";
+    // Every 10th chorale is held out: never trained on, used to measure
+    // how well the model predicts music it has not seen.
+    std::vector<std::vector<int>> held_out;
+    {
+        std::vector<std::vector<int>> train;
+        for (std::size_t i = 0; i < corpus.size(); ++i)
+            (i % 10 == 5 ? held_out : train).push_back(std::move(corpus[i]));
+        corpus = std::move(train);
+    }
+    std::cout << "split: " << corpus.size() << " training chorales, "
+              << held_out.size() << " held out\n";
+
+    // ---- two baselines to compare the transformer against -------------
+    // Both are fitted on the training chorales and scored, like the
+    // transformer, by the average cross-entropy (in nats per token) of
+    // the held-out chorales.
+    //   unigram : P(token), ignoring all context.
+    //   Markov  : P(token | the same voice's token one time step earlier),
+    //             i.e. a first-order Markov chain per voice.  In the flat
+    //             S A T B stream that is the token 4 positions back.
+    {
+        std::vector<double> uni(VOCAB_SIZE, 1.0);                    // add-one smoothing
+        std::vector<double> big(VOCAB_SIZE * VOCAB_SIZE, 1.0);
+        double uni_total = VOCAB_SIZE;
+        std::vector<double> row_total(VOCAB_SIZE, double(VOCAB_SIZE));
+        for (const auto& seq : corpus)
+            for (std::size_t t = 1; t < seq.size(); ++t) {
+                uni[seq[t]] += 1.0; uni_total += 1.0;
+                const int prev = (t >= 5) ? seq[t - 4] : TOK_BOS;
+                big[prev * VOCAB_SIZE + seq[t]] += 1.0;
+                row_total[prev] += 1.0;
+            }
+        double h_uni = 0.0, h_big = 0.0; std::size_t n = 0;
+        for (const auto& seq : held_out)
+            for (std::size_t t = 1; t < seq.size(); ++t) {
+                h_uni -= std::log(uni[seq[t]] / uni_total);
+                const int prev = (t >= 5) ? seq[t - 4] : TOK_BOS;
+                h_big -= std::log(big[prev * VOCAB_SIZE + seq[t]] / row_total[prev]);
+                ++n;
+            }
+        std::cout << std::fixed << std::setprecision(4)
+                  << "baselines on the held-out chorales (nats per token):\n"
+                  << "  uniform over the vocabulary : " << std::log(double(VOCAB_SIZE)) << "\n"
+                  << "  unigram                     : " << h_uni / double(n) << "\n"
+                  << "  per-voice first-order Markov: " << h_big / double(n) << "\n\n";
+    }
+
     if (corpus.empty()) {
         std::cerr << "no usable corpus -- chorale MIDIs must have 4 tracks "
                      "and produce at least " << (BLOCK + 1) << " tokens\n";
@@ -422,23 +482,48 @@ static int cmd_train(int argc, char** argv) {
     const std::size_t STEPS_PER_EPOCH = std::min<std::size_t>(2000, total_tokens / BLOCK);
     std::cout << "training (one " << BLOCK << "-token chunk per step, "
               << STEPS_PER_EPOCH << " steps/epoch):\n";
-    std::cout << "epoch    step      loss      perp     time\n";
-    std::cout << "-----    -----    ------    ------    -----\n";
+    std::cout << "epoch    train     held-out    time\n";
+    std::cout << "-----    ------    --------    -----\n";
+
+    // Held-out loss: every non-overlapping BLOCK-token chunk of every
+    // held-out chorale, no parameter update.
+    auto held_out_loss = [&]() {
+        double sum = 0.0; std::size_t count = 0;
+        for (const auto& seq : held_out)
+            for (std::size_t off = 0; off + BLOCK + 1 <= seq.size();
+                 off += (BLOCK / N_VOICES) * N_VOICES) {
+                std::vector<int> input (seq.begin() + off, seq.begin() + off + BLOCK);
+                std::vector<int> target(seq.begin() + off + 1, seq.begin() + off + BLOCK + 1);
+                sum += ce.forward(model.forward(input), one_hot_seq(target));
+                ++count;
+            }
+        return count ? sum / double(count) : 0.0;
+    };
 
     auto t_total = clock::now();
     for (int ep = 1; ep <= epochs; ++ep) {
-        auto t_ep = clock::now();
         double sum_loss = 0.0;
-        const std::size_t LOG = std::min<std::size_t>(100, std::max<std::size_t>(10, STEPS_PER_EPOCH / 8));
 
         for (std::size_t step = 0; step < STEPS_PER_EPOCH; ++step) {
             // Pick a random chorale, then a random chunk within it.
             std::uniform_int_distribution<std::size_t> pick_file(0, corpus.size() - 1);
             const std::size_t fi = pick_file(rng);
             const std::vector<int>& seq = corpus[fi];
-            std::uniform_int_distribution<std::size_t>
-                pick_off(0, seq.size() - BLOCK - 1);
-            const std::size_t off = pick_off(rng);
+            // The chunk starts at a token index that is a multiple of 4.
+            // Index 0 is BOS and indices 1..4 are S, A, T, B of the first
+            // time step, so in EVERY chunk positions 1, 2, 3, 0 (mod 4) hold
+            // S, A, T, B.  The positional encoding then tells the model
+            // which voice it is writing.  With arbitrary offsets it would
+            // have to guess that from the notes themselves.
+            //
+            // One chunk in ten starts at index 0, so that the model sees
+            // often enough how a chorale begins; a uniformly random offset
+            // would show it an opening about once in two hundred chunks.
+            const std::size_t max_k = (seq.size() - BLOCK - 1) / N_VOICES;
+            std::size_t off = 0;
+            if (std::uniform_int_distribution<int>(0, 9)(rng) != 0)
+                off = N_VOICES *
+                      std::uniform_int_distribution<std::size_t>(0, max_k)(rng);
 
             std::vector<int> input (seq.begin() + off, seq.begin() + off + BLOCK);
             std::vector<int> target(seq.begin() + off + 1, seq.begin() + off + BLOCK + 1);
@@ -452,26 +537,21 @@ static int cmd_train(int argc, char** argv) {
             model.backward(dP);
             model.update(opt);
 
-            if ((step + 1) % LOG == 0) {
-                const double avg = sum_loss / LOG;
-                const double perp = std::exp(avg);
-                const double secs =
-                    std::chrono::duration<double>(clock::now() - t_ep).count();
-                std::cout << std::setw(5) << ep << "    "
-                          << std::setw(5) << (step + 1) << "    "
-                          << std::fixed << std::setprecision(4)
-                          << std::setw(6) << avg << "    "
-                          << std::setprecision(2)
-                          << std::setw(6) << perp << "    "
-                          << std::setprecision(1)
-                          << std::setw(5) << secs << "s\n" << std::flush;
-                sum_loss = 0.0;
-            }
+        }
+
+        {
+            const double secs =
+                std::chrono::duration<double>(clock::now() - t_total).count();
+            std::cout << std::setw(5) << ep << "    "
+                      << std::fixed << std::setprecision(4)
+                      << sum_loss / double(STEPS_PER_EPOCH) << "    "
+                      << held_out_loss() << "      "
+                      << std::setprecision(0) << secs << "s\n" << std::flush;
         }
 
         // End-of-epoch: save and sample.
         model.save(prefix);
-        std::cout << "  [model saved -> " << prefix << ".clm]\n";
+        if (ep % 10 != 0 && ep != epochs) continue;      // sample every 10th epoch
 
         auto sample = sample_sequence(model, /*time_steps=*/32,
                                       /*temperature=*/1.0f,
@@ -523,6 +603,76 @@ static int cmd_generate(int argc, char** argv) {
     return 0;
 }
 
+// A chorale from the baseline the transformer is compared against: a
+// first-order Markov chain per voice.  Each voice's next token depends
+// only on that voice's own previous token; the voices never look at one
+// another.  Listening to this next to the transformer's output is the
+// audible version of the loss comparison printed by `train`.
+static int cmd_markov(int argc, char** argv) {
+    if (argc < 4) {
+        std::cerr << "usage: transformer_chorales markov <data_dir> <out.mid> "
+                     "[n_steps] [seed]\n";
+        return 1;
+    }
+    const std::string data_dir = argv[2];
+    const std::string out      = argv[3];
+    const int n_steps = (argc > 4) ? std::max(1, std::atoi(argv[4])) : 256;
+    const unsigned seed = (argc > 5) ? static_cast<unsigned>(std::atoi(argv[5])) : 1u;
+
+    std::vector<fs::path> paths;
+    for (const auto& entry : fs::recursive_directory_iterator(data_dir))
+        if (entry.path().extension() == ".mid") paths.push_back(entry.path());
+    std::sort(paths.begin(), paths.end());
+
+    // counts[v][prev][next]: one transition table per voice.
+    std::vector<std::vector<double>> counts(
+        N_VOICES, std::vector<double>(VOCAB_SIZE * VOCAB_SIZE, 0.0));
+    std::vector<std::array<int, N_VOICES>> openings;      // first time step of each chorale
+    for (const auto& p : paths) {
+        std::vector<int> toks;
+        try { toks = midi_to_tokens(midi::read(p.string())); }
+        catch (const std::exception&) { continue; }
+        if (toks.size() < 2 + 2 * N_VOICES) continue;
+        std::array<int, N_VOICES> first{};
+        for (std::size_t v = 0; v < N_VOICES; ++v) first[v] = toks[1 + v];
+        openings.push_back(first);
+        // toks[0] is BOS; token 1 + 4*t + v is voice v at time step t.
+        for (std::size_t i = 1 + N_VOICES; i + 1 < toks.size(); ++i) {
+            const std::size_t v = (i - 1) % N_VOICES;
+            counts[v][toks[i - N_VOICES] * VOCAB_SIZE + toks[i]] += 1.0;
+        }
+    }
+    if (openings.empty()) { std::cerr << "no usable MIDI files in " << data_dir << "\n"; return 1; }
+
+    std::mt19937 rng(seed);
+    std::array<int, N_VOICES> cur =
+        openings[std::uniform_int_distribution<std::size_t>(0, openings.size() - 1)(rng)];
+    std::vector<int> toks = {TOK_BOS};
+    for (std::size_t v = 0; v < N_VOICES; ++v) toks.push_back(cur[v]);
+    for (int t = 1; t < n_steps; ++t)
+        for (std::size_t v = 0; v < N_VOICES; ++v) {
+            const double* row = &counts[v][cur[v] * VOCAB_SIZE];
+            double total = 0.0;
+            for (int k = 0; k < VOCAB_SIZE; ++k) total += row[k];
+            int next = TOK_HOLD;
+            if (total > 0.0) {
+                double r = std::uniform_real_distribution<double>(0.0, total)(rng);
+                for (int k = 0; k < VOCAB_SIZE; ++k) {
+                    r -= row[k];
+                    if (r <= 0.0) { next = k; break; }
+                }
+            }
+            if (next == TOK_EOS || next == TOK_BOS) next = TOK_HOLD;
+            cur[v] = next;
+            toks.push_back(next);
+        }
+    toks.push_back(TOK_EOS);
+    midi::write(out, tokens_to_midi(toks));
+    std::cout << "wrote " << out << " (per-voice Markov chain, " << n_steps
+              << " steps, from " << openings.size() << " chorales)\n";
+    return 0;
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr <<
@@ -530,13 +680,16 @@ int main(int argc, char** argv) {
             "  transformer_chorales train    <data_dir> <model_prefix> "
             "[epochs] [block]\n"
             "  transformer_chorales generate <model_prefix> <out.mid> "
-            "[n_steps] [temperature] [seed]\n";
+            "[n_steps] [temperature] [seed]\n"
+            "  transformer_chorales markov   <data_dir> <out.mid> "
+            "[n_steps] [seed]\n";
         return 1;
     }
     const std::string cmd = argv[1];
     if (cmd == "train")    return cmd_train   (argc, argv);
     if (cmd == "generate") return cmd_generate(argc, argv);
+    if (cmd == "markov")   return cmd_markov  (argc, argv);
     std::cerr << "unknown command: " << cmd
-              << " (try 'train' or 'generate')\n";
+              << " (try 'train', 'generate' or 'markov')\n";
     return 1;
 }

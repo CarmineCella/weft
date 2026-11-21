@@ -20,8 +20,7 @@ voices over many bars* — is a long-range, joint, structured
 dependency, and that's precisely the regime where transformer
 attention exists to live.
 
-This was the framing that motivated DeepBach (Hadjeres, Pachet,
-Nielsen 2017) and Coconet (Huang et al. 2017): chorales are the
+This was the framing that motivated DeepBach [@hadjeres2017deepbach] and Coconet [@huang2017coconet]: chorales are the
 testbed where neural sequence models obviously beat their classical
 predecessors. We're going to build a much smaller version of the
 same idea — autoregressive (DeepBach is iteratively-rewriting,
@@ -29,46 +28,47 @@ Coconet is masked-orderless; we'll do the simpler one) — but the
 core demonstration is the same.
 
 
-## 1. Three small library additions
+## 1. What this note adds
 
-The pieces we have from notes 22-23 (`ScaledDotProductAttention`,
-`MultiHeadAttention`, `SinusoidalPositionalEncoding`, `LayerNorm`,
-`TransformerEncoderBlock`) are an *encoder*. To make them generative
-we need three more things.
+Notes 22 and 23 built `MultiHeadAttention`, `SinusoidalPositionalEncoding`,
+`LayerNorm` and `TransformerEncoderBlock`. With the causal mask of
+note 22 switched on (`set_causal(true)` on every block), a stack of
+those blocks is already the engine of a generator: each position sees
+only the positions before it, so the model can be trained to predict
+the next token and then run one token at a time. Two things are still
+missing, and neither is about attention.
 
-**Causal masking.** A bidirectional encoder lets every position see
-every other position. For autoregressive generation each position
-must only see *earlier* positions — otherwise training is meaningless
-because the model trivially predicts the next token by looking at the
-answer. The fix is one line in `ScaledDotProductAttention::forward`:
-before the softmax, set `S[j, i] = -∞` for `j > i`. After softmax
-those weights become zero. We expose it as a `causal` flag on
-`ScaledDotProductAttention::forward` and a `set_causal(bool)` member
-on `MultiHeadAttention` and `TransformerEncoderBlock` so callers can
-toggle it per training run without rebuilding the architecture. The
-finite-difference test passes at `~1e-12` in double precision with
-the mask active, confirming the masked backward is correct.
+**Tokens in.** A language model takes integer token IDs, not vectors.
+`Embedding<T>`, the lookup table we met in note 21 with twelve
+instruments, does the conversion; here its vocabulary is the 134
+tokens defined below. It holds a `(d_model × vocab_size)` parameter
+matrix `W`; forward returns, column by column, the vectors of the
+input tokens; backward scatters the upstream gradient back into the
+columns that were looked up, and *adds*, so that a token occurring
+five times in a sequence receives the sum of five gradients. The test
+checks that case explicitly, and also that a token which does not
+occur receives exactly zero. It's not a `Layer<T>` subclass because
+its input is `std::vector<int>` rather than `Matrix<T>`; we give it a
+compatible forward/backward/update interface and call it directly in
+the example.
 
-**Embedding.** Almost every layer so far took continuous-valued matrices.
-A language model takes integer token IDs, so we need a learnable
-lookup table. `Embedding<T>` holds a `(d_model × vocab_size)`
-parameter matrix `W`; forward returns the column-by-column gather
-indexed by the input token list; backward scatters the upstream
-gradient back into the columns that were looked up (and *adds*, so a
-repeated token gets the sum of its uses — a subtle correctness point
-the test verifies explicitly). It's not a `Layer<T>` subclass because
-its input is `std::vector<int>` rather than `Matrix<T>`; we just give
-it a compatible forward/backward/update interface and call it
-directly in the example.
+**MIDI in and out.** A binary format with big-endian multi-byte values
+and delta times stored as variable-length quantities. `Midi.h` reads
+Format 0 and Format 1 and writes Format 1, with note-on and note-off
+events, tempo, and the "running status" abbreviation in the parser.
+Other event types (sysex, control changes, pitch bend, program
+changes) are *skipped* on read and not emitted on write, a deliberate
+restriction of scope. About 330 lines.
 
-**MIDI I/O.** A binary format with big-endian multi-byte values and
-delta-time variable-length quantities. Our `Midi.h` does Format 0
-and Format 1 read, Format 1 write, with note-on/note-off events,
-tempo, and the "running status" optimisation in the parser. Other
-event types (sysex, control changes, pitch bend, program changes) are
-*skipped* on read and not emitted on write — a deliberate scope
-restriction. About 250 lines, with a round-trip test covering single-
-track, four-track, and re-articulated-pitch cases.
+The round-trip test in `tests/test_midi.cpp` found a bug on its first
+run, of the kind that never shows up by ear on a chorale. The reader
+was taking each note's velocity from its *note-off* event. In MIDI
+both events carry a velocity, but only the note-on's is the loudness
+of the note; the note-off's is a release speed, and most files simply
+write 64 there. Every note therefore came back at velocity 64. A
+dataset in which all notes are equally loud hides that completely,
+and a test that writes a note at velocity 90 and reads it back does
+not.
 
 
 ## 2. The tokenisation that decides everything

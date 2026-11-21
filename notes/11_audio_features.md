@@ -335,3 +335,12 @@ A real audio pipeline usually adds several things we're skipping:
 
 For SOL classification, 16-bit PCM in plus energy-weighted log-mag
 spectrum or MFCC out is enough to get a representative result.
+
+
+## Further reading
+
+The mel scale of pitch is [@stevens1937mel], and mel-frequency cepstral
+coefficients were introduced for speech recognition by [@davis1980mfcc].
+The classic reference on window functions is [@harris1978windows]. For
+the short-time Fourier transform as used in audio, see
+[@smith2011spectral].

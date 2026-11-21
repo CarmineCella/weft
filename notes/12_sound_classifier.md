@@ -204,3 +204,10 @@ The current pipeline composes everything else we have — WAV I/O, FFT,
 windowing, mel filterbank, DCT, Adam, dropout, train/eval mode,
 standardisation, group-aware splitting, a small binary serialisation
 format — into a working end-to-end classifier you can iterate on.
+
+
+## Further reading
+
+The instrument samples come from the Studio On Line recordings;
+the dataset and its role in computer-assisted orchestration are
+described in [@cella2020orchidea].

@@ -229,3 +229,10 @@ ReLU → Dense → Softmax`. To train it, we need a loss function. The next
 note covers **cross-entropy** and the Softmax+CE combined gradient
 shortcut, after which we have all the pieces for the first end-to-end
 network on IRIS.
+
+
+## Further reading
+
+The rectified linear unit became the default hidden activation after
+[@nair2010relu]. The softmax output, and its reading as a probability
+distribution over classes, is due to [@bridle1990softmax].

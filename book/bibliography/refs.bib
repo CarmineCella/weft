@@ -1,390 +1,665 @@
-% bibliography/refs.bib
-%
-% Placeholder bibliography for "Designing Musical Networks".  Covers the
-% main works the book builds on -- linear algebra, signal processing,
-% wavelets, neural networks, convolution, autoencoders, attention,
-% matching pursuit, and music technology.  Edit and extend as needed.
+% verified_refs.bib -- checked 2026-11-20 against the source named above each entry.
+% Encoding: UTF-8 (biblatex/biber). Fields that could not be confirmed are omitted, not guessed.
+% "Crossref" below means the publisher-deposited DOI metadata at https://api.crossref.org/works/<DOI>.
 
-%==============================================================================
-%  Linear algebra and mathematical foundations
-%==============================================================================
+% ====================================================================
+% PART A -- new entries
+% ====================================================================
 
-@book{strang2016linalg,
-    author    = {Gilbert Strang},
-    title     = {Introduction to Linear Algebra},
-    edition   = {5th},
-    publisher = {Wellesley-Cambridge Press},
-    year      = {2016},
+% verified: https://doi.org/10.1111/j.1469-1809.1936.tb02137.x (Crossref DOI metadata)
+@article{fisher1936iris,
+  author  = {Fisher, R. A.},
+  title   = {The Use of Multiple Measurements in Taxonomic Problems},
+  journal = {Annals of Eugenics},
+  volume  = {7},
+  number  = {2},
+  pages   = {179--188},
+  year    = {1936},
+  doi     = {10.1111/j.1469-1809.1936.tb02137.x}
 }
 
-@book{strang2019learning,
-    author    = {Gilbert Strang},
-    title     = {Linear Algebra and Learning from Data},
-    publisher = {Wellesley-Cambridge Press},
-    year      = {2019},
+% PARTLY verified: title/author/year from https://www.cs.toronto.edu/~kriz/cifar.html (which calls it a "tech report") and the PDF title page (dated April 8, 2009); institution is inferred from the hosting site only, and no report number exists on either page
+@techreport{krizhevsky2009cifar,
+  author      = {Krizhevsky, Alex},
+  title       = {Learning Multiple Layers of Features from Tiny Images},
+  institution = {University of Toronto},
+  year        = {2009},
+  url         = {https://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf}
 }
 
-@book{axler2015linalg,
-    author    = {Sheldon Axler},
-    title     = {Linear Algebra Done Right},
-    edition   = {3rd},
-    publisher = {Springer},
-    year      = {2015},
+% verified: https://doi.org/10.1109/ICCV.2015.123 (Crossref DOI metadata); arXiv id from https://arxiv.org/abs/1502.01852
+@inproceedings{he2015delving,
+  author        = {He, Kaiming and Zhang, Xiangyu and Ren, Shaoqing and Sun, Jian},
+  title         = {Delving Deep into Rectifiers: Surpassing Human-Level Performance on {ImageNet} Classification},
+  booktitle     = {2015 {IEEE} International Conference on Computer Vision ({ICCV})},
+  pages         = {1026--1034},
+  publisher     = {IEEE},
+  year          = {2015},
+  doi           = {10.1109/ICCV.2015.123},
+  eprint        = {1502.01852},
+  archivePrefix = {arXiv}
 }
 
-%==============================================================================
-%  Signal processing
-%==============================================================================
-
-@book{oppenheim2009dsp,
-    author    = {Alan V. Oppenheim and Ronald W. Schafer},
-    title     = {Discrete-Time Signal Processing},
-    edition   = {3rd},
-    publisher = {Prentice Hall},
-    year      = {2009},
+% verified: https://proceedings.mlr.press/v9/glorot10a.html
+@inproceedings{glorot2010understanding,
+  author    = {Glorot, Xavier and Bengio, Yoshua},
+  title     = {Understanding the difficulty of training deep feedforward neural networks},
+  booktitle = {Proceedings of the Thirteenth International Conference on Artificial Intelligence and Statistics},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {9},
+  pages     = {249--256},
+  publisher = {JMLR Workshop and Conference Proceedings},
+  year      = {2010},
+  url       = {https://proceedings.mlr.press/v9/glorot10a.html}
 }
 
-@book{bracewell2000fourier,
-    author    = {Ronald N. Bracewell},
-    title     = {The Fourier Transform and Its Applications},
-    edition   = {3rd},
-    publisher = {McGraw-Hill},
-    year      = {2000},
+% PARTLY verified: title, authors, venue, place, year from the paper PDF on the ICML site (https://icml.cc/Conferences/2010/papers/432.pdf); page numbers and publisher could not be confirmed (DBLP is behind a bot challenge) and are omitted
+@inproceedings{nair2010relu,
+  author    = {Nair, Vinod and Hinton, Geoffrey E.},
+  title     = {Rectified Linear Units Improve Restricted {Boltzmann} Machines},
+  booktitle = {Proceedings of the 27th International Conference on Machine Learning},
+  address   = {Haifa, Israel},
+  year      = {2010},
+  url       = {https://icml.cc/Conferences/2010/papers/432.pdf}
 }
 
-@book{smith2011spectral,
-    author    = {Julius O. Smith},
-    title     = {Spectral Audio Signal Processing},
-    publisher = {W3K Publishing},
-    year      = {2011},
-    note      = {Online: \url{https://ccrma.stanford.edu/~jos/sasp/}},
+% PARTLY verified: chapter and book metadata from Crossref for https://doi.org/10.1007/978-3-642-76153-9_28 and https://doi.org/10.1007/978-3-642-76153-9; NATO ASI series name/volume number could not be confirmed (Springer page blocked) and is omitted
+@inproceedings{bridle1990softmax,
+  author    = {Bridle, John S.},
+  title     = {Probabilistic Interpretation of Feedforward Classification Network Outputs, with Relationships to Statistical Pattern Recognition},
+  booktitle = {Neurocomputing: Algorithms, Architectures and Applications},
+  editor    = {Fogelman Souli{\'e}, Fran{\c c}oise and H{\'e}rault, Jeanny},
+  pages     = {227--236},
+  publisher = {Springer Berlin Heidelberg},
+  address   = {Berlin, Heidelberg},
+  year      = {1990},
+  doi       = {10.1007/978-3-642-76153-9_28}
 }
 
-@book{vetterli2014foundations,
-    author    = {Martin Vetterli and Jelena Kova{\v c}evi{\'c} and Vivek K. Goyal},
-    title     = {Foundations of Signal Processing},
-    publisher = {Cambridge University Press},
-    year      = {2014},
+% verified: https://doi.org/10.1214/aoms/1177729586 (Crossref DOI metadata)
+@article{robbins1951sgd,
+  author  = {Robbins, Herbert and Monro, Sutton},
+  title   = {A Stochastic Approximation Method},
+  journal = {The Annals of Mathematical Statistics},
+  volume  = {22},
+  number  = {3},
+  pages   = {400--407},
+  year    = {1951},
+  doi     = {10.1214/aoms/1177729586}
 }
 
-%==============================================================================
-%  Wavelets and time-frequency analysis
-%==============================================================================
-
-@book{daubechies1992wavelets,
-    author    = {Ingrid Daubechies},
-    title     = {Ten Lectures on Wavelets},
-    publisher = {SIAM},
-    year      = {1992},
+% verified: https://doi.org/10.1016/0041-5553(64)90137-5 (Crossref DOI metadata)
+@article{polyak1964momentum,
+  author  = {Polyak, B. T.},
+  title   = {Some methods of speeding up the convergence of iteration methods},
+  journal = {USSR Computational Mathematics and Mathematical Physics},
+  volume  = {4},
+  number  = {5},
+  pages   = {1--17},
+  year    = {1964},
+  doi     = {10.1016/0041-5553(64)90137-5}
 }
 
-@book{mallat2008wavelet,
-    author    = {St{\'e}phane Mallat},
-    title     = {A Wavelet Tour of Signal Processing: The Sparse Way},
-    edition   = {3rd},
-    publisher = {Academic Press},
-    year      = {2008},
+% PARTLY verified: slide deck at the URL below (PDF created 2012-10-09) confirms the course name, Lecture 6, and the slide title; but the deck's title page credits "Geoffrey Hinton with Nitish Srivastava, Kevin Swersky", and Tieleman appears only inside as "(Tijmen Tieleman, unpublished)". The usual "Tieleman & Hinton" attribution and the "6.5" numbering are convention, not confirmed on the source; the often-quoted "4(2):26--31" is unverifiable and omitted
+@misc{tieleman2012rmsprop,
+  author       = {Tieleman, Tijmen and Hinton, Geoffrey},
+  title        = {Lecture 6.5 -- rmsprop: Divide the gradient by a running average of its recent magnitude},
+  howpublished = {Coursera: Neural Networks for Machine Learning, lecture slides},
+  year         = {2012},
+  url          = {https://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf}
 }
 
-%==============================================================================
-%  Scattering transform
-%==============================================================================
-
-@article{mallat2012scattering,
-    author    = {St{\'e}phane Mallat},
-    title     = {Group Invariant Scattering},
-    journal   = {Communications on Pure and Applied Mathematics},
-    volume    = {65},
-    number    = {10},
-    pages     = {1331--1398},
-    year      = {2012},
+% verified: https://doi.org/10.1090/S0025-5718-1965-0178586-1 (Crossref DOI metadata)
+@article{cooley1965fft,
+  author  = {Cooley, James W. and Tukey, John W.},
+  title   = {An algorithm for the machine calculation of complex {Fourier} series},
+  journal = {Mathematics of Computation},
+  volume  = {19},
+  number  = {90},
+  pages   = {297--301},
+  year    = {1965},
+  doi     = {10.1090/S0025-5718-1965-0178586-1}
 }
 
-@article{bruna2013scattering,
-    author    = {Joan Bruna and St{\'e}phane Mallat},
-    title     = {Invariant Scattering Convolution Networks},
-    journal   = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
-    volume    = {35},
-    number    = {8},
-    pages     = {1872--1886},
-    year      = {2013},
+% verified: https://doi.org/10.1121/1.1915893 (Crossref DOI metadata)
+@article{stevens1937mel,
+  author  = {Stevens, S. S. and Volkmann, J. and Newman, E. B.},
+  title   = {A Scale for the Measurement of the Psychological Magnitude Pitch},
+  journal = {The Journal of the Acoustical Society of America},
+  volume  = {8},
+  number  = {3},
+  pages   = {185--190},
+  year    = {1937},
+  doi     = {10.1121/1.1915893}
 }
 
-@article{anden2014scattering,
-    author    = {Joakim And{\'e}n and St{\'e}phane Mallat},
-    title     = {Deep Scattering Spectrum},
-    journal   = {IEEE Transactions on Signal Processing},
-    volume    = {62},
-    number    = {16},
-    pages     = {4114--4128},
-    year      = {2014},
+% verified: https://doi.org/10.1109/TASSP.1980.1163420 (Crossref DOI metadata; source gives initials only)
+@article{davis1980mfcc,
+  author  = {Davis, S. and Mermelstein, P.},
+  title   = {Comparison of parametric representations for monosyllabic word recognition in continuously spoken sentences},
+  journal = {{IEEE} Transactions on Acoustics, Speech, and Signal Processing},
+  volume  = {28},
+  number  = {4},
+  pages   = {357--366},
+  year    = {1980},
+  doi     = {10.1109/TASSP.1980.1163420}
 }
 
-%==============================================================================
-%  Matching pursuit and sparse coding
-%==============================================================================
-
-@article{mallat1993mp,
-    author    = {St{\'e}phane Mallat and Zhifeng Zhang},
-    title     = {Matching Pursuits with Time-Frequency Dictionaries},
-    journal   = {IEEE Transactions on Signal Processing},
-    volume    = {41},
-    number    = {12},
-    pages     = {3397--3415},
-    year      = {1993},
+% verified: https://doi.org/10.1109/PROC.1978.10837 (Crossref DOI metadata)
+@article{harris1978windows,
+  author  = {Harris, F. J.},
+  title   = {On the use of windows for harmonic analysis with the discrete {Fourier} transform},
+  journal = {Proceedings of the {IEEE}},
+  volume  = {66},
+  number  = {1},
+  pages   = {51--83},
+  year    = {1978},
+  doi     = {10.1109/PROC.1978.10837}
 }
 
-@article{chen2001basis,
-    author    = {Scott Shaobing Chen and David L. Donoho and Michael A. Saunders},
-    title     = {Atomic Decomposition by Basis Pursuit},
-    journal   = {SIAM Review},
-    volume    = {43},
-    number    = {1},
-    pages     = {129--159},
-    year      = {2001},
+% verified: https://doi.org/10.1109/TASSP.1984.1164317 (Crossref DOI metadata; source gives "D. Griffin" and "Jae Lim")
+@article{griffin1984signal,
+  author  = {Griffin, D. and Lim, Jae},
+  title   = {Signal estimation from modified short-time {Fourier} transform},
+  journal = {{IEEE} Transactions on Acoustics, Speech, and Signal Processing},
+  volume  = {32},
+  number  = {2},
+  pages   = {236--243},
+  year    = {1984},
+  doi     = {10.1109/TASSP.1984.1164317}
 }
 
-%==============================================================================
-%  Neural networks and deep learning
-%==============================================================================
-
-@book{goodfellow2016deep,
-    author    = {Ian Goodfellow and Yoshua Bengio and Aaron Courville},
-    title     = {Deep Learning},
-    publisher = {MIT Press},
-    year      = {2016},
+% PARTLY verified: title and ICLR 2017 acceptance from the ICLR archive (https://iclr.cc/archive/www/doku.php%3Fid=iclr2017:conference_posters.html); author list only from https://mlanthology.org/iclr/2017/higgins2017iclr-beta (OpenReview itself is behind a bot challenge; the OpenReview URL below was not opened)
+@inproceedings{higgins2017betavae,
+  author    = {Higgins, Irina and Matthey, Lo{\"i}c and Pal, Arka and Burgess, Christopher P. and Glorot, Xavier and Botvinick, Matthew M. and Mohamed, Shakir and Lerchner, Alexander},
+  title     = {beta-{VAE}: Learning Basic Visual Concepts with a Constrained Variational Framework},
+  booktitle = {International Conference on Learning Representations ({ICLR})},
+  year      = {2017},
+  url       = {https://openreview.net/forum?id=Sy2fzU9gl}
 }
 
-@book{haykin2008nn,
-    author    = {Simon Haykin},
-    title     = {Neural Networks and Learning Machines},
-    edition   = {3rd},
-    publisher = {Prentice Hall},
-    year      = {2008},
+% verified: https://inria.hal.science/inria-00112631v1 (HAL record; no page numbers are recorded there, so none are given)
+@inproceedings{chellapilla2006high,
+  author    = {Chellapilla, Kumar and Puri, Sidd and Simard, Patrice},
+  title     = {High Performance Convolutional Neural Networks for Document Processing},
+  booktitle = {Tenth International Workshop on Frontiers in Handwriting Recognition},
+  address   = {La Baule, France},
+  publisher = {Suvisoft},
+  year      = {2006},
+  url       = {https://inria.hal.science/inria-00112631v1}
 }
 
-@article{lecun2015deep,
-    author    = {Yann LeCun and Yoshua Bengio and Geoffrey Hinton},
-    title     = {Deep Learning},
-    journal   = {Nature},
-    volume    = {521},
-    pages     = {436--444},
-    year      = {2015},
+% verified: https://doi.org/10.23915/distill.00003 (Crossref DOI metadata; DOI resolves to the Distill URL below)
+@article{odena2016deconvolution,
+  author  = {Odena, Augustus and Dumoulin, Vincent and Olah, Chris},
+  title   = {Deconvolution and Checkerboard Artifacts},
+  journal = {Distill},
+  volume  = {1},
+  number  = {10},
+  year    = {2016},
+  doi     = {10.23915/distill.00003},
+  url     = {https://distill.pub/2016/deconv-checkerboard/}
 }
 
+% verified: https://proceedings.mlr.press/v37/ioffe15.html
+@inproceedings{ioffe2015batchnorm,
+  author    = {Ioffe, Sergey and Szegedy, Christian},
+  title     = {Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift},
+  booktitle = {Proceedings of the 32nd International Conference on Machine Learning},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {37},
+  pages     = {448--456},
+  publisher = {PMLR},
+  year      = {2015},
+  url       = {https://proceedings.mlr.press/v37/ioffe15.html}
+}
+
+% verified: https://arxiv.org/abs/1607.06450
+@misc{ba2016layernorm,
+  author        = {Ba, Jimmy Lei and Kiros, Jamie Ryan and Hinton, Geoffrey E.},
+  title         = {Layer Normalization},
+  year          = {2016},
+  eprint        = {1607.06450},
+  archivePrefix = {arXiv},
+  primaryClass  = {stat.ML},
+  url           = {https://arxiv.org/abs/1607.06450}
+}
+
+% verified: https://proceedings.mlr.press/v119/xiong20b.html (last author is "Tieyan Liu" on PMLR, "Tie-Yan Liu" on arXiv:2002.04745; PMLR spelling used)
+@inproceedings{xiong2020prelayernorm,
+  author    = {Xiong, Ruibin and Yang, Yunchang and He, Di and Zheng, Kai and Zheng, Shuxin and Xing, Chen and Zhang, Huishuai and Lan, Yanyan and Wang, Liwei and Liu, Tieyan},
+  title     = {On Layer Normalization in the Transformer Architecture},
+  booktitle = {Proceedings of the 37th International Conference on Machine Learning},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {119},
+  pages     = {10524--10533},
+  publisher = {PMLR},
+  year      = {2020},
+  url       = {https://proceedings.mlr.press/v119/xiong20b.html}
+}
+
+% verified: https://iclr.cc/virtual_2020/poster_B1x1ma4tDr.html (ICLR 2020 title/authors) and https://arxiv.org/abs/2001.04643
+@inproceedings{engel2020ddsp,
+  author        = {Engel, Jesse and Hantrakul, Lamtharn and Gu, Chenjie and Roberts, Adam},
+  title         = {{DDSP}: Differentiable Digital Signal Processing},
+  booktitle     = {International Conference on Learning Representations ({ICLR})},
+  year          = {2020},
+  eprint        = {2001.04643},
+  archivePrefix = {arXiv},
+  url           = {https://iclr.cc/virtual_2020/poster_B1x1ma4tDr.html}
+}
+
+% verified: https://doi.org/10.2307/3680788 (Crossref DOI metadata; first page only) and https://mtg.upf.edu/node/251 (author's institutional record: vol. 14, issue 4, pp. 12-24)
+@article{serra1990sms,
+  author  = {Serra, Xavier and Smith, Julius},
+  title   = {Spectral Modeling Synthesis: A Sound Analysis/Synthesis System Based on a Deterministic Plus Stochastic Decomposition},
+  journal = {Computer Music Journal},
+  volume  = {14},
+  number  = {4},
+  pages   = {12--24},
+  year    = {1990},
+  doi     = {10.2307/3680788}
+}
+
+% verified: https://doi.org/10.1002/j.1538-7305.1966.tb01706.x (Crossref DOI metadata)
+@article{flanagan1966phase,
+  author  = {Flanagan, J. L. and Golden, R. M.},
+  title   = {Phase Vocoder},
+  journal = {Bell System Technical Journal},
+  volume  = {45},
+  number  = {9},
+  pages   = {1493--1509},
+  year    = {1966},
+  doi     = {10.1002/j.1538-7305.1966.tb01706.x}
+}
+
+% verified: https://doi.org/10.1109/TASSP.1986.1164910 (Crossref DOI metadata; source gives initials only)
+@article{mcaulay1986sinusoidal,
+  author  = {McAulay, R. and Quatieri, T.},
+  title   = {Speech analysis/synthesis based on a sinusoidal representation},
+  journal = {{IEEE} Transactions on Acoustics, Speech, and Signal Processing},
+  volume  = {34},
+  number  = {4},
+  pages   = {744--754},
+  year    = {1986},
+  doi     = {10.1109/TASSP.1986.1164910}
+}
+
+% verified: https://doi.org/10.1121/1.1458024 (Crossref DOI metadata)
+@article{decheveigne2002yin,
+  author  = {de Cheveign{\'e}, Alain and Kawahara, Hideki},
+  title   = {{YIN}, a fundamental frequency estimator for speech and music},
+  journal = {The Journal of the Acoustical Society of America},
+  volume  = {111},
+  number  = {4},
+  pages   = {1917--1930},
+  year    = {2002},
+  doi     = {10.1121/1.1458024}
+}
+
+% PARTLY verified: title, authors, venue from https://arxiv.org/abs/1206.6392 and the paper PDF on the ICML site (https://icml.cc/2012/papers/590.pdf); page numbers and publisher could not be confirmed and are omitted
+@inproceedings{boulanger2012modeling,
+  author        = {Boulanger-Lewandowski, Nicolas and Bengio, Yoshua and Vincent, Pascal},
+  title         = {Modeling Temporal Dependencies in High-Dimensional Sequences: Application to Polyphonic Music Generation and Transcription},
+  booktitle     = {Proceedings of the 29th International Conference on Machine Learning},
+  address       = {Edinburgh, Scotland, UK},
+  year          = {2012},
+  eprint        = {1206.6392},
+  archivePrefix = {arXiv},
+  url           = {https://icml.cc/2012/papers/590.pdf}
+}
+
+% verified: https://proceedings.mlr.press/v70/hadjeres17a.html
+@inproceedings{hadjeres2017deepbach,
+  author    = {Hadjeres, Ga{\"e}tan and Pachet, Fran{\c c}ois and Nielsen, Frank},
+  title     = {{DeepBach}: a Steerable Model for {Bach} Chorales Generation},
+  booktitle = {Proceedings of the 34th International Conference on Machine Learning},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {70},
+  pages     = {1362--1371},
+  publisher = {PMLR},
+  year      = {2017},
+  url       = {https://proceedings.mlr.press/v70/hadjeres17a.html}
+}
+
+% verified: title and ICLR 2019 acceptance from https://iclr.cc/virtual/2019/papers.html ; authors from https://arxiv.org/abs/1809.04281 (whose current arXiv title is just "Music Transformer")
+@inproceedings{huang2019musictransformer,
+  author        = {Huang, Cheng-Zhi Anna and Vaswani, Ashish and Uszkoreit, Jakob and Shazeer, Noam and Simon, Ian and Hawthorne, Curtis and Dai, Andrew M. and Hoffman, Matthew D. and Dinculescu, Monica and Eck, Douglas},
+  title         = {Music Transformer: Generating Music with Long-Term Structure},
+  booktitle     = {International Conference on Learning Representations ({ICLR})},
+  year          = {2019},
+  eprint        = {1809.04281},
+  archivePrefix = {arXiv},
+  url           = {https://arxiv.org/abs/1809.04281}
+}
+
+% verified: OpenAI-hosted PDF at the URL below (title, authors; marked "Preprint. Work in progress."; PDF dated 2018-06-08). No venue, number or DOI exists
+@misc{radford2018gpt,
+  author       = {Radford, Alec and Narasimhan, Karthik and Salimans, Tim and Sutskever, Ilya},
+  title        = {Improving Language Understanding by Generative Pre-Training},
+  howpublished = {OpenAI preprint},
+  year         = {2018},
+  url          = {https://cdn.openai.com/research-covers/language-unsupervised/language_understanding_paper.pdf}
+}
+
+% verified: OpenAI-hosted PDF at the URL below (title, authors; PDF dated 2019-02-14). No venue, number or DOI exists
+@misc{radford2019gpt2,
+  author       = {Radford, Alec and Wu, Jeffrey and Child, Rewon and Luan, David and Amodei, Dario and Sutskever, Ilya},
+  title        = {Language Models are Unsupervised Multitask Learners},
+  howpublished = {OpenAI preprint},
+  year         = {2019},
+  url          = {https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf}
+}
+
+% verified: https://zenodo.org/records/1416114 (ISMIR proceedings record) and page numbers printed in https://archives.ismir.net/ismir2010/paper/000108.pdf
+@inproceedings{cuthbert2010music21,
+  author    = {Cuthbert, Michael Scott and Ariza, Christopher},
+  title     = {music21: A Toolkit for Computer-Aided Musicology and Symbolic Music Data},
+  booktitle = {Proceedings of the 11th International Society for Music Information Retrieval Conference ({ISMIR} 2010)},
+  address   = {Utrecht, Netherlands},
+  pages     = {637--642},
+  year      = {2010},
+  doi       = {10.5281/zenodo.1416114}
+}
+
+% verified: https://papers.nips.cc/paper_files/paper/2019/hash/bdbca288fee7f92f2bfa9f7012727740-Abstract.html (the official record lists no page numbers, so none are given; author spellings as on that page) ; arXiv id from https://arxiv.org/abs/1912.01703
+@inproceedings{paszke2019pytorch,
+  author        = {Paszke, Adam and Gross, Sam and Massa, Francisco and Lerer, Adam and Bradbury, James and Chanan, Gregory and Killeen, Trevor and Lin, Zeming and Gimelshein, Natalia and Antiga, Luca and Desmaison, Alban and Kopf, Andreas and Yang, Edward and DeVito, Zachary and Raison, Martin and Tejani, Alykhan and Chilamkurthy, Sasank and Steiner, Benoit and Fang, Lu and Bai, Junjie and Chintala, Soumith},
+  title         = {{PyTorch}: An Imperative Style, High-Performance Deep Learning Library},
+  booktitle     = {Advances in Neural Information Processing Systems},
+  volume        = {32},
+  publisher     = {Curran Associates, Inc.},
+  year          = {2019},
+  eprint        = {1912.01703},
+  archivePrefix = {arXiv},
+  url           = {https://papers.nips.cc/paper_files/paper/2019/hash/bdbca288fee7f92f2bfa9f7012727740-Abstract.html}
+}
+
+% verified: https://doi.org/10.1038/s41586-020-2649-2 (Crossref DOI metadata)
+@article{harris2020numpy,
+  author  = {Harris, Charles R. and Millman, K. Jarrod and van der Walt, St{\'e}fan J. and Gommers, Ralf and Virtanen, Pauli and Cournapeau, David and Wieser, Eric and Taylor, Julian and Berg, Sebastian and Smith, Nathaniel J. and Kern, Robert and Picus, Matti and Hoyer, Stephan and van Kerkwijk, Marten H. and Brett, Matthew and Haldane, Allan and del R{\'i}o, Jaime Fern{\'a}ndez and Wiebe, Mark and Peterson, Pearu and G{\'e}rard-Marchant, Pierre and Sheppard, Kevin and Reddy, Tyler and Weckesser, Warren and Abbasi, Hameer and Gohlke, Christoph and Oliphant, Travis E.},
+  title   = {Array programming with {NumPy}},
+  journal = {Nature},
+  volume  = {585},
+  number  = {7825},
+  pages   = {357--362},
+  year    = {2020},
+  doi     = {10.1038/s41586-020-2649-2}
+}
+
+% verified: https://jmlr.org/papers/v18/17-468.html
+@article{baydin2018autodiff,
+  author  = {Baydin, Atilim Gunes and Pearlmutter, Barak A. and Radul, Alexey Andreyevich and Siskind, Jeffrey Mark},
+  title   = {Automatic Differentiation in Machine Learning: a Survey},
+  journal = {Journal of Machine Learning Research},
+  volume  = {18},
+  number  = {153},
+  pages   = {1--43},
+  year    = {2018},
+  url     = {https://jmlr.org/papers/v18/17-468.html}
+}
+
+% verified: https://doi.org/10.1145/1356052.1356053 (Crossref DOI metadata; pages 1-25 as deposited. The ACM article number could not be confirmed -- ACM page blocked -- and is omitted)
+@article{goto2008anatomy,
+  author  = {Goto, Kazushige and van de Geijn, Robert A.},
+  title   = {Anatomy of High-Performance Matrix Multiplication},
+  journal = {{ACM} Transactions on Mathematical Software},
+  volume  = {34},
+  number  = {3},
+  pages   = {1--25},
+  year    = {2008},
+  doi     = {10.1145/1356052.1356053}
+}
+
+% verified: https://doi.org/10.1145/355841.355847 (Crossref DOI metadata)
+@article{lawson1979blas,
+  author  = {Lawson, C. L. and Hanson, R. J. and Kincaid, D. R. and Krogh, F. T.},
+  title   = {Basic Linear Algebra Subprograms for {Fortran} Usage},
+  journal = {{ACM} Transactions on Mathematical Software},
+  volume  = {5},
+  number  = {3},
+  pages   = {308--323},
+  year    = {1979},
+  doi     = {10.1145/355841.355847}
+}
+
+% verified: title and ICLR 2017 acceptance from https://iclr.cc/archive/www/doku.php%3Fid=iclr2017:conference_posters.html ; authors from https://arxiv.org/abs/1612.07837
+@inproceedings{mehri2017samplernn,
+  author        = {Mehri, Soroush and Kumar, Kundan and Gulrajani, Ishaan and Kumar, Rithesh and Jain, Shubham and Sotelo, Jose and Courville, Aaron and Bengio, Yoshua},
+  title         = {{SampleRNN}: An Unconditional End-to-End Neural Audio Generation Model},
+  booktitle     = {International Conference on Learning Representations ({ICLR})},
+  year          = {2017},
+  eprint        = {1612.07837},
+  archivePrefix = {arXiv},
+  url           = {https://arxiv.org/abs/1612.07837}
+}
+
+% verified: https://doi.org/10.1002/j.1538-7305.1948.tb01338.x (Crossref; part 1: vol. 27 no. 3, July 1948, pp. 379-423) and https://doi.org/10.1002/j.1538-7305.1948.tb00917.x (Crossref; part 2: vol. 27 no. 4, Oct. 1948, pp. 623-656). Entropy is defined in part 1, whose DOI is given
+@article{shannon1948communication,
+  author  = {Shannon, C. E.},
+  title   = {A Mathematical Theory of Communication},
+  journal = {Bell System Technical Journal},
+  volume  = {27},
+  number  = {3},
+  pages   = {379--423},
+  year    = {1948},
+  doi     = {10.1002/j.1538-7305.1948.tb01338.x},
+  note    = {Continued in vol.~27, no.~4, pp.~623--656, doi:10.1002/j.1538-7305.1948.tb00917.x}
+}
+
+% verified: https://zenodo.org/records/1416370 (ISMIR proceedings record), page numbers printed in https://archives.ismir.net/ismir2017/paper/000187.pdf , arXiv id from https://arxiv.org/abs/1903.07227
+@inproceedings{huang2017coconet,
+  author        = {Huang, Cheng-Zhi Anna and Cooijmans, Tim and Roberts, Adam and Courville, Aaron C. and Eck, Douglas},
+  title         = {Counterpoint by Convolution},
+  booktitle     = {Proceedings of the 18th International Society for Music Information Retrieval Conference ({ISMIR} 2017)},
+  address       = {Suzhou, China},
+  pages         = {211--218},
+  year          = {2017},
+  doi           = {10.5281/zenodo.1416370},
+  eprint        = {1903.07227},
+  archivePrefix = {arXiv}
+}
+
+% ====================================================================
+% PART B -- re-verified existing entries
+% ====================================================================
+
+% verified: https://doi.org/10.1038/323533a0 (Crossref DOI metadata)
 @article{rumelhart1986backprop,
-    author    = {David E. Rumelhart and Geoffrey E. Hinton and Ronald J. Williams},
-    title     = {Learning Representations by Back-Propagating Errors},
-    journal   = {Nature},
-    volume    = {323},
-    pages     = {533--536},
-    year      = {1986},
+  author  = {Rumelhart, David E. and Hinton, Geoffrey E. and Williams, Ronald J.},
+  title   = {Learning representations by back-propagating errors},
+  journal = {Nature},
+  volume  = {323},
+  number  = {6088},
+  pages   = {533--536},
+  year    = {1986},
+  doi     = {10.1038/323533a0}
 }
 
-%==============================================================================
-%  Convolutional networks
-%==============================================================================
-
+% verified: https://doi.org/10.1109/5.726791 (Crossref DOI metadata; source gives initials only)
 @article{lecun1998gradient,
-    author    = {Yann LeCun and L{\'e}on Bottou and Yoshua Bengio and Patrick Haffner},
-    title     = {Gradient-Based Learning Applied to Document Recognition},
-    journal   = {Proceedings of the IEEE},
-    volume    = {86},
-    number    = {11},
-    pages     = {2278--2324},
-    year      = {1998},
+  author  = {LeCun, Y. and Bottou, L. and Bengio, Y. and Haffner, P.},
+  title   = {Gradient-based learning applied to document recognition},
+  journal = {Proceedings of the {IEEE}},
+  volume  = {86},
+  number  = {11},
+  pages   = {2278--2324},
+  year    = {1998},
+  doi     = {10.1109/5.726791}
 }
 
+% verified: https://papers.nips.cc/paper_files/paper/2012/hash/c399862d3b9d6b76c8436e924a68c45b-Abstract.html (the official record lists no page numbers, so none are given)
 @inproceedings{krizhevsky2012imagenet,
-    author    = {Alex Krizhevsky and Ilya Sutskever and Geoffrey E. Hinton},
-    title     = {{ImageNet} Classification with Deep Convolutional Neural Networks},
-    booktitle = {Advances in Neural Information Processing Systems (NIPS)},
-    volume    = {25},
-    year      = {2012},
+  author    = {Krizhevsky, Alex and Sutskever, Ilya and Hinton, Geoffrey E.},
+  title     = {{ImageNet} Classification with Deep Convolutional Neural Networks},
+  booktitle = {Advances in Neural Information Processing Systems},
+  editor    = {Pereira, F. and Burges, C. J. and Bottou, L. and Weinberger, K.},
+  volume    = {25},
+  publisher = {Curran Associates, Inc.},
+  year      = {2012},
+  url       = {https://papers.nips.cc/paper_files/paper/2012/hash/c399862d3b9d6b76c8436e924a68c45b-Abstract.html}
 }
 
-@inproceedings{zeiler2014visualizing,
-    author    = {Matthew D. Zeiler and Rob Fergus},
-    title     = {Visualizing and Understanding Convolutional Networks},
-    booktitle = {European Conference on Computer Vision (ECCV)},
-    year      = {2014},
-}
-
-@inproceedings{he2016resnet,
-    author    = {Kaiming He and Xiangyu Zhang and Shaoqing Ren and Jian Sun},
-    title     = {Deep Residual Learning for Image Recognition},
-    booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
-    year      = {2016},
-}
-
-%==============================================================================
-%  Autoencoders and generative models
-%==============================================================================
-
-@article{hinton2006dim,
-    author    = {Geoffrey E. Hinton and Ruslan R. Salakhutdinov},
-    title     = {Reducing the Dimensionality of Data with Neural Networks},
-    journal   = {Science},
-    volume    = {313},
-    number    = {5786},
-    pages     = {504--507},
-    year      = {2006},
-}
-
+% verified: https://iclr.cc/archive/2014/conference-proceedings/ (ICLR 2014 conference track) and https://arxiv.org/abs/1312.6114
 @inproceedings{kingma2014vae,
-    author    = {Diederik P. Kingma and Max Welling},
-    title     = {Auto-Encoding Variational {B}ayes},
-    booktitle = {International Conference on Learning Representations (ICLR)},
-    year      = {2014},
+  author        = {Kingma, Diederik P. and Welling, Max},
+  title         = {Auto-Encoding Variational {Bayes}},
+  booktitle     = {International Conference on Learning Representations ({ICLR})},
+  year          = {2014},
+  eprint        = {1312.6114},
+  archivePrefix = {arXiv},
+  url           = {https://arxiv.org/abs/1312.6114}
 }
 
-@inproceedings{goodfellow2014gan,
-    author    = {Ian J. Goodfellow and Jean Pouget-Abadie and Mehdi Mirza and Bing Xu
-                 and David Warde-Farley and Sherjil Ozair and Aaron Courville and Yoshua Bengio},
-    title     = {Generative Adversarial Networks},
-    booktitle = {Advances in Neural Information Processing Systems (NIPS)},
-    year      = {2014},
-}
-
-%==============================================================================
-%  Optimization
-%==============================================================================
-
+% verified: https://iclr.cc/archive/www/doku.php%3Fid=iclr2015:accepted-main.html (ICLR 2015 accepted papers) and https://arxiv.org/abs/1412.6980
 @inproceedings{kingma2015adam,
-    author    = {Diederik P. Kingma and Jimmy Ba},
-    title     = {{Adam}: A Method for Stochastic Optimization},
-    booktitle = {International Conference on Learning Representations (ICLR)},
-    year      = {2015},
+  author        = {Kingma, Diederik P. and Ba, Jimmy},
+  title         = {Adam: A Method for Stochastic Optimization},
+  booktitle     = {International Conference on Learning Representations ({ICLR})},
+  year          = {2015},
+  eprint        = {1412.6980},
+  archivePrefix = {arXiv},
+  url           = {https://arxiv.org/abs/1412.6980}
 }
 
+% verified: https://jmlr.org/papers/v15/srivastava14a.html
 @article{srivastava2014dropout,
-    author    = {Nitish Srivastava and Geoffrey Hinton and Alex Krizhevsky
-                 and Ilya Sutskever and Ruslan Salakhutdinov},
-    title     = {Dropout: A Simple Way to Prevent Neural Networks from Overfitting},
-    journal   = {Journal of Machine Learning Research},
-    volume    = {15},
-    number    = {56},
-    pages     = {1929--1958},
-    year      = {2014},
+  author  = {Srivastava, Nitish and Hinton, Geoffrey and Krizhevsky, Alex and Sutskever, Ilya and Salakhutdinov, Ruslan},
+  title   = {Dropout: A Simple Way to Prevent Neural Networks from Overfitting},
+  journal = {Journal of Machine Learning Research},
+  volume  = {15},
+  number  = {56},
+  pages   = {1929--1958},
+  year    = {2014},
+  url     = {https://jmlr.org/papers/v15/srivastava14a.html}
 }
 
-%==============================================================================
-%  Attention and Transformers
-%==============================================================================
-
+% verified: https://papers.nips.cc/paper_files/paper/2017/hash/3f5ee243547dee91fbd053c1c4a845aa-Abstract.html (title capitalised there as "Attention is All you Need"; the official record lists no page numbers, so none are given) ; arXiv id from https://arxiv.org/abs/1706.03762
 @inproceedings{vaswani2017attention,
-    author    = {Ashish Vaswani and Noam Shazeer and Niki Parmar and Jakob Uszkoreit
-                 and Llion Jones and Aidan N. Gomez and {\L}ukasz Kaiser and Illia Polosukhin},
-    title     = {Attention Is All You Need},
-    booktitle = {Advances in Neural Information Processing Systems (NIPS)},
-    year      = {2017},
+  author        = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, {\L}ukasz and Polosukhin, Illia},
+  title         = {Attention is All you Need},
+  booktitle     = {Advances in Neural Information Processing Systems},
+  editor        = {Guyon, I. and Von Luxburg, U. and Bengio, S. and Wallach, H. and Fergus, R. and Vishwanathan, S. and Garnett, R.},
+  volume        = {30},
+  publisher     = {Curran Associates, Inc.},
+  year          = {2017},
+  eprint        = {1706.03762},
+  archivePrefix = {arXiv},
+  url           = {https://papers.nips.cc/paper_files/paper/2017/hash/3f5ee243547dee91fbd053c1c4a845aa-Abstract.html}
 }
 
+% verified: https://iclr.cc/archive/www/doku.php%3Fid=iclr2015:accepted-main.html (ICLR 2015, oral) and https://arxiv.org/abs/1409.0473
 @inproceedings{bahdanau2015attention,
-    author    = {Dzmitry Bahdanau and Kyunghyun Cho and Yoshua Bengio},
-    title     = {Neural Machine Translation by Jointly Learning to Align and Translate},
-    booktitle = {International Conference on Learning Representations (ICLR)},
-    year      = {2015},
+  author        = {Bahdanau, Dzmitry and Cho, Kyunghyun and Bengio, Yoshua},
+  title         = {Neural Machine Translation by Jointly Learning to Align and Translate},
+  booktitle     = {International Conference on Learning Representations ({ICLR})},
+  year          = {2015},
+  eprint        = {1409.0473},
+  archivePrefix = {arXiv},
+  url           = {https://arxiv.org/abs/1409.0473}
 }
 
-%==============================================================================
-%  Audio synthesis and music generation with neural networks
-%==============================================================================
-
-@inproceedings{vandenoord2016wavenet,
-    author    = {A{\"a}ron van den Oord and Sander Dieleman and Heiga Zen and Karen Simonyan
-                 and Oriol Vinyals and Alex Graves and Nal Kalchbrenner and Andrew Senior
-                 and Koray Kavukcuoglu},
-    title     = {{WaveNet}: A Generative Model for Raw Audio},
-    booktitle = {arXiv preprint arXiv:1609.03499},
-    year      = {2016},
+% verified: https://arxiv.org/abs/1609.03499
+@misc{vandenoord2016wavenet,
+  author        = {van den Oord, Aaron and Dieleman, Sander and Zen, Heiga and Simonyan, Karen and Vinyals, Oriol and Graves, Alex and Kalchbrenner, Nal and Senior, Andrew and Kavukcuoglu, Koray},
+  title         = {{WaveNet}: A Generative Model for Raw Audio},
+  year          = {2016},
+  eprint        = {1609.03499},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.SD},
+  url           = {https://arxiv.org/abs/1609.03499}
 }
 
-@inproceedings{engel2017nsynth,
-    author    = {Jesse Engel and Cinjon Resnick and Adam Roberts and Sander Dieleman
-                 and Mohammad Norouzi and Douglas Eck and Karen Simonyan},
-    title     = {Neural Audio Synthesis of Musical Notes with {WaveNet} Autoencoders},
-    booktitle = {International Conference on Machine Learning (ICML)},
-    year      = {2017},
+% verified: https://doi.org/10.1109/CVPR.2016.90 (Crossref DOI metadata); arXiv id from https://arxiv.org/abs/1512.03385
+@inproceedings{he2016resnet,
+  author        = {He, Kaiming and Zhang, Xiangyu and Ren, Shaoqing and Sun, Jian},
+  title         = {Deep Residual Learning for Image Recognition},
+  booktitle     = {2016 {IEEE} Conference on Computer Vision and Pattern Recognition ({CVPR})},
+  pages         = {770--778},
+  publisher     = {IEEE},
+  year          = {2016},
+  doi           = {10.1109/CVPR.2016.90},
+  eprint        = {1512.03385},
+  archivePrefix = {arXiv}
 }
 
-@article{dhariwal2020jukebox,
-    author    = {Prafulla Dhariwal and Heewoo Jun and Christine Payne and Jong Wook Kim
-                 and Alec Radford and Ilya Sutskever},
-    title     = {Jukebox: A Generative Model for Music},
-    journal   = {arXiv preprint arXiv:2005.00341},
-    year      = {2020},
+% PARTLY verified: chapter and book metadata from Crossref for https://doi.org/10.1007/978-3-319-10590-1_53 and https://doi.org/10.1007/978-3-319-10590-1; the LNCS volume number could not be confirmed (Springer page blocked) and is omitted
+@inproceedings{zeiler2014visualizing,
+  author    = {Zeiler, Matthew D. and Fergus, Rob},
+  title     = {Visualizing and Understanding Convolutional Networks},
+  booktitle = {Computer Vision -- {ECCV} 2014, Part {I}},
+  editor    = {Fleet, David and Pajdla, Tomas and Schiele, Bernt and Tuytelaars, Tinne},
+  series    = {Lecture Notes in Computer Science},
+  pages     = {818--833},
+  publisher = {Springer International Publishing},
+  address   = {Cham},
+  year      = {2014},
+  doi       = {10.1007/978-3-319-10590-1_53}
 }
 
-@article{borsos2023audiolm,
-    author    = {Zal{\'a}n Borsos and Rapha{\"e}l Marinier and Damien Vincent
-                 and Eugene Kharitonov and Olivier Pietquin and Matt Sharifi
-                 and Dominik Roblek and Olivier Teboul and David Grangier
-                 and Marco Tagliasacchi and Neil Zeghidour},
-    title     = {{AudioLM}: A Language Modeling Approach to Audio Generation},
-    journal   = {IEEE/ACM Transactions on Audio, Speech, and Language Processing},
-    year      = {2023},
+% verified: https://doi.org/10.1126/science.1127647 (Crossref DOI metadata)
+@article{hinton2006dim,
+  author  = {Hinton, G. E. and Salakhutdinov, R. R.},
+  title   = {Reducing the Dimensionality of Data with Neural Networks},
+  journal = {Science},
+  volume  = {313},
+  number  = {5786},
+  pages   = {504--507},
+  year    = {2006},
+  doi     = {10.1126/science.1127647}
 }
 
-@article{agostinelli2023musiclm,
-    author    = {Andrea Agostinelli and Timo I. Denk and Zal{\'a}n Borsos and Jesse Engel
-                 and Mauro Verzetti and Antoine Caillon and Qingqing Huang
-                 and Aren Jansen and Adam Roberts and Marco Tagliasacchi
-                 and Matt Sharifi and Neil Zeghidour and Christian Frank},
-    title     = {{MusicLM}: Generating Music From Text},
-    journal   = {arXiv preprint arXiv:2301.11325},
-    year      = {2023},
+% PARTLY verified: title, authors, publisher, year from the authors' own citation block at https://www.deeplearningbook.org/ ; the MIT Press page was blocked, so ISBN, address and series are not confirmed and are omitted
+@book{goodfellow2016deep,
+  author    = {Goodfellow, Ian and Bengio, Yoshua and Courville, Aaron},
+  title     = {Deep Learning},
+  publisher = {MIT Press},
+  year      = {2016},
+  url       = {https://www.deeplearningbook.org}
 }
 
-%==============================================================================
-%  Computer music, composition, music technology
-%==============================================================================
-
-@book{roads2001microsound,
-    author    = {Curtis Roads},
-    title     = {Microsound},
-    publisher = {MIT Press},
-    year      = {2001},
+% verified: https://doi.org/10.1109/78.258082 (Crossref DOI metadata; source gives "S.G. Mallat" and "Zhifeng Zhang")
+@article{mallat1993mp,
+  author  = {Mallat, S. G. and Zhang, Zhifeng},
+  title   = {Matching pursuits with time-frequency dictionaries},
+  journal = {{IEEE} Transactions on Signal Processing},
+  volume  = {41},
+  number  = {12},
+  pages   = {3397--3415},
+  year    = {1993},
+  doi     = {10.1109/78.258082}
 }
 
-@book{roads1996computermusic,
-    author    = {Curtis Roads},
-    title     = {The Computer Music Tutorial},
-    publisher = {MIT Press},
-    year      = {1996},
+% verified: https://ccrma.stanford.edu/~jos/sasp/ (author's page: "W3K Publishing, 2011, ISBN 978-0-9745607-3-1")
+@book{smith2011spectral,
+  author    = {Smith, III, Julius O.},
+  title     = {Spectral Audio Signal Processing},
+  publisher = {W3K Publishing},
+  year      = {2011},
+  isbn      = {978-0-9745607-3-1},
+  url       = {https://ccrma.stanford.edu/~jos/sasp/}
 }
 
-@book{xenakis1992formalized,
-    author    = {Iannis Xenakis},
-    title     = {Formalized Music: Thought and Mathematics in Composition},
-    publisher = {Pendragon Press},
-    year      = {1992},
+% PARTLY verified: Pearson's own product page could not be opened. Library catalog record https://catalog.lib.msu.edu/Record/folio.in00004533105/Description gives: Third edition, Pearson, Upper Saddle River [N.J.], 2010, (c)2010, ISBN 9780131988422, Prentice-Hall signal processing series. Retail listings show a release date of August 2009, so the book shipped in 2009 with a 2010 imprint; the imprint year 2010 is used
+@book{oppenheim2009dsp,
+  author    = {Oppenheim, Alan V. and Schafer, Ronald W.},
+  title     = {Discrete-Time Signal Processing},
+  edition   = {3},
+  series    = {Prentice-Hall Signal Processing Series},
+  publisher = {Pearson},
+  address   = {Upper Saddle River, NJ},
+  year      = {2010},
+  isbn      = {978-0-13-198842-2}
 }
 
-@book{miranda2001composing,
-    author    = {Eduardo Reck Miranda},
-    title     = {Composing Music with Computers},
-    publisher = {Focal Press},
-    year      = {2001},
-}
-
-%==============================================================================
-%  Computer-assisted orchestration (placeholder -- to be completed)
-%==============================================================================
-
-@article{cella2020orchidea,
-    author    = {Carmine-Emanuele Cella and Daniele Ghisi and Vincent Lostanlen
-                 and Fabien Levy and Joshua Fineberg and Yan Maresz},
-    title     = {{OrchideaSOL}: A Dataset of Extended Instrumental Techniques
-                 for Computer-Aided Orchestration},
-    journal   = {Proceedings of the International Computer Music Conference (ICMC)},
-    year      = {2020},
-    note      = {Placeholder -- please verify and amend.},
-}
-
-@inproceedings{esling2018bridging,
-    author    = {Philippe Esling and Axel Chemla-Romeu-Santos and Adrien Bitton},
-    title     = {Bridging Audio Analysis, Perception and Synthesis with Perceptually-Regularized Variational Timbre Spaces},
-    booktitle = {International Society for Music Information Retrieval Conference (ISMIR)},
-    year      = {2018},
+% PARTLY verified: title, authors, year from https://arxiv.org/abs/2007.00763 , whose comment reads "To appear in the proceedings of the International Computer Music Conference (ICMC 2020)". No published ICMC proceedings record (pages, DOI, final year) could be found -- ICMC 2020 was postponed and held in 2021 -- so this is given as the arXiv preprint with the venue in a note
+@misc{cella2020orchidea,
+  author        = {Cella, Carmine Emanuele and Ghisi, Daniele and Lostanlen, Vincent and L{\'e}vy, Fabien and Fineberg, Joshua and Maresz, Yan},
+  title         = {{OrchideaSOL}: a dataset of extended instrumental techniques for computer-aided orchestration},
+  year          = {2020},
+  eprint        = {2007.00763},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.SD},
+  note          = {To appear in the Proceedings of the International Computer Music Conference (ICMC 2020)},
+  url           = {https://arxiv.org/abs/2007.00763}
 }

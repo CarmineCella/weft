@@ -222,3 +222,10 @@ And once generation works on MNIST, the same machinery points straight
 at the audio goal: train the encoder/decoder on per-frame spectra
 instead of pixels, and the latent space becomes a space of timbres to
 interpolate through and sample from.
+
+
+## Further reading
+
+Training a network to reproduce its input through a narrow layer, and
+what the resulting codes are good for, is the subject of
+[@hinton2006dim].

@@ -56,8 +56,8 @@
 \lstset{style=weft}
 
 % --- Bibliography --------------------------------------------------------------
-% \usepackage{kaobiblio}
-% \addbibresource{bibliography/refs.bib}
+\usepackage{kaobiblio}
+\addbibresource{bibliography/refs.bib}
 
 % --- Graphics paths ------------------------------------------------------------
 \graphicspath{{images/}{./}}
@@ -190,11 +190,8 @@
 \backmatter
 \setchapterstyle{plain}
 
-% No chapter cites anything yet, so the bibliography is switched off (an
-% empty one makes latexmk report a failure).  Re-enable these two lines,
-% and the kaobiblio lines in the preamble, when the first \cite appears.
-% \defbibnote{bibnote}{References cited in this work.\par\bigskip}
-% \printbibliography[heading=bibintoc, title=Bibliography, prenote=bibnote]
+\defbibnote{bibnote}{References cited in this work.\par\bigskip}
+\printbibliography[heading=bibintoc, title=Bibliography, prenote=bibnote]
 
 \printindex
 

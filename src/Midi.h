@@ -176,7 +176,11 @@ inline File read(const std::string& path) {
         const std::streampos track_end = in.tellg() + std::streamoff(tlen);
 
         Track track;
-        std::vector<std::pair<int, int>> pending;   // (pitch -> start_tick) for active notes
+        // Notes that are sounding: pitch, start tick, and the velocity of
+        // the note-ON (the note-off's velocity is a release speed, not the
+        // loudness of the note).
+        struct Active { int pitch, start, velocity; };
+        std::vector<Active> pending;
         int abs_tick = 0;
         std::uint8_t running_status = 0;
 
@@ -219,15 +223,15 @@ inline File read(const std::string& path) {
                     const int vel   = detail::read_u8(in);
                     if (kind == 0x90 && vel > 0) {
                         // Note ON
-                        pending.emplace_back(pitch, abs_tick);
+                        pending.push_back({pitch, abs_tick, vel});
                     } else {
                         // Note OFF (or note-on with velocity 0).
                         for (auto it = pending.rbegin(); it != pending.rend(); ++it) {
-                            if (it->first == pitch) {
-                                const int start = it->second;
+                            if (it->pitch == pitch) {
+                                const int start = it->start;
                                 const int dur   = abs_tick - start;
                                 if (dur > 0)
-                                    track.push_back(Note{pitch, vel > 0 ? vel : 64,
+                                    track.push_back(Note{pitch, it->velocity,
                                                          start, dur});
                                 pending.erase(std::next(it).base());
                                 break;

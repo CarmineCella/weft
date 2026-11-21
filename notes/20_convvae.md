@@ -264,3 +264,13 @@ the network produce a spectrum and then turn that spectrum back into a
 waveform. [Note 21](21_differentiable_synthesis.md) keeps the goal and
 changes the decision: the network there outputs the controls of a
 synthesiser, and the synthesiser makes the sound.
+
+
+## Further reading
+
+The model combines the variational autoencoder of [@kingma2014vae] with
+the convolutional layers of note 19. The checkerboard artefacts of
+transposed convolutions, and the upsample-then-convolve remedy used in
+our decoder, are analysed in [@odena2016deconvolution]. The mel scale is
+[@stevens1937mel], and phase reconstruction from a magnitude
+spectrogram is [@griffin1984signal].

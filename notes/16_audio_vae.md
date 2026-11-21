@@ -133,7 +133,7 @@ decoder being unable to represent anything but SOL spectra.
 
 The remap had the input's phase to lean on. The two generative
 applications produce a magnitude with no obvious phase, so each has to
-borrow one. Both avoid iterative phase estimation (Griffin-Lim), trading
+borrow one. Both avoid iterative phase estimation (Griffin-Lim [@griffin1984signal]), trading
 some fidelity for simplicity.
 
 **Interpolation** morphs between two real sounds. Encode both to latent
@@ -192,3 +192,12 @@ change that. [Note 21](21_differentiable_synthesis.md) gets clean
 audio by a different route, with a network that controls a
 synthesiser instead of producing spectra.
 
+
+## Further reading
+
+The model is the variational autoencoder of [@kingma2014vae] applied to
+spectrogram frames of the samples described in [@cella2020orchidea].
+Estimating a phase for a given magnitude spectrogram, which we avoid by
+borrowing one, is the problem solved iteratively by
+[@griffin1984signal]. The learned alternative, a network that produces
+the waveform directly, begins with [@vandenoord2016wavenet].

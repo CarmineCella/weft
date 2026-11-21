@@ -219,3 +219,10 @@ What comes next is the layer that finally uses the Tensor4D — `Conv2D`,
 which turns a `Tensor4D(N, in_C, H, W)` into a
 `Tensor4D(N, out_C, H', W')` via the im2col-and-matmul approach. That
 is the next note, and where the shape we just chose pays off in code.
+
+
+## Further reading
+
+The NCHW layout follows the convention of PyTorch [@paszke2019pytorch].
+The convolutional architectures that make a four-dimensional tensor
+necessary are those of [@lecun1998gradient].

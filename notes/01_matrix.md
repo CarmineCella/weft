@@ -194,3 +194,11 @@ every step in this library.
 The forward pass tells you what a layer *computes*, but not how it *learns*. The
 next note covers **backpropagation** — the chain rule applied systematically — and
 `src/Layer.h` builds the first learnable layer (`Dense`) on top of `Matrix`.
+
+
+## Further reading
+
+The linear algebra used throughout is covered in chapter 2 of
+[@goodfellow2016deep]. Why the order of the three loops in a matrix
+product matters so much, and how tuned libraries go much further than
+our `i-k-j` loop, is explained in [@goto2008anatomy].

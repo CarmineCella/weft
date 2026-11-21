@@ -142,3 +142,10 @@ run. Stacked together they're enough to keep CPU training of everything in
 this library, up through the GAN, bearable on a laptop. Knowing which
 lever to pull, and when reaching for a BLAS or a GPU is worth the cost, is
 itself part of doing machine learning.
+
+
+## Further reading
+
+The BLAS interface that the optional backend calls is
+[@lawson1979blas]. How a tuned matrix product achieves its speed, with
+blocking for each level of cache, is described in [@goto2008anatomy].

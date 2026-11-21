@@ -238,3 +238,11 @@ The pieces we're missing for MNIST:
 
 Then we train the MNIST classifier, which is where Adam over SGD will
 start mattering visibly.
+
+
+## Further reading
+
+Plain stochastic gradient descent is [@robbins1951sgd]; momentum is
+[@polyak1964momentum]; RMSProp was never published as a paper and is
+cited by its lecture [@tieleman2012rmsprop]. Adam, which combines the
+last two with a bias correction, is [@kingma2015adam].

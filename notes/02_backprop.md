@@ -225,3 +225,12 @@ A `Dense` layer alone can only fit linear maps. To make a network expressive
 we need **nonlinearities** — `ReLU`, then `Softmax` paired with **cross-
 entropy loss**. That's the next note, after which we'll have everything
 needed for our first real classifier (IRIS).
+
+
+## Further reading
+
+Backpropagation as a practical way to train multi-layer networks was
+established by [@rumelhart1986backprop]. The initialisation that `Dense`
+uses, a Gaussian with variance `2 / fan_in`, comes from [@he2015delving],
+which extends the earlier analysis of [@glorot2010understanding] to ReLU
+networks.

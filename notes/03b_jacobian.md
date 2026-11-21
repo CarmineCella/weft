@@ -239,3 +239,11 @@ That formula, plus the principle "exploit structure, never materialise an
 expensive Jacobian", is the whole story of backward in a neural-network
 library. Everything else is recognising what `J` looks like for your
 particular layer and rewriting `Jᵀ · dY` in the cheapest possible form.
+
+
+## Further reading
+
+The view of backpropagation as a sequence of vector-Jacobian products is
+that of reverse-mode automatic differentiation; [@baydin2018autodiff] is
+a thorough survey. Chapter 6 of [@goodfellow2016deep] derives the same
+formulas in textbook form.

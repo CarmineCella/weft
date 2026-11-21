@@ -221,3 +221,9 @@ match.
 
 Build it from the project root with `make -C build` and run
 `./build/bin/examples/backprop_example`.
+
+
+## Further reading
+
+Updating parameters from one noisy gradient estimate at a time goes back
+to the stochastic approximation method of [@robbins1951sgd].

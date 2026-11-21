@@ -24,8 +24,9 @@ error measured on the *audio* can flow back through it and tell the
 network how to change the controls.
 
 The idea is known as differentiable digital signal processing, or
-DDSP, and the synthesiser inside it is much older: it is the
-harmonic-plus-noise model of spectral modelling synthesis. That is the
+DDSP [@engel2020ddsp], and the synthesiser inside it is much older:
+it is the harmonic-plus-noise model of spectral modelling synthesis
+[@serra1990sms]. That is the
 point of this note. It is the place where the neural networks we have
 been building meet the signal processing that audio people already
 know, and each does the part it is good at.
@@ -221,8 +222,9 @@ noise part turns out to be small for these sustained tones, under
 half a percent of the energy.
 
 It is important to say what this is. **It is analysis and
-resynthesis**, the same family as the phase vocoder and sinusoidal
-modelling: measure a sound's partials, then rebuild it from them.
+resynthesis**, the same family as the phase vocoder
+[@flanagan1966phase] and sinusoidal modelling
+[@mcaulay1986sinusoidal]: measure a sound's partials, then rebuild it from them.
 Gradient descent is an unusual way to do the analysis, but nothing
 here is beyond what classical methods already do, and
 `synth_fit morph` and `synth_fit blend`, which interpolate between
@@ -395,3 +397,15 @@ processed one frame, one patch or one image at a time. Attention is
 how a network relates the elements of a *sequence* to one another,
 and it is what the generative models at the end of the book are built
 from.
+
+
+## Further reading
+
+Training a network through a differentiable harmonic-plus-noise
+synthesiser with a multi-scale spectral loss is [@engel2020ddsp]; this
+note follows its design closely. The synthesiser itself is the
+deterministic-plus-stochastic model of [@serra1990sms], which builds on
+the sinusoidal model of [@mcaulay1986sinusoidal] and, further back, on
+the phase vocoder [@flanagan1966phase]. A general-purpose pitch
+tracker, which this note avoids needing, is [@decheveigne2002yin]. The
+samples are those of [@cella2020orchidea].

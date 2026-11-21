@@ -215,3 +215,12 @@ with im2col, attention with positional encoding, the whole arc. Then
 you can use PyTorch if you want to, and you will know exactly what it
 is doing under the hood, because you will have built each piece
 yourself.
+
+
+## Further reading
+
+PyTorch [@paszke2019pytorch] and NumPy [@harris2020numpy] are the tools
+this book deliberately does not use. What a framework's automatic
+differentiation does behind `loss.backward()` is surveyed in
+[@baydin2018autodiff]. For a broad textbook treatment of everything the
+following notes build by hand, see [@goodfellow2016deep].

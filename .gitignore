@@ -25,3 +25,4 @@ book/book.toc
 .vscode
 outputs
 book/*.synctex*
+data/chorales

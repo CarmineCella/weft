@@ -191,3 +191,11 @@ The next session wires these into a small `Network` class that holds an
 ordered list of layers and runs them forward/backward as a unit, then
 trains it on the **IRIS** dataset — the first time we'll watch loss curves
 drop on real data.
+
+
+## Further reading
+
+Entropy and cross-entropy as measures of information come from
+[@shannon1948communication]. The pairing of a softmax output with a
+cross-entropy loss, and the probabilistic argument for it, is in
+[@bridle1990softmax].

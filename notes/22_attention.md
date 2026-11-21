@@ -79,7 +79,7 @@ the softmax becomes nearly one-hot: a tiny perturbation in the score
 flips the weight by a lot, and the gradient through softmax collapses
 to almost zero almost everywhere. The `sqrt(d_k)` rescaling keeps the
 score variance at 1 regardless of dimension, so the softmax stays in
-its "soft" regime where gradients flow. The Vaswani paper introduced
+its "soft" regime where gradients flow. The Vaswani paper [@vaswani2017attention] introduced
 the scaling for exactly this reason, and it's the difference between
 training that works and training that doesn't past `d_k ≈ 64`.
 
@@ -290,3 +290,11 @@ Two other variants are common and are not implemented:
 Note 23 builds the surrounding pieces — sinusoidal positional
 encoding, LayerNorm, residual connections — and assembles a complete
 transformer block.
+
+
+## Further reading
+
+Attention as a learned, soft alignment between sequence positions was
+introduced for translation by [@bahdanau2015attention]. Scaled
+dot-product attention, multi-head attention and the causal mask in the
+form built here are from [@vaswani2017attention].

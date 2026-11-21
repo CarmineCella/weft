@@ -133,3 +133,10 @@ itself, and the tests confirm it correctly returns:
 
 Anything that depends on FFT correctness — and lots of things will —
 rests on those.
+
+
+## Further reading
+
+The fast Fourier transform in the form used here is [@cooley1965fft].
+For the discrete Fourier transform itself and its properties, see
+[@oppenheim2009dsp].

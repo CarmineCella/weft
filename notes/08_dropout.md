@@ -57,7 +57,7 @@ The shape of this API is borrowed from PyTorch (`model.train()`,
 ## 2. Dropout — what and why
 
 Dropout is a regularisation technique introduced by Srivastava et al.
-(2014). The mechanism is brutally simple:
+(2014) [@srivastava2014dropout]. The mechanism is brutally simple:
 
 > During training, for each activation, with probability `p` set it to
 > zero; otherwise scale it by `1/(1-p)`. During inference, do nothing.
@@ -210,3 +210,10 @@ parser that returns a `(784, N)` matrix of pixels in `[0, 1]` and a
 `std::vector<int>` of labels. The actual MNIST classifier example —
 network architecture, training loop with eval-mode test passes, results
 — is the next step.
+
+
+## Further reading
+
+Dropout is [@srivastava2014dropout]. Batch normalisation, mentioned here
+as the other layer that behaves differently in training and inference,
+is [@ioffe2015batchnorm].

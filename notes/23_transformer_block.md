@@ -33,7 +33,7 @@ representation before attention sees it.
 
 ## 2. Sinusoidal positional encoding
 
-The "Attention is All You Need" paper picked a beautifully simple
+The "Attention is All You Need" paper [@vaswani2017attention] picked a beautifully simple
 solution: add a deterministic, fixed pattern to each input token's
 embedding, where the pattern depends only on the position.
 
@@ -160,7 +160,7 @@ them, training a stack of more than a handful of these blocks
 fails — gradients vanish through the long chain of matmuls and
 softmaxes. With them, the gradient gets an identity shortcut that
 keeps signal flowing, and the network can train hundreds of layers
-deep. It's the same trick as ResNet, in the same role.
+deep. It's the same trick as ResNet [@he2016resnet], in the same role.
 
 In code, each block is one `Layer<T>` that owns six sub-layers in
 fixed order:
@@ -258,3 +258,13 @@ Note 24 puts the pieces to work. It adds a token embedding, stacks
 causal blocks into an autoregressive model, and trains it on four-voice
 chorales, so that sampling from it one token at a time writes new
 ones.
+
+
+## Further reading
+
+The transformer and its sinusoidal positional encoding are
+[@vaswani2017attention]. Layer normalisation is [@ba2016layernorm], and
+the case for placing it before each sub-layer, as we do, is made in
+[@xiong2020prelayernorm]. Residual connections come from
+[@he2016resnet]. The sizes quoted for GPT-2 are from
+[@radford2019gpt2].

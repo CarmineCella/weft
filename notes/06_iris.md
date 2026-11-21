@@ -240,3 +240,9 @@ accuracy number is no longer noisy.
 
 After MNIST: orchestral instrument sounds, then the autoencoder, then
 ConvNets.
+
+
+## Further reading
+
+The Iris measurements were published, with the first statistical
+classifier applied to them, by [@fisher1936iris].

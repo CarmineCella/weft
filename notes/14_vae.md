@@ -218,3 +218,10 @@ digits. Then:
 
 That's the morphing application. The remaining pieces are the audio
 plumbing — STFT/iSTFT with overlap-add — not the model, which is done.
+
+
+## Further reading
+
+The variational autoencoder and the reparameterisation trick are
+[@kingma2014vae]. The effect of weighting the KL term, the `beta` of
+this note, is studied in [@higgins2017betavae].

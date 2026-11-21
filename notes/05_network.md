@@ -191,3 +191,9 @@ need as it scales:
   inference (or uses inverted dropout).
 - **Conv2D and MaxPool**: needs 4D tensors. Arrives with the ConvNet
   milestone.
+
+
+## Further reading
+
+Building a network as a chain of modules, each with its own forward and
+backward function, is the design described in [@lecun1998gradient].

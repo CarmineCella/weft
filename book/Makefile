@@ -53,6 +53,7 @@ PANDOC    := pandoc
 PANDOC_FLAGS := --from markdown+tex_math_dollars+raw_tex \
                 --to latex \
                 --listings \
+                --biblatex \
                 --top-level-division=chapter \
                 --template pandoc-template.latex
 
