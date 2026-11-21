@@ -1,8 +1,8 @@
-# 16 — The audio VAE: training, serialization, and remapping
+# 19 — The audio VAE: training, serialization, and remapping
 
-We have a working VAE (note 14) and the audio plumbing — WAV I/O and a
+We have a working VAE (chapter 17) and the audio plumbing — WAV I/O and a
 transparent STFT/iSTFT (the round-trip reproduces a signal to the
-quantisation floor). This note connects them: train the VAE on the
+quantisation floor). This chapter connects them: train the VAE on the
 spectra of orchestral sounds, save it, and use it to "remap" an
 arbitrary input sound onto the manifold of orchestral timbres.
 
@@ -72,7 +72,7 @@ magnitude.
 
 `train_audio_vae` reads the per-frame logmag cache, ignores the labels
 (this is unsupervised), and runs the exact VAE training loop from
-note 14 — encoder emits `mu` and `logvar`, reparameterise
+chapter 17 — encoder emits `mu` and `logvar`, reparameterise
 `z = mu + sigma*eps`, decode, loss `= MSE + beta*KL`, backprop the
 reconstruction and KL gradients into the encoder. At the end it saves
 `<prefix>.enc` and `<prefix>.dec`.
@@ -81,12 +81,12 @@ This is also the first training run heavy enough to need performance care:
 the frames are subsampled (adjacent STFT frames are highly redundant) and
 the model is checkpointed periodically so a long run is never
 all-or-nothing. Those tricks, and the parallelised matmul underneath
-them, are the subject of note 17.
+them, are the subject of chapter 20.
 
 A balance note: because MSE is summed over 2049 bins, the
 reconstruction term dwarfs the KL at `beta = 1`, so the latent isn't
 pulled tightly onto the unit Gaussian. That's the "ignored prior" regime
-from note 14 — perfectly fine for the remap (which encodes real frames
+from chapter 17 — perfectly fine for the remap (which encodes real frames
 and uses `mu`, never sampling the prior), but for clean *sampling* and
 *interpolation* we'll want a larger `beta`. It's a constant in the file.
 
@@ -187,8 +187,8 @@ A caution about what to expect when listening. The remap, the
 interpolation and the sampling all run, and they show what a latent
 space is good for, but the audio quality is low: a small network
 trained with squared error produces blurred spectra, and the phase is
-borrowed from another sound. Note 20 improves the model; it does not
-change that. [Note 21](21_differentiable_synthesis.md) gets clean
+borrowed from another sound. Chapter 23 improves the model; it does not
+change that. [Chapter 24](24_differentiable_synthesis.md) gets clean
 audio by a different route, with a network that controls a
 synthesiser instead of producing spectra.
 

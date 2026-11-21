@@ -1,6 +1,6 @@
-# 19 — Convolutional networks
+# 22 — Convolutional networks
 
-For the first eighteen notes we worked exclusively with dense (fully
+For the first twenty chapters we worked exclusively with dense (fully
 connected) layers. Dense layers handle the MNIST classifier, the Iris
 classifier, the audio VAE on spectrograms — anything where the input is
 naturally a flat vector of features and you don't care which feature
@@ -220,7 +220,7 @@ In our library, this is the moment where the data structure changes —
 tensor type. The conv stack is one `ConvNetwork`; the dense head is
 another `Network`; the example wires them together. Why this is the
 right choice for a teaching library is discussed at length in
-[note 18](18_from_matrices_to_tensors.md).
+[chapter 21](21_from_matrices_to_tensors.md).
 
 The classic AlexNet shape, in our library, looks exactly like this:
 
@@ -253,7 +253,7 @@ The conv work in this chapter added five new headers:
 - **`Tensor4D.h`** — the 4-D dense tensor in NCHW layout, with
   element access, `apply`, `fill`, randomisation, and a `hadamard`
   free function for element-wise products in backward computations.
-  Covered in [note 18](18_from_matrices_to_tensors.md).
+  Covered in [chapter 21](21_from_matrices_to_tensors.md).
 
 - **`ConvLayer.h`** — the abstract base class for conv-stack layers,
   parallel to `Layer` for the dense world.
@@ -332,7 +332,7 @@ epochs, He-initialised conv kernels, zero-initialised biases, no data
 augmentation. Run it with
 
 ```sh
-./bin/examples/cifar_conv  data/cifar-10-batches-bin  15  cifar_model
+./examples/cifar_conv  ../data/cifar-10-batches-bin  15  cifar_model
 ```
 
 and on an Apple M3 with `make BLAS=1` it should take roughly 60-90
@@ -389,9 +389,9 @@ what is locally informative in natural images.
 The conv arc continues into audio. The same Conv2D layer, applied to
 log-magnitude spectrograms instead of CIFAR images, gives us a
 **ConvVAE for sound** — the same generative architecture as the dense
-audio VAE from [note 16](16_audio_vae.md), but with the magnitude-blur
+audio VAE from [chapter 19](19_audio_vae.md), but with the magnitude-blur
 problem of the dense version largely fixed by local spatial structure
-in the encoder and decoder. That's [note 20](20_convvae.md) (still to
+in the encoder and decoder. That's [chapter 23](23_convvae.md) (still to
 come): the architecture, the training, the morphs and interpolations,
 and an honest comparison against the dense version. We should hear the
 difference.

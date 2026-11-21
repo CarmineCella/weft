@@ -1,4 +1,4 @@
-# 12 — Musical instrument classifier (SOL)
+# 15 — Musical instrument classifier (SOL)
 
 Putting the audio pipeline to work. SOL_flat is ~5000 WAV files, each
 a single note from an orchestral instrument; the filename's first

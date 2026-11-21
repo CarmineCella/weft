@@ -1,4 +1,4 @@
-# 08 — Train/eval mode and Dropout
+# 11 — Train/eval mode and Dropout
 
 Two changes that go together. We added a training/inference mode flag to
 `Layer`, and we built `Dropout` — the first layer that actually uses it.
@@ -205,7 +205,7 @@ situation on MNIST (60k examples, but our networks will have hundreds
 of thousands of weights). Combined with Adam, this is enough machinery
 for a respectable MNIST classifier.
 
-The MNIST loader is in the same release as this note; it's a tiny IDX
+The MNIST loader is in the same release as this chapter; it's a tiny IDX
 parser that returns a `(784, N)` matrix of pixels in `[0, 1]` and a
 `std::vector<int>` of labels. The actual MNIST classifier example —
 network architecture, training loop with eval-mode test passes, results

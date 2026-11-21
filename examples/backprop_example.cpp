@@ -6,7 +6,7 @@
 // fastest way to see that the matrix formulation in Dense::backward
 // is doing exactly the same chain-rule arithmetic, only mass-produced.
 //
-// The accompanying note is notes/02b_one_weight.md.
+// The accompanying chapter is notes/04_one_weight.md.
 //
 // Where is the "squared error" loss in this code?
 //   It appears in exactly one line:    dL_dz = z - t;

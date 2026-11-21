@@ -1,4 +1,4 @@
-# 10 — The FFT
+# 13 — The FFT
 
 We're about to do audio. Step one is being able to look at sound in the
 frequency domain — what mix of sinusoids is in this signal? — and the
@@ -123,7 +123,7 @@ In the instrument classifier:
    "spectral envelope" per file.
 
 The classifier then learns instrument identities from those envelopes.
-Steps 1-5 are the subject of the next note; this one is just the FFT
+Steps 1-5 are the subject of the next chapter; this one is just the FFT
 itself, and the tests confirm it correctly returns:
 
 - the DC magnitude `N` for a constant input,

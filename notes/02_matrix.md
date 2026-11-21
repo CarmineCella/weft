@@ -1,8 +1,8 @@
-# 01 — Matrix: the foundation
+# 2 — Matrix: the foundation
 
 Every neural network is, at its heart, a sequence of matrix operations. Before we
 build a layer that learns, we need a solid matrix class — and we need to understand
-*why* a matrix is the right abstraction, not an arbitrary choice. This note explains
+*why* a matrix is the right abstraction, not an arbitrary choice. This chapter explains
 both: first the conceptual leap from a single neuron to a matrix, then the design
 decisions inside `src/Matrix.h`.
 
@@ -20,7 +20,7 @@ scalar `b`, and computes:
 z = w · x + b = w₁x₁ + w₂x₂ + … + wₙxₙ + b
 ```
 
-That value `z` is then passed through a nonlinearity (covered in a later note). The
+That value `z` is then passed through a nonlinearity (covered in a later chapter). The
 dot product is the *entire* computation of a neuron. Everything else — depth,
 learning, representation — is built on top of this one operation.
 
@@ -192,7 +192,7 @@ every step in this library.
 ## 5. What's next
 
 The forward pass tells you what a layer *computes*, but not how it *learns*. The
-next note covers **backpropagation** — the chain rule applied systematically — and
+next chapter covers **backpropagation** — the chain rule applied systematically — and
 `src/Layer.h` builds the first learnable layer (`Dense`) on top of `Matrix`.
 
 

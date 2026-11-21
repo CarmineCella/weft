@@ -1,11 +1,11 @@
-# 11 — Loading audio and extracting features
+# 14 — Loading audio and extracting features
 
 Two things are needed to feed audio into the classifier: a way to read
 sample data from a file, and a way to turn an arbitrary-length sample
 stream into a fixed-length feature vector that summarises its
 timbre well enough for a classifier to learn from.
 
-This note covers both, in pipeline order: WAV parsing, then framing
+This chapter covers both, in pipeline order: WAV parsing, then framing
 and windowing, then the two feature flavours we expose (log-magnitude
 spectrum and MFCC).
 

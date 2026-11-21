@@ -1,6 +1,6 @@
-# 20 — A convolutional VAE for audio
+# 23 — A convolutional VAE for audio
 
-The audio VAE of [note 16](16_audio_vae.md) works on individual STFT
+The audio VAE of [chapter 19](19_audio_vae.md) works on individual STFT
 frames. Each column of the magnitude spectrogram becomes an isolated
 2049-dimensional vector that the dense encoder squeezes to 32 latent
 dimensions and the dense decoder reconstructs. That gives us a learned
@@ -15,12 +15,12 @@ single frames. A patch of 16 STFT frames × 64 frequency bins is a
 small 2-D image whose vertical axis is *which frequencies are present*
 and horizontal axis is *how those frequencies move in time*. Once it's
 a 2-D image we have everything we need: Conv2D, MaxPool2D, ReLU4D,
-Upsample2D, all from the convnet work of [note 19](19_convnets.md).
+Upsample2D, all from the convnet work of [chapter 22](22_convnets.md).
 Stack them into a conv encoder and a mirrored conv decoder with a
 small dense bottleneck in between, and we have a VAE that models
 *local time-frequency texture*, not just static timbre.
 
-This note builds that ConvVAE and three applications of it:
+This chapter builds that ConvVAE and three applications of it:
 interpolating between two timbres in latent space, sampling from the
 prior to invent new timbres, and remapping arbitrary input audio onto
 the manifold the model has learned. We'll also be honest about where
@@ -78,7 +78,7 @@ unbounded, not `[0, 1]` like pixel intensities. A sigmoid would
 saturate them. The generation code clamps to `≥ 0` before
 exponentiating back to linear magnitude.
 
-**Reparameterisation inline.** Same trick as [note 14](14_vae.md):
+**Reparameterisation inline.** Same trick as [chapter 17](17_vae.md):
 the encoder's last dense layer emits `2·LATENT` numbers; the first
 half is `μ` and the second half is `log σ²`. We sample
 `z = μ + σ · ε` with `ε ~ N(0, I)` and pass `z` to the decoder.
@@ -170,7 +170,7 @@ the encoder's `N(μ, σ²)` posterior and the standard normal prior, with
 epochs.
 
 What's different from the dense case is the data pipeline. We read
-the per-frame logmag cache (the same one [note 16](16_audio_vae.md)
+the per-frame logmag cache (the same one [chapter 19](19_audio_vae.md)
 consumes), then for each contiguous run of frames belonging to one
 source WAV, slide a 16-frame window with a hop of 8 frames and extract
 patches. Each patch's 16 columns get mel-transformed from 2049 to 64
@@ -247,7 +247,7 @@ Honest limitations from this build, in order of how much they hurt:
   rapid spectral changes (a piano attack, a percussive transient)
   blur into the surrounding sustain.
 
-The thing to take from this note isn't a finished audio system — for
+The thing to take from this chapter isn't a finished audio system — for
 that you'd reach for a vocoder. What we have is the *architectural
 pattern*: encoder as `ConvNetwork → Flatten → Network`, decoder as
 `Network → Unflatten → ConvNetwork`, latent in the middle,
@@ -257,11 +257,11 @@ spectrogram patches today, image tiles tomorrow, raw waveforms in 1-D
 the day after.
 
 One thing has to be said plainly before moving on. Judged by ear, the
-audio from this model and from the dense VAE of note 16 is poor, and
+audio from this model and from the dense VAE of chapter 19 is poor, and
 the three limitations above are structural: training longer does not
 remove them. They all come from the same decision, which is to make
 the network produce a spectrum and then turn that spectrum back into a
-waveform. [Note 21](21_differentiable_synthesis.md) keeps the goal and
+waveform. [Chapter 24](24_differentiable_synthesis.md) keeps the goal and
 changes the decision: the network there outputs the controls of a
 synthesiser, and the synthesiser makes the sound.
 
@@ -269,7 +269,7 @@ synthesiser, and the synthesiser makes the sound.
 ## Further reading
 
 The model combines the variational autoencoder of [@kingma2014vae] with
-the convolutional layers of note 19. The checkerboard artefacts of
+the convolutional layers of chapter 22. The checkerboard artefacts of
 transposed convolutions, and the upsample-then-convolve remedy used in
 our decoder, are analysed in [@odena2016deconvolution]. The mel scale is
 [@stevens1937mel], and phase reconstruction from a magnitude

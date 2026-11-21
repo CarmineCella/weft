@@ -32,7 +32,7 @@
 
 NOTES_DIR := ../notes
 NOTES     := $(wildcard $(NOTES_DIR)/*.md)
-# Map ../notes/19_convnets.md -> generated/19_convnets.tex
+# Map ../notes/22_convnets.md -> generated/22_convnets.tex
 GENERATED := $(patsubst $(NOTES_DIR)/%.md,generated/%.tex,$(NOTES))
 
 # Hand-written chapter sources (the introduction).
@@ -76,7 +76,7 @@ notes: $(GENERATED)
 
 generated/%.tex: $(NOTES_DIR)/%.md pandoc-template.latex preprocess_note.py
 	@mkdir -p generated
-	python3 preprocess_note.py < $< | $(PANDOC) $(PANDOC_FLAGS) -o $@
+	python3 preprocess_note.py $* < $< | $(PANDOC) $(PANDOC_FLAGS) -o $@
 
 # Stage 2: build the PDF.  latexmk handles bibtex/biber and multiple
 # passes for cross-references automatically.  We depend on the generated
@@ -90,6 +90,10 @@ generated/%.tex: $(NOTES_DIR)/%.md pandoc-template.latex preprocess_note.py
 # build succeeded; if not, fail.
 $(BUILD_DIR)/book.pdf: book.tex $(GENERATED) $(CHAPTERS)
 	@mkdir -p $(BUILD_DIR)
+	@# An editor building book.tex in place leaves book.bbl / book.bcf here.
+	@# LaTeX finds those before the ones in $(BUILD_DIR), and latexmk then
+	@# runs bibtex instead of biber and stops after one pass.
+	@rm -f book.bbl book.bcf
 	-$(LATEXMK) $(LATEXMK_FLAGS) book.tex
 	@if [ -f $(BUILD_DIR)/book.pdf ]; then \
 	    echo ""; \

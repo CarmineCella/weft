@@ -1,6 +1,6 @@
-# 02 — Backpropagation, and the Dense layer
+# 3 — Backpropagation, and the Dense layer
 
-The matrix from the last note is the foundation. This note is the heart of the
+The matrix from the last chapter is the foundation. This chapter is the heart of the
 library: how a neural network *learns*. We derive backpropagation for a `Dense`
 layer, implement it in `src/Layer.h` and `src/Dense.h`, and verify the
 implementation with a *numerical gradient check* — the single most important
@@ -223,7 +223,7 @@ tight tolerance if you're paranoid.
 
 A `Dense` layer alone can only fit linear maps. To make a network expressive
 we need **nonlinearities** — `ReLU`, then `Softmax` paired with **cross-
-entropy loss**. That's the next note, after which we'll have everything
+entropy loss**. That's the next chapter, after which we'll have everything
 needed for our first real classifier (IRIS).
 
 

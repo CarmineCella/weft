@@ -1,9 +1,9 @@
-# 06 — IRIS: the first end-to-end classifier
+# 9 — IRIS: the first end-to-end classifier
 
-This note walks through the IRIS example end-to-end and the new tools the
+This chapter walks through the IRIS example end-to-end and the new tools the
 library acquired to make it possible.
 
-The example lives at `examples/iris_classifier/`. The library tools it
+The example lives at `examples/iris_classifier.cpp`. The library tools it
 relies on are:
 
 - `Matrix::selectColumns(indices)` — slice a matrix by column indices.

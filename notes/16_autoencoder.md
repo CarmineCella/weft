@@ -1,4 +1,4 @@
-# 13 — Autoencoders
+# 16 — Autoencoders
 
 Everything so far has been *supervised*: we hand the network an input
 and a label, and it learns the mapping. An autoencoder throws the
@@ -9,7 +9,7 @@ bottleneck, the network has to discover the underlying structure of
 the data and encode it compactly. That's representation learning, and
 it's the doorway to generative models.
 
-This note covers the two small primitives the autoencoder needs (MSE
+This chapter covers the two small primitives the autoencoder needs (MSE
 loss and the Sigmoid activation), the autoencoder itself, and the
 demo: reconstructing MNIST digits and morphing one digit into another
 through the latent space. The demos are written out as BMP images via
@@ -209,7 +209,7 @@ with no real image behind it, you'll often land in one of the voids
 and the decoder produces garbage. The space is good for reconstructing
 and interpolating known points, not for sampling fresh ones.
 
-The **variational autoencoder** (next note) fixes this by forcing the
+The **variational autoencoder** (next chapter) fixes this by forcing the
 latent space into a known, gap-free shape — a unit Gaussian — so that
 *any* sample from that distribution decodes to something plausible.
 That requires two new ideas: encoding a distribution instead of a

@@ -1,10 +1,10 @@
-# 15 — Visualising weights
+# 18 — Visualising weights
 
 So far we've judged networks by their outputs — accuracy, reconstructions,
 samples. But we can also look directly at what a network *learned* by
 rendering its weights as images. For the first layer of an MNIST model this
 is especially vivid, and it needs nothing we haven't already built: the
-`Bmp.h` writer from note 13 does all the work.
+`Bmp.h` writer from chapter 16 does all the work.
 
 ## 1. Weights are images
 

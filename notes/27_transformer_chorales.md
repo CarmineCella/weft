@@ -1,4 +1,4 @@
-# 24 — A transformer that writes chorales
+# 27 — A transformer that writes chorales
 
 The examples in this book so far have done things classical signal
 processing already does. Phase vocoders cross-synthesised timbres in
@@ -7,7 +7,7 @@ melodies since the 1950s. If a neural-network book stops at examples
 that match those old baselines, the reader is entitled to ask why we
 bothered with all the gradient bookkeeping.
 
-This note is the answer for the attention chapters. The task is
+This chapter is the answer for the attention chapters. The task is
 **generation of four-voice chorales in the style of Bach**, and the
 reason it matters is that **Markov chains genuinely cannot do this.**
 A first-order Markov over one voice produces a plausible melody.
@@ -28,18 +28,18 @@ Coconet is masked-orderless; we'll do the simpler one) — but the
 core demonstration is the same.
 
 
-## 1. What this note adds
+## 1. What this chapter adds
 
-Notes 22 and 23 built `MultiHeadAttention`, `SinusoidalPositionalEncoding`,
+Chapters 25 and 26 built `MultiHeadAttention`, `SinusoidalPositionalEncoding`,
 `LayerNorm` and `TransformerEncoderBlock`. With the causal mask of
-note 22 switched on (`set_causal(true)` on every block), a stack of
+chapter 25 switched on (`set_causal(true)` on every block), a stack of
 those blocks is already the engine of a generator: each position sees
 only the positions before it, so the model can be trained to predict
 the next token and then run one token at a time. Two things are still
 missing, and neither is about attention.
 
 **Tokens in.** A language model takes integer token IDs, not vectors.
-`Embedding<T>`, the lookup table we met in note 21 with twelve
+`Embedding<T>`, the lookup table we met in chapter 24 with twelve
 instruments, does the conversion; here its vocabulary is the 134
 tokens defined below. It holds a `(d_model × vocab_size)` parameter
 matrix `W`; forward returns, column by column, the vectors of the
@@ -308,7 +308,7 @@ nothing but the layers built in this book, running on a laptop CPU
 for eight minutes, a network learns a joint, structured property of
 four-voice music from examples alone.
 
-The next note takes the same model from symbols to sound. Its tokens
+The next chapter takes the same model from symbols to sound. Its tokens
 are no longer notes but the atoms of a matching-pursuit decomposition
 [@mallat1993mp] of recorded audio, so that what the transformer
 writes can be heard directly.

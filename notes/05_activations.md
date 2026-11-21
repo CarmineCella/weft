@@ -1,7 +1,7 @@
-# 03 — Non-linearities (ReLU and Softmax)
+# 5 — Non-linearities (ReLU and Softmax)
 
 A network of `Dense` layers alone can only learn *linear* functions, no
-matter how deep it is. This note explains why, then builds and explains the
+matter how deep it is. This chapter explains why, then builds and explains the
 two activations we need for our first classifier: `ReLU` for hidden layers
 and `Softmax` for the output of a multi-class classifier.
 
@@ -194,7 +194,7 @@ and you're left with:
 
 That is dramatically simpler than (and numerically better-behaved than)
 chaining the standalone Softmax backward with a standalone cross-entropy
-backward. The next note covers this and the Loss class will use the
+backward. The next chapter covers this and the Loss class will use the
 shortcut.
 
 The standalone Softmax backward we just implemented is still correct on
@@ -226,7 +226,7 @@ enough.
 
 We have everything for the forward pass of a real classifier: `Dense →
 ReLU → Dense → Softmax`. To train it, we need a loss function. The next
-note covers **cross-entropy** and the Softmax+CE combined gradient
+chapter covers **cross-entropy** and the Softmax+CE combined gradient
 shortcut, after which we have all the pieces for the first end-to-end
 network on IRIS.
 

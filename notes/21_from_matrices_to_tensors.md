@@ -1,6 +1,6 @@
-# 18 — From matrices to tensors
+# 21 — From matrices to tensors
 
-For seventeen notes we have used a single data structure, `Matrix`, for
+For twenty chapters we have used a single data structure, `Matrix`, for
 all of the numerical work in this library. The MLPs, the autoencoders,
 the variational autoencoders — every layer in every network has taken
 a matrix in and produced a matrix out. That has been sufficient because
@@ -17,7 +17,7 @@ feature maps deeper in a network. So the natural shape is
 **four-dimensional**: batch × channels × height × width. We need a
 data structure that holds that shape.
 
-This note is about what such a data structure is, what layout we chose
+This chapter is about what such a data structure is, what layout we chose
 for it, and — because it is a question worth being honest about — why
 we built `Tensor4D` as its own class rather than generalising `Matrix`
 to N dimensions.
@@ -43,7 +43,7 @@ So `Matrix` is mathematically a 2-tensor with shape `(rows, cols)`,
 and our new `Tensor4D` is a 4-tensor with shape `(N, C, H, W)`. The
 natural question follows immediately: if `Matrix` is a special case of
 tensor, why do we have two classes? Couldn't a single unified `Tensor`
-cover both? That is the design question this note is really about,
+cover both? That is the design question this chapter is really about,
 and the answer is a real tradeoff rather than an obvious one. We come
 back to it after settling the layout choice.
 
@@ -145,7 +145,7 @@ what the library is for.
       dW = dZ * X.transpose() / N
 
   in our `Dense` layer, the code reads literally like the
-  matrix-form backprop equations from note 02. No `.view()`, no
+  matrix-form backprop equations from chapter 3. No `.view()`, no
   `.contract(...)`, no axis names. The math and the code are the same
   string of symbols. In a unified Tensor every operation must specify
   which axes are involved, which moves the code one step away from
@@ -218,7 +218,7 @@ thing to say in a book: the design *is* a design, with reasons.
 What comes next is the layer that finally uses the Tensor4D — `Conv2D`,
 which turns a `Tensor4D(N, in_C, H, W)` into a
 `Tensor4D(N, out_C, H', W')` via the im2col-and-matmul approach. That
-is the next note, and where the shape we just chose pays off in code.
+is the next chapter, and where the shape we just chose pays off in code.
 
 
 ## Further reading

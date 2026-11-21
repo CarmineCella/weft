@@ -1,4 +1,4 @@
-# 0b — Why C++?
+# 1 — Why C++?
 
 If you have any background in modern machine learning, the obvious
 question on opening this book is: PyTorch exists, NumPy exists, the whole
@@ -223,4 +223,4 @@ PyTorch [@paszke2019pytorch] and NumPy [@harris2020numpy] are the tools
 this book deliberately does not use. What a framework's automatic
 differentiation does behind `loss.backward()` is surveyed in
 [@baydin2018autodiff]. For a broad textbook treatment of everything the
-following notes build by hand, see [@goodfellow2016deep].
+following chapters build by hand, see [@goodfellow2016deep].

@@ -1,4 +1,4 @@
-# 17 — Making training practical
+# 20 — Making training practical
 
 Up to the audio VAE we never had to think about speed. IRIS trains in a
 blink; the MNIST classifier in a minute or two. You could change a
@@ -83,7 +83,7 @@ This one isn't about speed; it's about not losing work. A long training
 run that only saves at the very end is fragile — a crash, a closed laptop,
 or a `Ctrl-C` at minute 90 throws everything away. So `train_audio_vae`
 **checkpoints**: every few epochs it writes the current encoder and
-decoder to the same `<prefix>.enc`/`.dec` files (serialization, note 16,
+decoder to the same `<prefix>.enc`/`.dec` files (serialization, chapter 19,
 makes this a one-liner). Kill the run whenever you like and the latest
 weights are already on disk. It also lets you *listen* to an intermediate
 model — load the epoch-10 checkpoint in `vae_remap`, decide whether more

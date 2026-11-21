@@ -1,9 +1,9 @@
-# 14 — Variational autoencoders
+# 17 — Variational autoencoders
 
 The plain autoencoder learned to compress and reconstruct, and its
 latent space was continuous enough that interpolating between two
 *real* encoded points produced sensible blends. But it had a flaw we
-flagged at the end of note 13: nothing forced the latent space into
+flagged at the end of chapter 16: nothing forced the latent space into
 any particular shape. The encoder scattered codes wherever was
 convenient, leaving voids between the clusters. Interpolating between
 known points works because the path stays near the data, but *sample*
@@ -161,7 +161,7 @@ specific handwritten digit — every slant, stroke width, and loop — so
 60,000 varied images through a 2-float bottleneck simply doesn't have
 the capacity, and you see it directly: a 2D run lands around 0.20 RMS
 error per pixel, versus ~0.07 for the 16-dimensional plain autoencoder
-in note 13.
+in chapter 16.
 
 So the example defaults to **LATENT = 16** for genuinely sharp
 reconstructions and varied samples, and you set it back to 2 when you
@@ -224,4 +224,4 @@ plumbing — STFT/iSTFT with overlap-add — not the model, which is done.
 
 The variational autoencoder and the reparameterisation trick are
 [@kingma2014vae]. The effect of weighting the KL term, the `beta` of
-this note, is studied in [@higgins2017betavae].
+this chapter, is studied in [@higgins2017betavae].

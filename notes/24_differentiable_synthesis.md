@@ -1,7 +1,7 @@
-# 21 — Differentiable synthesis: a network that plays a synthesiser
+# 24 — Differentiable synthesis: a network that plays a synthesiser
 
-The audio VAEs of notes [16](16_audio_vae.md) and
-[20](20_convvae.md) work, in the sense that they train, their latent
+The audio VAEs of chapters [19](19_audio_vae.md) and
+[23](23_convvae.md) work, in the sense that they train, their latent
 spaces are smooth, and the three applications run. But listen to the
 results next to the recordings they came from and the verdict is
 plain: they sound poor. The reason is not a bug and more epochs would
@@ -13,7 +13,7 @@ peaks into a haze; the magnitudes are paired with the phases of a
 different sound; and in the convolutional model 64 mel bands are
 stretched back to 2049 bins.
 
-This note takes a different route to the same goal. Instead of asking
+This chapter takes a different route to the same goal. Instead of asking
 the network for sound, we ask it for the *controls* of a synthesiser
 that can only make plausible sounds in the first place. The
 synthesiser is classical signal processing: a bank of sinusoids at
@@ -27,7 +27,7 @@ The idea is known as differentiable digital signal processing, or
 DDSP [@engel2020ddsp], and the synthesiser inside it is much older:
 it is the harmonic-plus-noise model of spectral modelling synthesis
 [@serra1990sms]. That is the
-point of this note. It is the place where the neural networks we have
+point of this chapter. It is the place where the neural networks we have
 been building meet the signal processing that audio people already
 know, and each does the part it is good at.
 
@@ -386,13 +386,13 @@ The limits of the approach are built into the synthesiser:
 
 What we have is not a new kind of sound. It is a connection: the
 synthesiser is the one signal processing has used for decades, the
-training loop is the one we have used since note 06, and the only new idea is that
+training loop is the one we have used since chapter 9, and the only new idea is that
 the first can be placed inside the second. The network supplies what
 the classical method lacks, a mapping from musical intentions to
 synthesis parameters, and the synthesiser supplies what the network
 lacks, a guarantee that whatever comes out is a sound.
 
-The next notes return to architecture. Everything so far has
+The next chapters return to architecture. Everything so far has
 processed one frame, one patch or one image at a time. Attention is
 how a network relates the elements of a *sequence* to one another,
 and it is what the generative models at the end of the book are built
@@ -407,5 +407,5 @@ note follows its design closely. The synthesiser itself is the
 deterministic-plus-stochastic model of [@serra1990sms], which builds on
 the sinusoidal model of [@mcaulay1986sinusoidal] and, further back, on
 the phase vocoder [@flanagan1966phase]. A general-purpose pitch
-tracker, which this note avoids needing, is [@decheveigne2002yin]. The
+tracker, which this chapter avoids needing, is [@decheveigne2002yin]. The
 samples are those of [@cella2020orchidea].

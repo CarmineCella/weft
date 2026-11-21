@@ -1,8 +1,8 @@
-# 03b — The Jacobian (the unifying object behind every backward pass)
+# 6 — The Jacobian (the unifying object behind every backward pass)
 
-`02_backprop.md` derived `Dense::backward` from a perturbation argument on a
-single weight. `03_activations.md` built ReLU and Softmax and derived their
-backward formulas. This note steps back and shows that *every* backward pass
+`03_backprop.md` derived `Dense::backward` from a perturbation argument on a
+single weight. `05_activations.md` built ReLU and Softmax and derived their
+backward formulas. This chapter steps back and shows that *every* backward pass
 we've written — and every one we'll write — is the same operation:
 
 > **Backward = multiply the upstream gradient by the transposed Jacobian of
@@ -62,7 +62,7 @@ f(x + ε)  ≈  f(x)  +  J · ε
 
 This is the multi-variable generalisation of `f(x + ε) ≈ f(x) + f'(x)·ε`.
 It's exactly the perturbation intuition we used to derive Dense's backward
-pass in `02b_one_weight.md` — but stated for vectors. The Jacobian answers
+pass in `04_one_weight.md` — but stated for vectors. The Jacobian answers
 "how does the output respond when an input is nudged?" all at once, for
 every (input, output) pair.
 
@@ -110,7 +110,7 @@ dX = Wᵀ · dY     i.e.    dX = Jᵀ · dY
 ```
 
 The `Wᵀ` that appears in `Dense::backward` is just `Jᵀ` for this particular
-Jacobian. The "transpose symmetry" of `02_backprop.md` is the general `Jᵀ`
+Jacobian. The "transpose symmetry" of `03_backprop.md` is the general `Jᵀ`
 rule, specialised to the linear case.
 
 ### ReLU: J is diagonal

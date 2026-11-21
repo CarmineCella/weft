@@ -1,6 +1,6 @@
-# 04 — Cross-entropy loss (and the Softmax+CE shortcut)
+# 7 — Cross-entropy loss (and the Softmax+CE shortcut)
 
-This note covers the loss function we'll use for every classifier in weft.
+This chapter covers the loss function we'll use for every classifier in weft.
 It also derives the famous Softmax + cross-entropy "shortcut" — the result
 that the combined gradient with respect to the logits is simply `S − T`
 (divided by batch size). That identity is the reason almost all classifier
@@ -76,7 +76,7 @@ Averaging (rather than summing) makes the loss magnitude independent of
 batch size, so learning rates don't need to be rescaled when you change
 the batch.
 
-By the convention we established in `02_backprop.md`, the `1/N` factor
+By the convention we established in `03_backprop.md`, the `1/N` factor
 lives **inside the gradient returned by the loss class**, not inside the
 backward formulas of layers below it. This keeps layer code simple — they
 never see batch-size arithmetic.
@@ -100,7 +100,7 @@ expression is correct, but it's brittle in float arithmetic.
 
 ## 5. The Softmax + CE shortcut (the beautiful part)
 
-The Softmax Jacobian (from `03b_jacobian.md`) is
+The Softmax Jacobian (from `06_jacobian.md`) is
 `∂Sᵢ/∂Zⱼ = Sᵢ(δᵢⱼ − Sⱼ)`. Chain it with the CE gradient:
 
 ```
@@ -140,7 +140,7 @@ operation internally.
 
 For pedagogy, we keep `Softmax` and `CrossEntropy` as separate classes,
 each with its own `backward`. The standalone formulas are correct and
-match the math we derived in `03_activations.md`. The composition
+match the math we derived in `05_activations.md`. The composition
 `Softmax.backward(CE.backward())` is exactly `(S − T)/N` — that is the
 identity our test 4 verifies numerically. For IRIS-scale problems the
 numerical fragility of the standalone form never manifests. When we

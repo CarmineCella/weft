@@ -1,6 +1,6 @@
-# 23 — Positional encoding, LayerNorm, and the transformer block
+# 26 — Positional encoding, LayerNorm, and the transformer block
 
-[Note 22](22_attention.md) built attention as a pure operator on
+[Chapter 25](25_attention.md) built attention as a pure operator on
 `(Q, K, V)` and wrapped it in `MultiHeadAttention` with learnable
 projections. By itself attention can't quite stand alone yet: it has
 no notion of *where* a token sits in the sequence, no normalisation
@@ -8,7 +8,7 @@ to keep activations in a workable range across many layers, and no
 internal feed-forward to give each position its own learned
 transformation in between attention passes.
 
-This note adds the three remaining pieces and assembles them into a
+This chapter adds the three remaining pieces and assembles them into a
 **transformer encoder block** — the basic repeating unit of a
 transformer. None of the three ideas is deep, but skipping any one of
 them in a real transformer training run produces something that
@@ -206,7 +206,7 @@ difference's own truncation error, not of a wrong gradient, so the
 block's test uses a step of `1e-6`.
 
 **A causal block.** `set_causal(true)` on the block switches its
-attention sub-layer to the causal mask of note 22. Nothing else has to
+attention sub-layer to the causal mask of chapter 25. Nothing else has to
 change, because LayerNorm, the feed-forward sub-stack and the
 residuals all act on one token at a time and cannot carry information
 from a later position to an earlier one. A stack of causal blocks is
@@ -232,7 +232,7 @@ Counting the moving parts of one encoder block at `d_model = 512`,
   = `2048*512 + 2048 + 512*2048 + 512` = 2,099,712 parameters
 - **Total per block: ~3.15 million parameters**
 
-For comparison, our ConvVAE for audio (note 20) had ~2 million total
+For comparison, our ConvVAE for audio (chapter 23) had ~2 million total
 across the whole encoder + decoder. A single encoder block at typical
 transformer sizes already outweighs the entire ConvVAE. This is the
 order-of-magnitude scaling that defines modern deep learning: not
@@ -252,9 +252,9 @@ The full encoder–decoder transformer of the original paper adds
 *cross-attention*, where the decoder queries the encoder output. We
 don't build it: it is the same operator with `Q` taken from one
 source and `K, V` from another, and the generative models in the next
-notes are decoder-only, which need only the causal block above.
+chapters are decoder-only, which need only the causal block above.
 
-Note 24 puts the pieces to work. It adds a token embedding, stacks
+Chapter 27 puts the pieces to work. It adds a token embedding, stacks
 causal blocks into an autoregressive model, and trains it on four-voice
 chorales, so that sampling from it one token at a time writes new
 ones.

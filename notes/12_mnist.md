@@ -1,4 +1,4 @@
-# 09 — MNIST classifier
+# 12 — MNIST classifier
 
 MNIST is the canonical "is your neural network actually working" test —
 60,000 training and 10,000 test images of 28×28-pixel handwritten digits,
@@ -161,8 +161,8 @@ Then from `build/`:
 
 ```
 make
-./bin/examples/mnist_classifier              # uses ../data/mnist
-./bin/examples/mnist_classifier /some/path   # or pass a path
+./examples/mnist_classifier              # uses ../data/mnist
+./examples/mnist_classifier /some/path   # or pass a path
 ```
 
 Expected output: ~97% test accuracy after ten epochs, in a few minutes

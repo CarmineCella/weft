@@ -144,8 +144,33 @@ def strip_heading_prefix(line):
     return line
 
 
+# A link to another chapter's source file, e.g. [chapter 19](19_audio_vae.md)
+# or just [19](19_audio_vae.md).  In the book the number must come from
+# LaTeX, so that it is right whatever the chapter order: the digits in
+# the link text are replaced by \ref{ch:19_audio_vae} and the link itself
+# is dropped (a .md file is not a valid target inside a PDF).
+_CHAPTER_LINK = re.compile(r"\[([^\]\n]*?)\]\((?:notes/)?(\d+\w*_[a-z0-9_]+)\.md\)")
+
+
+def chapter_links(text):
+    def fix(m):
+        label, target = m.group(1), m.group(2)
+        ref = "\\ref{ch:" + target + "}"
+        if re.search(r"\d+", label):
+            # "chapter 19" -> "chapter~\ref{...}", "19" -> "\ref{...}"
+            out = re.sub(r"\s*\d+\w*", lambda k: ("\u00a0" if k.group(0)[0].isspace() else "") + "@@REF@@",
+                         label, count=1)
+            return out.replace("@@REF@@", ref)
+        return label + " (chapter\u00a0" + ref + ")"
+    return _CHAPTER_LINK.sub(fix, text)
+
+
 def main():
     src = sys.stdin.read()
+    # Optional argument: this chapter's file stem, used as its label so
+    # that other chapters can refer to it by number.
+    stem = sys.argv[1] if len(sys.argv) > 1 else None
+    labelled = False
     parts = re.split(
         r"(```.*?```|`[^`\n]+`|\$\$.*?\$\$|\$[^$\n]+\$)",
         src, flags=re.DOTALL)
@@ -154,7 +179,14 @@ def main():
         if i % 2 == 0:
             lines = part.splitlines(keepends=True)
             lines = [strip_heading_prefix(ln) for ln in lines]
+            if stem and not labelled:
+                for k, ln in enumerate(lines):
+                    if ln.startswith("# "):
+                        lines[k] = ln.rstrip("\n") + " {#ch:" + stem + "}\n"
+                        labelled = True
+                        break
             part = "".join(lines)
+            part = chapter_links(part)
             part = replace_prose(part)
         else:
             part = replace_code(part)

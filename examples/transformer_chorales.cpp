@@ -2,7 +2,7 @@
 //
 // Train an autoregressive transformer on a corpus of four-voice MIDI
 // chorales, then sample new chorales from the model.  This is the
-// payoff for the attention machinery built in notes 22-23: a generator
+// payoff for the attention machinery built in chapters 25-26: a generator
 // that does something a Markov chain genuinely cannot, because the
 // constraint we're modelling -- correct voice leading across four
 // simultaneous voices -- is joint over the whole vocal texture, not

@@ -1,8 +1,8 @@
-# 07 — Optimizers (SGD and Adam)
+# 10 — Optimizers (SGD and Adam)
 
 So far every layer's update method has been plain stochastic gradient
 descent baked into the layer itself. Adam (and friends) need
-per-parameter state, so we need a cleaner separation. This note covers
+per-parameter state, so we need a cleaner separation. This chapter covers
 the refactor, the two ideas behind Adam, and why it usually wins.
 
 ---

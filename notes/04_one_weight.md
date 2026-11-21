@@ -1,7 +1,7 @@
-# 02b — One weight, one step (SGD by hand)
+# 4 — One weight, one step (SGD by hand)
 
-The main backprop note (`02_backprop.md`) derives the matrix formulas for
-`Dense::backward`. This note walks through the *same arithmetic* on a single
+The main backprop chapter ([chapter 3](03_backprop.md)) derives the matrix formulas for
+`Dense::backward`. This chapter walks through the *same arithmetic* on a single
 neuron with a single weight, by hand, with concrete numbers. The point is to
 see exactly what the matrix formulas are mass-producing.
 
@@ -205,7 +205,7 @@ we ignore it. Stack two `Dense` layers and `dX` from the second becomes
 the `dZ` going into the first.
 
 Every matrix line in `Dense::backward` is producing the per-weight
-arithmetic from this note — one for every weight in `W`, summed across
+arithmetic from this chapter — one for every weight in `W`, summed across
 every example in the batch. The math doesn't get fancier when you go from
 one weight to a million; only the bookkeeping does, and that's what
 matrices are for.
@@ -215,12 +215,12 @@ matrices are for.
 ## See it run
 
 `backprop_example/backprop_example.cpp` runs this exact calculation twice
-— once with raw scalars (mirroring this note line by line), once with
+— once with raw scalars (mirroring this chapter line by line), once with
 `weft::Dense` — and prints both sets of numbers so you can verify they
 match.
 
-Build it from the project root with `make -C build` and run
-`./build/bin/examples/backprop_example`.
+Build it with `make` in the `build/` directory and run
+`./examples/backprop_example` from there.
 
 
 ## Further reading

@@ -1,7 +1,7 @@
-# 05 — Network: layers composed
+# 8 — Network: layers composed
 
 By now, all the math in weft lives inside the individual layer and loss
-classes — `Dense`, `ReLU`, `Softmax`, `CrossEntropy`. This note covers the
+classes — `Dense`, `ReLU`, `Softmax`, `CrossEntropy`. This chapter covers the
 small class that composes them into a trainable model.
 
 `Network` is the simplest class in the library, and it should be — its job
@@ -39,8 +39,8 @@ The chain rule for composed functions is:
 (f_N ∘ … ∘ f_1)'(X)  =  J_N  ·  J_{N-1}  ·  …  ·  J_1
 ```
 
-where `J_k` is the Jacobian of layer `k`. From the `Jᵀ · dY` view in note
-`03b_jacobian.md`, computing `∂L/∂X` from `∂L/∂Y` means *transposing* this
+where `J_k` is the Jacobian of layer `k`. From the `Jᵀ · dY` view in
+[chapter 6](06_jacobian.md), computing `∂L/∂X` from `∂L/∂Y` means *transposing* this
 product and applying it to the upstream gradient — which is exactly
 multiplying by `J_1ᵀ`, then by `J_2ᵀ`, … , then by `J_Nᵀ`. So we walk the
 list in reverse:
@@ -181,7 +181,7 @@ We have every piece needed for a real classifier:
 
 The next step is the IRIS dataset: load it, normalise the features, split
 into train/test, write a training loop, watch the loss curve, report
-accuracy. That goes in `examples/iris_classifier/`.
+accuracy. That goes in `examples/iris_classifier.cpp`.
 
 After IRIS we'll also start collecting the roadmap items the project will
 need as it scales:

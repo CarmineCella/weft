@@ -1,7 +1,7 @@
 // cifar_conv.cpp
 //
 // CIFAR-10 conv classifier.  The first real test that all the conv work
-// from notes 18-19 actually trains on natural images.
+// from chapters 21-22 actually trains on natural images.
 //
 // Architecture (AlexNet-shape, just much smaller):
 //

@@ -20,10 +20,10 @@ because some chapter of the book explains why.
 There are no external dependencies beyond the C++ standard library. No
 PyTorch, no NumPy, no BLAS by default. Matrix multiply, backpropagation, the
 FFT, convolution, attention — every algorithm is implemented from first
-principles and explained in the notes.
+principles and explained in the book.
 
 For why this is written in C++ rather than Python with PyTorch, see
-[note 0b](notes/0b_why_cpp.md).
+[chapter 1](notes/01_why_cpp.md).
 
 ## Principles
 
@@ -49,7 +49,7 @@ For why this is written in C++ rather than Python with PyTorch, see
   (batch × channels × height × width), matching PyTorch and cuDNN.
   Conversion between 2-D and 4-D is via an explicit `flatten` free
   function — the design choice is discussed in
-  [note 18](notes/18_from_matrices_to_tensors.md).
+  [chapter 21](notes/21_from_matrices_to_tensors.md).
 
 ## Build and run
 
@@ -75,7 +75,7 @@ Tests and examples are both auto-discovered from their folders: drop a
       tests/      *.cpp      one executable per .cpp file
       examples/   *.cpp      one executable per .cpp file
       notes/      *.md       the book's chapters live here
-      book/                  LaTeX build of the notes into one PDF
+      book/                  LaTeX build of the chapters into one PDF
       build/      Makefile   (you run make from here)
                   tests/     test binaries land here
                   examples/  example binaries land here
@@ -86,25 +86,26 @@ The library is built in the order the book teaches it. Each milestone
 produces both classification and generative applications; audio and music
 are the binding domain.
 
-| Stage | Material | Notes |
+| Stage | Material | Chapters |
 |---|---|---|
-| Why C++ | The language choice, up front and honestly. | 0b |
-| Foundations | Matrix algebra, backpropagation, layers and activations, losses, the network class, optimizers, dropout. | 01–08 |
-| MLP applications | Iris classifier; FFT and audio features; MNIST classifier; orchestral-instrument sound classifier. | 06, 09, 10, 11, 12 |
-| Autoencoders | MNIST autoencoder, weight visualization, dense variational autoencoder. | 13, 14, 15 |
-| Audio VAE | Spectrogram VAE for timbre interpolation, generation, and remap on real instrument samples. | 16 |
-| Performance | `std::thread`-parallelised matmul and the optional BLAS path. | 17 |
-| Convolutional networks | Tensors, Conv2D via im2col, max-pooling, the CIFAR-10 conv classifier. | 18, 19 |
-| Convolutional VAE | Conv-based VAE for audio spectrograms; sharper morphs and interpolations than the dense one. | 20 |
-| Differentiable synthesis | A harmonic-plus-noise synthesiser with hand-written gradients, a spectral loss, and a network that plays it: timbre transfer, instrument morphing, notes that were never recorded. | 21 |
-| Attention | Multi-head self-attention with a causal mask, positional encoding, layer norm, the transformer block. | 22, 23 |
-| Transformer chorales | An autoregressive transformer trained on four-voice Bach chorales, measured against a Markov baseline. | 24 |
+| Why C++ | The language choice, up front and honestly. | 1 |
+| Foundations | Matrix algebra, backpropagation, one weight by hand, activations, the Jacobian, cross-entropy, the network class. | 2–8 |
+| First classifiers | Iris; optimizers; dropout; MNIST. | 9–12 |
+| Audio | The FFT, audio features, an orchestral-instrument classifier. | 13–15 |
+| Autoencoders | MNIST autoencoder, variational autoencoder, weight visualization, the audio VAE. | 16–19 |
+| Performance | `std::thread`-parallelised matmul and the optional BLAS path. | 20 |
+| Convolution | Tensors, Conv2D via im2col, max-pooling, the CIFAR-10 classifier, a convolutional VAE for audio. | 21–23 |
+| Differentiable synthesis | A harmonic-plus-noise synthesiser with hand-written gradients, a spectral loss, and a network that plays it: timbre transfer, instrument morphing, notes that were never recorded. | 24 |
+| Attention | Multi-head self-attention with a causal mask, positional encoding, layer norm, the transformer block. | 25, 26 |
+| Transformer chorales | An autoregressive transformer trained on four-voice Bach chorales, measured against a Markov baseline. | 27 |
+
+Each chapter is one Markdown file in `notes/`, numbered as in the book.
 
 ## Status
 
-- **Done:** notes 0b – 24 and the corresponding code. These are the
+- **Done:** chapters 1 – 27 and the corresponding code. These are the
   chapters of the book (`book/`, built with `make book`).
-- **Not written:** the matching-pursuit capstone and the closing note on
+- **Not written:** the matching-pursuit capstone and the closing chapter on
   architectures we don't cover (RNNs, GANs, diffusion, reinforcement
   learning).
 
@@ -120,6 +121,6 @@ Two performance levers are built in:
   OpenBLAS (elsewhere). Off by default so the std-lib-only promise holds
   for anyone who doesn't ask for it.
 
-See [note 17](notes/17_performance.md) for the full story, including how
+See [chapter 20](notes/20_performance.md) for the full story, including how
 profiling led to each choice and why GPU support is deliberately not on
 the roadmap.
