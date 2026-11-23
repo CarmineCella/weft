@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a concluding chapter linking the representations, measured
+  results, listening examples, and three follow-up experiments.
 - Reran MNIST with three declared seeds, the dense audio VAE, and the
   synthesis-control network using the v0.2.0 C++ sources. Recorded
   data hashes, complete file splits, commands, raw logs, and measurements.

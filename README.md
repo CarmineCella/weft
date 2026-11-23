@@ -28,6 +28,9 @@ dense audio VAE, and differentiable-synthesis experiments have a
 [fixed reproduction protocol](book/experiments/README.md), recorded
 commands, file hashes, logs, and results.
 
+The [concluding chapter](notes/30_conclusions.md) brings together the
+representation choices, experimental limits, and possible next projects.
+
 The matrix product, backpropagation, the FFT, convolution and attention
 are implemented in the library and explained in the book. PyTorch,
 NumPy and BLAS are not used by the default build.
@@ -181,6 +184,7 @@ Markdown file in `notes/`, with the same number as in the book.
 | Sound and autoencoders | The FFT; audio features; an instrument classifier; autoencoder; variational autoencoder; weight visualisation; the audio VAE. | 13–19 |
 | Convolution | A threaded matrix product and the optional BLAS path; tensors; Conv2D by im2col, max-pooling and a CIFAR-10 classifier; a convolutional VAE for audio. | 20–23 |
 | Synthesis and sequence models | A network that controls a harmonic-plus-noise synthesiser; attention; the transformer block; a transformer trained on Bach chorales; matching pursuit; a transformer trained on matching-pursuit atoms. | 24–29 |
+| Conclusions | Choosing representations, interpreting results, and extending the experiments. | 30 |
 
 Recurrent networks, GANs, diffusion models and reinforcement learning
 are not covered.
